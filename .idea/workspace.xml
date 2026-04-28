@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="1c44f20e-6cbe-47e2-ac2e-0fe86a2e6375" name="Changes" comment="" />
+    <list default="true" id="1c44f20e-6cbe-47e2-ac2e-0fe86a2e6375" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -10,12 +12,27 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "amingharbaoui"
+  }
+}]]></component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/amingharbaoui/programming_project_group_1.git",
+    "accountId": "eefdf843-d43a-420f-89ac-8d769668d322"
+  }
+}]]></component>
   <component name="ProjectColorInfo"><![CDATA[{
   "customColor": "2b352aff",
   "associatedIndex": 3,
   "fromUser": true
 }]]></component>
   <component name="ProjectId" id="3CzAHK7lg9LQpvyhi4yTuMyqk7c" />
+  <component name="ProjectLevelVcsManager">
+    <ConfirmationsSetting value="1" id="Add" />
+  </component>
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
@@ -27,7 +44,7 @@
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
-    "git-widget-placeholder": "main",
+    "git-widget-placeholder": "amin",
     "kotlin-language-version-configured": "true",
     "last_opened_file_path": "C:/Users/Amin/Documents/programming_project_group_1",
     "vue.rearranger.settings.migration": "true"
@@ -40,7 +57,7 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1777377936190</updated>
-      <workItem from="1777377937930" duration="330000" />
+      <workItem from="1777377937930" duration="2843000" />
     </task>
     <servers />
   </component>
