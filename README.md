@@ -1,7 +1,17 @@
-# Ontwikkeling van een Stage Monitoring Tool
+## Projectomschrijving
+Deze applicatie ondersteunt het volledige stageproces van studenten binnen EhB, van aanvraag tot evaluatie.
 
-Een digitale tool die het volledige stageproces van aanvraag tot eindevaluatie end-to-end ondersteunt voor studenten, docenten, de stagecommissie en bedrijven.
+## Functionaliteiten
+- Stagevoorstel indienen
+- Goedkeuring door stagecommissie
+- Stageovereenkomst uploaden
+- Wekelijkse logboeken
+- Evaluaties en feedback
+- Eindoverzicht per student
 
+## Structuur
+- /code → broncode
+- /docs → documentatie
 
 ## Authors
 

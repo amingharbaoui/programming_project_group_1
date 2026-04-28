@@ -1,0 +1,34 @@
+Index: README.md
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+># Ontwikkeling van een Stage Monitoring Tool\r\n\r\nEen digitale tool die het volledige stageproces van aanvraag tot eindevaluatie end-to-end ondersteunt voor studenten, docenten, de stagecommissie en bedrijven.\r\n\r\n\r\n## Authors\r\n\r\n- [@amingharbaoui](https://www.github.com/amingharbaoui)\r\n- [@imrane](https://www.github.com/imrane-bekkaoui)\r\n- [@david](https://www.github.com/davidvuy)\r\n- [@mohamad](https://www.github.com/mohamad-azhar)\r\n- [@nathan](https://www.github.com/Ehbnathanmadimba)
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/README.md b/README.md
+--- a/README.md	(revision 3fe2ec44d83f52450c0efc71cd9866c1227bef68)
++++ b/README.md	(date 1777384076592)
+@@ -1,7 +1,17 @@
+-# Ontwikkeling van een Stage Monitoring Tool
++## Projectomschrijving
++Deze applicatie ondersteunt het volledige stageproces van studenten binnen EhB, van aanvraag tot evaluatie.
+ 
+-Een digitale tool die het volledige stageproces van aanvraag tot eindevaluatie end-to-end ondersteunt voor studenten, docenten, de stagecommissie en bedrijven.
++## Functionaliteiten
++- Stagevoorstel indienen
++- Goedkeuring door stagecommissie
++- Stageovereenkomst uploaden
++- Wekelijkse logboeken
++- Evaluaties en feedback
++- Eindoverzicht per student
+ 
++## Structuur
++- /code → broncode
++- /docs → documentatie
+ 
+ ## Authors
+ 
+diff --git a/docs/.gitkeep b/docs/.gitkeep
+new file mode 100644
+diff --git a/code/.gitkeep b/code/.gitkeep
+new file mode 100644
