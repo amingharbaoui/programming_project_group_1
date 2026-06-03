@@ -1,19 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="1c44f20e-6cbe-47e2-ac2e-0fe86a2e6375" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/stage_monitoring_tool/backend/src/main.js" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/stage_monitoring_tool/frontend/src/style.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/stage_monitoring_tool/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/stage_monitoring_tool/frontend/src/index.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/stage_monitoring_tool/public/favicon.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/stage_monitoring_tool/public/icons.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/stage_monitoring_tool/src/assets/hero.png" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/stage_monitoring_tool/src/assets/javascript.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/stage_monitoring_tool/src/assets/vite.svg" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/stage_monitoring_tool/src/counter.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/stage_monitoring_tool/src/main.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/stage_monitoring_tool/src/style.css" beforeDir="false" />
-    </list>
+    <list default="true" id="1c44f20e-6cbe-47e2-ac2e-0fe86a2e6375" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -117,7 +105,7 @@
       <workItem from="1780490501231" duration="31000" />
       <workItem from="1780490579344" duration="53000" />
       <workItem from="1780491055554" duration="174000" />
-      <workItem from="1780492975084" duration="308000" />
+      <workItem from="1780492975084" duration="2028000" />
     </task>
     <servers />
   </component>
