@@ -10,8 +10,8 @@ Deze applicatie ondersteunt het volledige stageproces van studenten binnen EhB, 
 - Eindoverzicht per student
 
 ## Structuur
-- /code → broncode
-- /docs → documentatie
+- /stageify → app
+- /README.md → documentatie
 
 ## Authors
 
