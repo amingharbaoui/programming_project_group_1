@@ -1,7 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="1c44f20e-6cbe-47e2-ac2e-0fe86a2e6375" name="Changes" comment="" />
+    <list default="true" id="1c44f20e-6cbe-47e2-ac2e-0fe86a2e6375" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/stageify/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/stageify/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/stageify/eslint.config.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/stageify/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/stageify/package-lock.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/stageify/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/stageify/src/App.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/stageify/src/App.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/stageify/src/index.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/stageify/src/main.jsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/stageify/vite.config.js" beforeDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -13,6 +25,8 @@
         <option value="HTML File" />
         <option value="CSS File" />
         <option value="JavaScript File" />
+        <option value="JSX File" />
+        <option value="package.json" />
       </list>
     </option>
   </component>
@@ -64,11 +78,11 @@
 }</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\Amin\Documents\programming_project_group_1\backend" />
       <recent name="C:\Users\Amin\Documents\programming_project_group_1\frontend" />
       <recent name="C:\Users\Amin\Documents\programming_project_group_1" />
       <recent name="C:\Users\Amin\Documents\programming_project_group_1\stage_monitoring_tool\frontend\src" />
       <recent name="C:\Users\Amin\Documents\programming_project_group_1\stage_monitoring_tool\backend\src" />
-      <recent name="C:\Users\Amin\Documents\programming_project_group_1\stage_monitoring_tool\frontend" />
     </key>
   </component>
   <component name="RunManager">
@@ -87,8 +101,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-jdk-30f59d01ecdd-37e91769500f-intellij.indexing.shared.core-IU-261.24374.151" />
-        <option value="bundled-js-predefined-d6986cc7102b-31caf2ab9e3c-JavaScript-IU-261.24374.151" />
+        <option value="bundled-jdk-30f59d01ecdd-37e91769500f-intellij.indexing.shared.core-IU-261.25134.95" />
+        <option value="bundled-js-predefined-d6986cc7102b-31caf2ab9e3c-JavaScript-IU-261.25134.95" />
       </set>
     </attachedChunks>
   </component>
@@ -108,7 +122,11 @@
       <workItem from="1780491055554" duration="174000" />
       <workItem from="1780492975084" duration="308000" />
       <workItem from="1780497680851" duration="1022000" />
-      <workItem from="1780646782536" duration="355000" />
+      <workItem from="1780646782536" duration="3353000" />
+      <workItem from="1780663215350" duration="881000" />
+      <workItem from="1780664506135" duration="296000" />
+      <workItem from="1780668729404" duration="2177000" />
+      <workItem from="1780768547732" duration="5772000" />
     </task>
     <servers />
   </component>
