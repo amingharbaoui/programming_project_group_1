@@ -1,0 +1,27 @@
+Index: frontend/package.json
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>{\r\n  \"name\": \"frontend\",\r\n  \"version\": \"0.0.0\",\r\n  \"private\": true,\r\n  \"type\": \"module\",\r\n  \"scripts\": {\r\n    \"dev\": \"vite\",\r\n    \"build\": \"vite build\",\r\n    \"preview\": \"vite preview\"\r\n  },\r\n  \"devDependencies\": {\r\n    \"vite\": \"^8.0.12\"\r\n  }\r\n}\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend/package.json b/frontend/package.json
+--- a/frontend/package.json	(revision 8f30999e2780991395219cc7fab2041a1416143a)
++++ b/frontend/package.json	(date 1780498207224)
+@@ -1,12 +1,12 @@
+ {
+-  "name": "frontend",
++  "name": "stage_monitoring_tool",
+   "version": "0.0.0",
+   "private": true,
+   "type": "module",
+   "scripts": {
+-    "dev": "vite",
+-    "build": "vite build",
+-    "preview": "vite preview"
++    "dev": "node_modules/.bin/vite",
++    "build": "node_modules/.bin/vite build",
++    "preview": "node_modules/.bin/vite preview"
+   },
+   "devDependencies": {
+     "vite": "^8.0.12"
