@@ -1,7 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="1c44f20e-6cbe-47e2-ac2e-0fe86a2e6375" name="Changes" comment="" />
+    <list default="true" id="1c44f20e-6cbe-47e2-ac2e-0fe86a2e6375" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/frontend/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package-lock.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/frontend/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package.json" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -69,11 +72,11 @@
       <recent name="C:\Users\Amin\Documents\programming_project_group_1\frontend\src\assets" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\Amin\Documents\programming_project_group_1\backend\src" />
       <recent name="C:\Users\Amin\Documents\programming_project_group_1\backend" />
       <recent name="C:\Users\Amin\Documents\programming_project_group_1\frontend" />
       <recent name="C:\Users\Amin\Documents\programming_project_group_1" />
       <recent name="C:\Users\Amin\Documents\programming_project_group_1\stage_monitoring_tool\frontend\src" />
-      <recent name="C:\Users\Amin\Documents\programming_project_group_1\stage_monitoring_tool\backend\src" />
     </key>
   </component>
   <component name="RunManager">
@@ -120,7 +123,8 @@
       <workItem from="1780768547732" duration="6593000" />
       <workItem from="1780780372910" duration="265000" />
       <workItem from="1780828024483" duration="511000" />
-      <workItem from="1780829017089" duration="322000" />
+      <workItem from="1780829017089" duration="512000" />
+      <workItem from="1780829537889" duration="1060000" />
     </task>
     <servers />
   </component>
