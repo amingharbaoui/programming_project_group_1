@@ -1,14 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="1c44f20e-6cbe-47e2-ac2e-0fe86a2e6375" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/frontend/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/frontend/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/frontend/package.json" afterDir="false" />
-    </list>
+    <list default="true" id="1c44f20e-6cbe-47e2-ac2e-0fe86a2e6375" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="CodeInsightWorkspaceSettings">
+    <option name="optimizeImportsOnTheFly" value="true" />
   </component>
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
@@ -16,8 +16,8 @@
         <option value="HTML File" />
         <option value="CSS File" />
         <option value="JavaScript File" />
-        <option value="JSX File" />
         <option value="package.json" />
+        <option value="JSX File" />
       </list>
     </option>
   </component>
@@ -36,6 +36,9 @@
     &quot;accountId&quot;: &quot;eefdf843-d43a-420f-89ac-8d769668d322&quot;
   }
 }</component>
+  <component name="KotlinCodeInsightWorkspaceSettings">
+    <option name="optimizeImportsOnTheFly" value="true" />
+  </component>
   <component name="ProjectColorInfo">{
   &quot;customColor&quot;: &quot;2b352aff&quot;,
   &quot;associatedIndex&quot;: 3,
@@ -63,7 +66,8 @@
     &quot;last_opened_file_path&quot;: &quot;C:/Users/Amin/Documents/programming_project_group_1/frontend/src/assets&quot;,
     &quot;list.type.of.created.stylesheet&quot;: &quot;CSS&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;terminal&quot;,
+    &quot;typescript.add.unambiguous.imports.on.the.fly&quot;: &quot;true&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
@@ -124,11 +128,21 @@
       <workItem from="1780780372910" duration="265000" />
       <workItem from="1780828024483" duration="511000" />
       <workItem from="1780829017089" duration="512000" />
-      <workItem from="1780829537889" duration="1060000" />
+      <workItem from="1780829537889" duration="3829000" />
+      <workItem from="1780833405606" duration="91000" />
+      <workItem from="1780833504349" duration="4564000" />
+      <workItem from="1780842818330" duration="414000" />
+      <workItem from="1780855490628" duration="901000" />
+      <workItem from="1780950533844" duration="437000" />
+      <workItem from="1780950984187" duration="437000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
   </component>
 </project>
