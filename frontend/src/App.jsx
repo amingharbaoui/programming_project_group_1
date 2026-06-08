@@ -1,7 +1,29 @@
-import './App.css'
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import AppLayout from "./components/layout/AppLayout";
 
-function App() {
+import StudentDashboard from "./features/student/pages/StudentDashboard";
+import CommitteeDashboard from "./features/committee/pages/CommitteeDashboard";
+import AdminDashboard from "./features/admin/pages/AdminDashboard";
+import MentorDashboard from "./features/mentor/pages/MentorDashboard";
+import TeacherDashboard from "./features/teacher/pages/TeacherDashboard";
 
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<Navigate to="/student" replace />} />
+
+            <Route path="/student" element={<StudentDashboard />} />
+            <Route path="/committee" element={<CommitteeDashboard />} />
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/mentor" element={<MentorDashboard />} />
+            <Route path="/teacher" element={<TeacherDashboard />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </AuthProvider>
+  );
 }
-
-export default App
