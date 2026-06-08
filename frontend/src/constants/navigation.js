@@ -28,10 +28,11 @@ export const NAVIGATION = {
     { label: "Evaluatie", path: "/mentor/evaluation" },
   ],
 
-  [ROLES.TEACHER]: [
-    { label: "Dashboard", path: "/teacher" },
-    { label: "Studenten", path: "/teacher/students" },
-    { label: "Logboeken", path: "/teacher/logbooks" },
-    { label: "Evaluaties", path: "/teacher/evaluations" },
+  [ROLES.DOCENT]: [
+    { label: "Dashboard", path: "/docent" },
+    { label: "Studenten", path: "/docent/students" },
+    { label: "Logboeken", path: "/docent/logbooks" },
+    { label: "Evaluaties", path: "/docent/evaluations" },
   ],
 };
+

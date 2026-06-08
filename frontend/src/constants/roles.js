@@ -3,5 +3,6 @@ export const ROLES = {
   COMMITTEE: "stagecommissie",
   ADMIN: "administratie",
   MENTOR: "mentor",
-  TEACHER: "docent",
+  DOCENT: "docent",
 };
+

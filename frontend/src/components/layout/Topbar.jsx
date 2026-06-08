@@ -13,8 +13,9 @@ export default function Topbar() {
         <option value={ROLES.COMMITTEE}>Stagecommissie</option>
         <option value={ROLES.ADMIN}>Administratie</option>
         <option value={ROLES.MENTOR}>Mentor</option>
-        <option value={ROLES.TEACHER}>Docent</option>
+        <option value={ROLES.DOCENT}>Docent</option>
       </select>
     </header>
   );
 }
+

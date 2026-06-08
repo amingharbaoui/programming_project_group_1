@@ -27,7 +27,7 @@ const demoUsers = {
   docent: {
     id: 5,
     name: "Demo Docent",
-    role: ROLES.TEACHER,
+    role: ROLES.DOCENT,
   },
 };
 
@@ -48,3 +48,4 @@ export function AuthProvider({ children }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
+
