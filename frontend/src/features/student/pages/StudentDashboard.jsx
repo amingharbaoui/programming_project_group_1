@@ -38,26 +38,85 @@ export default function StudentDashboard() {
           </div>
         </div>
       )}
+
     <div className = "page-header">
       <h1>Mijn stage</h1>
       <p>Academiejaar 2025-2026</p>
     </div>
-    
-    <div className="card">
-      <div className="card-title">
-        <i className="ti ti-briefcase"/>
-        Stageaanvraag
-      </div>
-      <p>Je hebt nog geen stage. <span> Alles start met je stagevoorstel: bedrijf, mentor, opdracht en periode. Na indiening bekijkt de stagecommisie je voorstel</span> </p>
-      <div className="actions">
-        <button className="btn primary" onClick={() => navigate("/student/application")}>
-          <i className="ti ti-plus"/>
-          Stagevoorstel indienen
-        </button>
-      </div>
-    </div>
+{!ingediend ? (
 
- 
-  </div>
-  )
+        <div className="card">
+          <div className="card-title">
+            <i className="ti ti-briefcase" />
+            Stageaanvraag
+          </div>
+          <p>Je hebt nog geen stage. Alles start met je stagevoorstel: bedrijf, mentor, opdracht en periode. Na indiening bekijkt de stagecommissie je voorstel.</p>
+          <div className="actions">
+            <button className="btn primary" onClick={() => navigate("/student/application")}>
+              <i className="ti ti-plus" />
+              Stagevoorstel indienen
+            </button>
+          </div>
+        </div>
+
+      ) : (
+
+        <>
+          <div className="card">
+            <div className="card-title">
+              <i className="ti ti-info-circle" />
+              Beslissing volgt op de commissievergadering van 28 januari
+            </div>
+            <p>Je stagevoorstel werd ingediend en wordt behandeld door de stagecommissie. Je krijgt een melding zodra er een beslissing is.</p>
+          </div>
+
+          <div className="grid-2">
+            <div>
+              <div className="card">
+                <div className="card-title">
+                  <i className="ti ti-file-description" />
+                  Je voorstel zoals ingediend — nog niet goedgekeurd
+                </div>
+              </div>
+              <div className="card">
+                <button className="btn">
+                  <i className="ti ti-arrow-back-up" />
+                  Voorstel intrekken
+                </button>
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-title">
+                <i className="ti ti-users" />
+                Begeleiding
+              </div>
+              <div className="kv">
+                <span className="k">Mentor</span>
+                <span className="status s-amber">In afwachting</span>
+              </div>
+              <div className="kv">
+                <span className="k">Naam</span>
+                <span className="v">Sofie Maris</span>
+              </div>
+              <div className="kv">
+                <span className="k">Bedrijf</span>
+                <span className="v">Nodea Software (voorgesteld)</span>
+              </div>
+              <div className="kv">
+                <span className="k">E-mail</span>
+                <span className="v">sofie.maris@nodea.be</span>
+              </div>
+              <div className="kv">
+                <span className="k">Stagebegeleider</span>
+                <span className="v">K. Wouters (voorlopig)</span>
+              </div>
+            </div>
+          </div>
+        </>
+
+      )}
+
+    </div>
+  );
+  
 }
