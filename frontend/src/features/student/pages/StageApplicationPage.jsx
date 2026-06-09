@@ -73,7 +73,25 @@ export default function StageApplicationPage() {
               <textarea className="form-textarea" placeholder="Technologie, taken, team..." required />
             </div>
           </div>
-        
+         <div className="card">
+            <div className="card-title">
+              <i className="ti ti-calendar" />
+              Periode
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Startdatum<span className="req">*</span></label>
+                <input className="form-input" type="date" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Einddatum<span className="req">*</span></label>
+                <input className="form-input" type="date" required />
+              </div>
+            </div>
+            <p>Moet binnen het stagevenster van de opleiding vallen: 9 feb – 26 jun 2026.</p>
+          </div>
+
+          
       </div>
     </div>
     
