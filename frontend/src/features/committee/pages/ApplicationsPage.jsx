@@ -1,16 +1,46 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import axios from "axios";
 
 export default function ApplicationsPage() {
-  const [applications] = useState([
-    {
-      id: 1,
-      student: "Nathan",
-      company: "Microsoft",
-      period: "01/09/2026 - 31/01/2027",
-      status: "Pending",
-      description: "Ontwikkeling van Stageify",
-    },
-  ]);
+  const [applications, setApplications] = useState([]);
+
+  const handleApprove = (id) => {
+    axios.patch(
+      `http://localhost:5000/api/committee/applications/${id}/decision`,
+      {
+        decision: "approved",
+      }
+    )
+    .then(() => {
+      alert("Goedgekeurd");
+    })
+    .catch(console.error);
+  };
+
+  const handleReject = (id) => {
+    axios.patch(
+      `http://localhost:5000/api/committee/applications/${id}/decision`,
+      {
+        decision: "rejected",
+      }
+    )
+    .then(() => {
+      alert("Afgekeurd");
+    })
+    .catch(console.error);
+  };
+
+  useEffect(() => {
+    axios
+      .get("http://localhost:5000/api/committee/applications")
+      .then((response) => {
+        console.log(response.data);
+        setApplications(response.data.data);
+      })
+      .catch((error) => {
+        console.error(error);
+      });
+  }, []);
 
   return (
     <div>
@@ -24,8 +54,14 @@ export default function ApplicationsPage() {
           <p>Status: {app.status}</p>
           <p>{app.description}</p>
 
-          <button>Goedkeuren</button>
-          <button>Afkeuren</button>
+          <button onClick={() => handleApprove(app.id)}>
+            Goedkeuren
+          </button>
+
+          <button onClick={() => handleReject(app.id)}>
+            Afkeuren
+          </button>
+
           <button>Aanpassing vragen</button>
         </div>
       ))}
