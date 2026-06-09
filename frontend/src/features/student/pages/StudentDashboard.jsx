@@ -1,6 +1,5 @@
 export default function StudentDashboard() {
   return( 
-  <>
 
   <div className = "page-inner">
     <div className = "page-header">
@@ -23,6 +22,5 @@ export default function StudentDashboard() {
 
  
   </div>
-  </>
   )
 }
