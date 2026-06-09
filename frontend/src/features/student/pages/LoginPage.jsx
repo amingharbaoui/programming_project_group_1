@@ -1,5 +1,17 @@
+import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+
 export default function LoginPage() {
+    const navigate = useNavigate();
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+
+      function handleLogin(e) {
+    e.preventDefault();
+    navigate("/student");
+  }
   return (
+
     <div className="login-page">
       <div className="login-card">
 
@@ -10,14 +22,19 @@ export default function LoginPage() {
           Stage Monitoring Tool · Erasmushogeschool Brussel
         </div>
 
+        
+        <form onSubmit={handleLogin}>
         <div className="form-group">
           <label className="form-label">
             E-mailadres<span className="req">*</span>
           </label>
           <input
+            className = "form-input"
             type="email"
-            className="form-input"
             placeholder="voornaam.naam@student.ehb.be"
+            value={email}
+            onChange={(e)=> setEmail(e.target.value)}
+            required
           />
         </div>
 
@@ -26,9 +43,12 @@ export default function LoginPage() {
             Wachtwoord<span className="req">*</span>
           </label>
           <input
+          className="form-input"
             type="password"
-            className="form-input"
             placeholder="••••••••"
+            value={password}
+            onChange={(e)=> setPassword(e.target.value)}
+            required
           />
         </div>
 
@@ -36,6 +56,7 @@ export default function LoginPage() {
           <i className="ti ti-login-2" />
           Aanmelden
         </button>
+        </form>
 
         <div className="login-divider">
           <span className="login-divider-line" />
