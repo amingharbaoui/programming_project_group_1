@@ -1,6 +1,6 @@
 export default function StageApplicationPage() {
   return(
-    <>
+    <div>
     <div className="page-inner">
       <div className="page-header">
         <h1>Stagevoorstel</h1>
@@ -90,12 +90,37 @@ export default function StageApplicationPage() {
             </div>
             <p>Moet binnen het stagevenster van de opleiding vallen: 9 feb – 26 jun 2026.</p>
           </div>
-
           
+          
+          <div className="actions">
+            <button className="btn">
+              <i className="ti ti-device-floppy" />
+              Opslaan als concept
+            </button>
+            <button className="btn primary">
+              <i className="ti ti-send" />
+              Indienen
+            </button>
+          </div>
+
+        </div>
+
+        <div className="card">
+          <div className="card-title">
+            <i className="ti ti-checklist" />
+            Waar de commissie op let
+          </div>
+          <p><i className="ti ti-circle-check" />Minstens 12 weken voltijds (456 uur) binnen het stagevenster</p>
+          <p><i className="ti ti-circle-check" />IT-gerelateerde opdracht met een ontwikkelcomponent</p>
+          <p><i className="ti ti-circle-check" />Mentor met een technische functie binnen het bedrijf</p>
+          <p><i className="ti ti-circle-check" />Concrete omschrijving: technologie, taken en team</p>
+          <p><i className="ti ti-circle-check" />Stage in een professionele bedrijfsomgeving</p>
+        </div>
+
       </div>
+
     </div>
     
-    </>
   )
 
 }
