@@ -1,10 +1,12 @@
 const express = require("express");
-const { list, detail, action } = require("../controllers/placeholderController");
+const {
+  getCommitteeApplications,
+  decideApplication
+} = require("../controllers/internshipController");
 
 const router = express.Router();
 
-router.get("/applications", list("Stagecommissie aanvragen"));
-router.get("/applications/:id", detail("Stagecommissie aanvraag"));
-router.patch("/applications/:id/decision", action("Stagecommissie beslissing"));
+router.get("/applications", getCommitteeApplications);
+router.patch("/applications/:id/decision", decideApplication);
 
 module.exports = router;
