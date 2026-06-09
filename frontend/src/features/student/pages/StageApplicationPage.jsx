@@ -52,9 +52,31 @@ export default function StageApplicationPage() {
               </div>
             </div>
           </div>
+
+           <div className="card">
+            <div className="card-title">
+              <i className="ti ti-clipboard-text" />
+              Opdracht
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Functie<span className="req">*</span></label>
+                <input className="form-input" type="text" placeholder="bv. Webdeveloper" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Uren per week<span className="req">*</span></label>
+                <input className="form-input" type="number" placeholder="38" required />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Omschrijving van de opdracht<span className="req">*</span></label>
+              <textarea className="form-textarea" placeholder="Technologie, taken, team..." required />
+            </div>
+          </div>
         
       </div>
     </div>
+    
     </>
   )
 
