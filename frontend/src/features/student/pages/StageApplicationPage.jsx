@@ -25,8 +25,34 @@ export default function StageApplicationPage() {
               <label className="form-label">Adres<span className="req">*</span></label>
               <input className="form-input" type="text" placeholder="Straat nr, postcode gemeente" required />
           </div>
-
-        </div>
+          </div>
+      <div className="card">
+            <div className="card-title">
+              <i className="ti ti-user-check" />
+              Mentor
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Naam<span className="req">*</span></label>
+                <input className="form-input" type="text" placeholder="Naam van je mentor" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Functie<span className="req">*</span></label>
+                <input className="form-input" type="text" placeholder="Functie" required />
+              </div>
+            </div>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">E-mail<span className="req">*</span></label>
+                <input className="form-input" type="email" required />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Telefoon</label>
+                <input className="form-input" type="tel" />
+              </div>
+            </div>
+          </div>
+        
       </div>
     </div>
     </>
