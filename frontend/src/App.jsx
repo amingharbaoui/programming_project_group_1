@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import AppLayout from "./components/layout/AppLayout";
+import LoginPage from "./features/student/pages/LoginPage";
 
 import StudentDashboard from "./features/student/pages/StudentDashboard";
 import StageApplicationPage from "./features/student/pages/StageApplicationPage";
@@ -31,10 +32,11 @@ export default function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          <Route element={<AppLayout />}>
-            <Route path="/" element={<Navigate to="/student" replace />} />
 
-            <Route path="/student" element={<StudentDashboard />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route element={<AppLayout />}>
+           <Route path="/student" element={<StudentDashboard />} />
             <Route path="/student/application" element={<StageApplicationPage />} />
             <Route path="/student/internship" element={<MyInternshipPage />} />
             <Route path="/student/logbook" element={<StudentLogbookPage />} />
