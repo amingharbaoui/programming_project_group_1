@@ -62,6 +62,42 @@ export default function StudentDashboard() {
       ) : (
 
         <>
+        {/* Progressbar */}
+          <div className="card">
+            <div className="card-title">
+              <i className="ti ti-list-check" />
+              Voortgang
+            </div>
+            <div className="progress-steps">
+              <div className="progress-step done">
+                <div className="progress-circle">
+                  <i className="ti ti-check" />
+                </div>
+                <div className="progress-label">Voorstel ingediend</div>
+              </div>
+              <div className="progress-line active" />
+              <div className="progress-step active">
+                <div className="progress-circle">2</div>
+                <div className="progress-label">Beoordeling</div>
+              </div>
+              <div className="progress-line" />
+              <div className="progress-step">
+                <div className="progress-circle">3</div>
+                <div className="progress-label">Contract</div>
+              </div>
+              <div className="progress-line" />
+              <div className="progress-step">
+                <div className="progress-circle">4</div>
+                <div className="progress-label">Stage</div>
+              </div>
+              <div className="progress-line" />
+              <div className="progress-step">
+                <div className="progress-circle">5</div>
+                <div className="progress-label">Evaluatie</div>
+              </div>
+            </div>
+          </div>
+
           <div className="card">
             <div className="card-title">
               <i className="ti ti-info-circle" />
