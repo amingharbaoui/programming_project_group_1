@@ -1,4 +1,8 @@
+import { useNavigate } from "react-router-dom"
+
 export default function StudentDashboard() {
+      const navigate = useNavigate();
+      
   return( 
 
   <div className = "page-inner">
@@ -14,7 +18,8 @@ export default function StudentDashboard() {
       </div>
       <p>Je hebt nog geen stage. <span> Alles start met je stagevoorstel: bedrijf, mentor, opdracht en periode. Na indiening bekijkt de stagecommisie je voorstel</span> </p>
       <div className="actions">
-        <button className="btn-primary">
+        <button className="btn primary" onClick={() => navigate("/student/application")}>
+          <i className="ti ti-plus"/>
           Stagevoorstel indienen
         </button>
       </div>
