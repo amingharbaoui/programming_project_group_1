@@ -10,6 +10,7 @@ export default function MyInternshipPage() {
   const [voorstelOpen, setVoorstelOpen] = useState(false);
   const [internship, setInternship] = useState(null);
 
+  // Status configuratie met bijhorende CSS klasse, icoon en label
   const statusConfig = {
     ingediend: { cls: "s_grijs", icon: "ti-hourglass", label: "In behandeling" },
     goedgekeurd: { cls: "s_ok", icon: "ti-check", label: "Goedgekeurd" },
@@ -23,6 +24,7 @@ export default function MyInternshipPage() {
     setShowPopup(false);
   }
 
+  // Haal het voorstel op bij het laden van de pagina
   useEffect(() => {
     async function fetchInternship() {
       try {
@@ -41,6 +43,7 @@ export default function MyInternshipPage() {
   return (
     <div className="page-inner">
 
+      {/* Popup na indienen */}
       {showPopup && (
         <div className="popup-overlay">
           <div className="popup">
@@ -71,6 +74,7 @@ export default function MyInternshipPage() {
         <p>Academiejaar 2025–2026</p>
       </div>
 
+      {/* Geen stage ingediend */}
       {!ingediend ? (
 
         <div className="card">
@@ -91,6 +95,7 @@ export default function MyInternshipPage() {
 
         <>
 
+          {/* Progressbar */}
           <div className="card">
             <div className="progress-steps">
               <div className="progress-step done">
@@ -122,6 +127,7 @@ export default function MyInternshipPage() {
             </div>
           </div>
 
+          {/* Huidige status van het voorstel */}
           <div className="card">
             <div className="card_title">
               <i className="ti ti-info-circle" />
@@ -133,6 +139,7 @@ export default function MyInternshipPage() {
             </span>
           </div>
 
+          {/* Begeleiding — komt van de backend */}
           <div className="card">
             <div className="card_title">
               <i className="ti ti-users" />
@@ -148,6 +155,7 @@ export default function MyInternshipPage() {
             <div className="kv"><span className="k">Stagebegeleider</span><span className="v">—</span></div>
           </div>
 
+          {/* Uitklapbaar voorsteldetail */}
           <div className="card" onClick={() => setVoorstelOpen(!voorstelOpen)}>
             <div className="card_title">
               <i className="ti ti-file-description" />
@@ -205,6 +213,23 @@ export default function MyInternshipPage() {
                 </button>
               </div>
             </>
+          )}
+
+          {/* Knop naar logboek — alleen zichtbaar als stage goedgekeurd is */}
+          {internship?.status === "goedgekeurd" && (
+            <div className="card">
+              <div className="card_title">
+                <i className="ti ti-notebook" />
+                Logboek
+              </div>
+              <p>Je stage is goedgekeurd. Je kan nu je logboek invullen.</p>
+              <div className="actions">
+                <button className="btn primary" onClick={() => navigate("/student/logbook")}>
+                  <i className="ti ti-arrow-right" />
+                  Naar logboek
+                </button>
+              </div>
+            </div>
           )}
 
         </>
