@@ -1,11 +1,15 @@
 const express = require("express");
-const { list, detail, action } = require("../controllers/placeholderController");
+const { list, detail } = require("../controllers/placeholderController");
+const {
+  getLogbooksByStudent,
+  docentReviewLogbookWeek
+} = require("../controllers/logbookController");
 
 const router = express.Router();
 
 router.get("/students", list("Docent studenten"));
 router.get("/students/:id", detail("Docent student"));
-router.get("/logbooks/:studentId", list("Docent logboeken"));
-router.patch("/logbooks/:weekId/review", action("Docent logboek review"));
+router.get("/logbooks/:studentId", getLogbooksByStudent);
+router.patch("/logbooks/:weekId/review", docentReviewLogbookWeek);
 
 module.exports = router;

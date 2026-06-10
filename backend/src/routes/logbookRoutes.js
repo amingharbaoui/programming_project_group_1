@@ -1,9 +1,12 @@
 const express = require("express");
-const { list, action } = require("../controllers/placeholderController");
+const {
+  createLogbook,
+  getLogbooksByStudent
+} = require("../controllers/logbookController");
 
 const router = express.Router();
 
-router.post("/", action("Logboek aanmaken"));
-router.get("/:studentId", list("Logboeken ophalen"));
+router.post("/", createLogbook);
+router.get("/:studentId", getLogbooksByStudent);
 
 module.exports = router;
