@@ -80,6 +80,64 @@ export default function StudentLogbookPage() {
         <p>Vul wekelijks je activiteiten in</p>
       </div>
 
+      {/* Fout- en succesbericht */}
+      {error && (
+        <div className="card">
+          <p className="status s_rood">{error}</p>
+        </div>
+      )}
+      {succes && (
+        <div className="card">
+          <p className="status s_ok">Week succesvol ingediend.</p>
+        </div>
+      )}
+
+      {/* Formulier voor nieuwe week */}
+      <div className="card">
+        <div className="card_title">
+          <i className="ti ti-pencil" />
+          Nieuwe week invullen
+        </div>
+
+        <form onSubmit={handleSubmit}>
+
+          <div className="form_row">
+            <div className="form_group">
+              <label className="form_label">Weeknummer<span className="req">*</span></label>
+              <input className="form_input" type="number" name="weekNummer" value={form.weekNummer} onChange={handleChange} placeholder="1" />
+            </div>
+            <div className="form_group">
+              <label className="form_label">Aantal uren<span className="req">*</span></label>
+              <input className="form_input" type="number" name="aantalUren" value={form.aantalUren} onChange={handleChange} placeholder="38" />
+            </div>
+          </div>
+
+          <div className="form_group">
+            <label className="form_label">Taken<span className="req">*</span></label>
+            <textarea className="form_textarea" name="taken" value={form.taken} onChange={handleChange} placeholder="Wat heb je deze week gedaan?" />
+          </div>
+
+          <div className="form_group">
+            <label className="form_label">Reflectie<span className="req">*</span></label>
+            <textarea className="form_textarea" name="reflectie" value={form.reflectie} onChange={handleChange} placeholder="Hoe verliep de week?" />
+          </div>
+
+          <div className="form_group">
+            <label className="form_label">Problemen / leerpunten</label>
+            <textarea className="form_textarea" name="leerpunten" value={form.leerpunten} onChange={handleChange} placeholder="Wat liep moeilijk? Wat heb je geleerd?" />
+          </div>
+
+          <div className="actions">
+            <button type="submit" className="btn primary">
+              <i className="ti ti-send" />
+              Week indienen
+            </button>
+          </div>
+
+        </form>
+      </div>
+
+      
 
     </div>
   );
