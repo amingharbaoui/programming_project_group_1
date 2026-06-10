@@ -6,12 +6,18 @@ export default function DocentLogbooksPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // feedback per week
+  const [feedbackByWeek, setFeedbackByWeek] = useState({});
+
+  // knop blokkeren tijdens opslaan
+  const [actionLoadingId, setActionLoadingId] = useState(null);
+
   async function loadLogbooks() {
     try {
       setLoading(true);
       setError("");
 
-      // Demo: student 1 heeft normaal al een stagedossier en logboek.
+      // logboeken ophalen
       const response = await api.get("/docent/logbooks/1");
       setWeeks(response.data.data || []);
     } catch (err) {
@@ -38,11 +44,38 @@ export default function DocentLogbooksPage() {
     return "s-grijs";
   }
 
+  async function reviewWeek(weekId, herindieningNodig = false) {
+    try {
+      setActionLoadingId(weekId);
+
+      // feedback opslaan
+      await api.patch(
+        `/docent/logbooks/${weekId}/review`,
+        {
+          feedback: feedbackByWeek[weekId] || "Logboek nagekeken door docent.",
+          herindieningNodig,
+        },
+        {
+          headers: {
+            "x-user-id": "5",
+          },
+        }
+      );
+
+      // status opnieuw ophalen
+      await loadLogbooks();
+    } catch (err) {
+      alert(err.response?.data?.message || err.message || "Docentcontrole mislukt");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
   return (
     <div className="page-inner">
       <div className="page-header">
         <h1>Docent logboeken</h1>
-        <p>Bekijk logboeken en mentorstatus van de student.</p>
+        <p>Bekijk logboeken, mentorfeedback en geef docentfeedback.</p>
       </div>
 
       <button className="btn primary" onClick={loadLogbooks}>
@@ -115,6 +148,40 @@ export default function DocentLogbooksPage() {
               ))}
             </tbody>
           </table>
+
+          <div className="form-group" style={{ marginTop: "14px" }}>
+            <label className="form-label">Feedback docent</label>
+
+            <textarea
+              className="form-textarea"
+              placeholder="Geef feedback als docent..."
+              value={feedbackByWeek[week.id] || ""}
+              onChange={(e) =>
+                setFeedbackByWeek({
+                  ...feedbackByWeek,
+                  [week.id]: e.target.value,
+                })
+              }
+            />
+          </div>
+
+          <div className="actions">
+            <button
+              className="btn"
+              disabled={actionLoadingId === week.id}
+              onClick={() => reviewWeek(week.id, true)}
+            >
+              Aanpassing vragen
+            </button>
+
+            <button
+              className="btn primary"
+              disabled={actionLoadingId === week.id}
+              onClick={() => reviewWeek(week.id, false)}
+            >
+              Nagekeken
+            </button>
+          </div>
         </div>
       ))}
     </div>
