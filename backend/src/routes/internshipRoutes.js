@@ -1,10 +1,12 @@
 const express = require("express");
-const { list, action } = require("../controllers/placeholderController");
+const {
+  getMyInternship,
+  createInternship
+} = require("../controllers/internshipController");
 
 const router = express.Router();
 
-router.get("/my", list("Mijn stagevoorstel"));
-router.post("/", action("Stagevoorstel indienen"));
-router.patch("/:id", action("Stagevoorstel aanpassen"));
+router.get("/my", getMyInternship);
+router.post("/", createInternship);
 
 module.exports = router;

@@ -1,7 +1,7 @@
 import { useAuth } from "../../context/AuthContext";
 import { ROLES } from "../../constants/roles";
 
-export default function Topbar() {
+export default function Navbar() {
   const { user, switchRole } = useAuth();
 
   return (

@@ -1,0 +1,331 @@
+## bedrijven
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- naam | varchar(255) | null:NO | key:- | default:- | -
+- afdeling | varchar(255) | null:YES | key:- | default:- | -
+- adres | text | null:YES | key:- | default:- | -
+- postcode | varchar(255) | null:YES | key:- | default:- | -
+- stad | varchar(255) | null:YES | key:- | default:- | -
+- land | varchar(255) | null:YES | key:- | default:- | -
+- email | varchar(255) | null:YES | key:- | default:- | -
+- telefoon | varchar(255) | null:YES | key:- | default:- | -
+- website | varchar(255) | null:YES | key:- | default:- | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+- aangepast_op | timestamp | null:YES | key:- | default:- | -
+
+## competentie_profielen
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- opleiding | varchar(255) | null:NO | key:MUL | default:- | -
+- academiejaar | varchar(255) | null:NO | key:- | default:- | -
+- naam | varchar(255) | null:NO | key:- | default:- | -
+- versie | varchar(255) | null:NO | key:- | default:- | -
+- status | varchar(255) | null:NO | key:- | default:- | -
+- aangemaakt_door_id | int | null:YES | key:MUL | default:- | -
+- gepubliceerd_door_id | int | null:YES | key:MUL | default:- | -
+- gepubliceerd_op | timestamp | null:YES | key:- | default:- | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+- aangepast_op | timestamp | null:YES | key:- | default:- | -
+
+## competentie_scores
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- evaluatie_id | int | null:NO | key:MUL | default:- | -
+- competentie_id | int | null:NO | key:MUL | default:- | -
+- ingevuld_door_id | int | null:NO | key:MUL | default:- | -
+- rol | varchar(255) | null:NO | key:- | default:- | -
+- score | decimal(3,1) | null:YES | key:- | default:- | -
+- motivering | text | null:YES | key:- | default:- | -
+- feedback | text | null:YES | key:- | default:- | -
+- ingediend | tinyint(1) | null:YES | key:- | default:0 | -
+- ingediend_op | timestamp | null:YES | key:- | default:- | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+- aangepast_op | timestamp | null:YES | key:- | default:- | -
+
+## competenties
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- competentie_profiel_id | int | null:NO | key:MUL | default:- | -
+- code | varchar(255) | null:NO | key:- | default:- | -
+- naam | varchar(255) | null:NO | key:- | default:- | -
+- beschrijving | text | null:YES | key:- | default:- | -
+- gewicht_percentage | decimal(5,2) | null:NO | key:- | default:- | -
+- volgorde | int | null:YES | key:- | default:- | -
+- is_actief | tinyint(1) | null:YES | key:- | default:1 | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+- aangepast_op | timestamp | null:YES | key:- | default:- | -
+
+## document_soorten
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- naam | varchar(255) | null:NO | key:- | default:- | -
+- type | varchar(255) | null:NO | key:- | default:- | -
+- is_verplicht | tinyint(1) | null:YES | key:- | default:1 | -
+- is_vast | tinyint(1) | null:YES | key:- | default:0 | -
+- opleiding | varchar(255) | null:YES | key:- | default:- | -
+- academiejaar | varchar(255) | null:YES | key:- | default:- | -
+- status | varchar(255) | null:NO | key:- | default:- | -
+- aangemaakt_door_id | int | null:YES | key:MUL | default:- | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+- aangepast_op | timestamp | null:YES | key:- | default:- | -
+
+## documenten
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- stagedossier_id | int | null:NO | key:MUL | default:- | -
+- document_soort_id | int | null:NO | key:MUL | default:- | -
+- status | varchar(255) | null:NO | key:- | default:- | -
+- versie_nummer | int | null:YES | key:- | default:1 | -
+- bestand_url | text | null:YES | key:- | default:- | -
+- bestand_naam | varchar(255) | null:YES | key:- | default:- | -
+- opgeladen_door_id | int | null:YES | key:MUL | default:- | -
+- opgeladen_op | timestamp | null:YES | key:- | default:- | -
+- gecontroleerd_door_id | int | null:YES | key:MUL | default:- | -
+- gecontroleerd_op | timestamp | null:YES | key:- | default:- | -
+- afkeurreden | text | null:YES | key:- | default:- | -
+- zichtbaar_voor_student | tinyint(1) | null:YES | key:- | default:1 | -
+- zichtbaar_voor_docent | tinyint(1) | null:YES | key:- | default:1 | -
+- zichtbaar_voor_mentor | tinyint(1) | null:YES | key:- | default:0 | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+- aangepast_op | timestamp | null:YES | key:- | default:- | -
+
+## evaluaties
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- stagedossier_id | int | null:NO | key:MUL | default:- | -
+- type | varchar(255) | null:NO | key:- | default:- | -
+- status | varchar(255) | null:NO | key:- | default:- | -
+- deadline_student | date | null:YES | key:- | default:- | -
+- deadline_mentor | date | null:YES | key:- | default:- | -
+- deadline_docent | date | null:YES | key:- | default:- | -
+- student_ingediend_op | timestamp | null:YES | key:- | default:- | -
+- mentor_ingediend_op | timestamp | null:YES | key:- | default:- | -
+- docent_geregistreerd_op | timestamp | null:YES | key:- | default:- | -
+- verslag | text | null:YES | key:- | default:- | -
+- eindpresentatie_score | decimal(4,2) | null:YES | key:- | default:- | -
+- competentie_score | decimal(4,2) | null:YES | key:- | default:- | -
+- eindcijfer | decimal(4,2) | null:YES | key:- | default:- | -
+- vrijgegeven_door_id | int | null:YES | key:MUL | default:- | -
+- vrijgegeven_op | timestamp | null:YES | key:- | default:- | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+- aangepast_op | timestamp | null:YES | key:- | default:- | -
+
+## gebruikers
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- voornaam | varchar(255) | null:NO | key:- | default:- | -
+- achternaam | varchar(255) | null:NO | key:- | default:- | -
+- email | varchar(255) | null:NO | key:UNI | default:- | -
+- auth_provider | varchar(255) | null:NO | key:MUL | default:school_sso | -
+- externe_auth_id | varchar(255) | null:YES | key:- | default:- | -
+- wachtwoord_hash | varchar(255) | null:YES | key:- | default:- | -
+- hoofdrol | varchar(255) | null:NO | key:- | default:- | -
+- status | varchar(255) | null:NO | key:- | default:- | -
+- laatste_login_op | timestamp | null:YES | key:- | default:- | -
+- login_fout_teller | int | null:YES | key:- | default:0 | -
+- geblokkeerd_tot | timestamp | null:YES | key:- | default:- | -
+- laatst_gesynchroniseerd_op | timestamp | null:YES | key:- | default:- | -
+- sync_bron | varchar(255) | null:YES | key:- | default:- | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+- aangepast_op | timestamp | null:YES | key:- | default:- | -
+
+## logboek_dagen
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- logboek_week_id | int | null:NO | key:MUL | default:- | -
+- datum | date | null:NO | key:- | default:- | -
+- status | varchar(255) | null:NO | key:- | default:- | -
+- titel | varchar(255) | null:YES | key:- | default:- | -
+- uitgevoerde_taken | text | null:YES | key:- | default:- | -
+- reflectie | text | null:YES | key:- | default:- | -
+- problemen | text | null:YES | key:- | default:- | -
+- leerpunten | text | null:YES | key:- | default:- | -
+- aantal_uren | decimal(4,2) | null:YES | key:- | default:- | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+- aangepast_op | timestamp | null:YES | key:- | default:- | -
+
+## logboek_weken
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- stagedossier_id | int | null:NO | key:MUL | default:- | -
+- week_nummer | int | null:NO | key:- | default:- | -
+- week_start | date | null:NO | key:- | default:- | -
+- week_einde | date | null:NO | key:- | default:- | -
+- status | varchar(255) | null:NO | key:- | default:- | -
+- totaal_uren | decimal(5,2) | null:YES | key:- | default:- | -
+- ingediend_op | timestamp | null:YES | key:- | default:- | -
+- mentor_id | int | null:YES | key:MUL | default:- | -
+- mentor_feedback | text | null:YES | key:- | default:- | -
+- mentor_nagekeken_op | timestamp | null:YES | key:- | default:- | -
+- docent_id | int | null:YES | key:MUL | default:- | -
+- docent_feedback | text | null:YES | key:- | default:- | -
+- docent_nagekeken_op | timestamp | null:YES | key:- | default:- | -
+- herindiening_nodig | tinyint(1) | null:YES | key:- | default:0 | -
+- blokkade | text | null:YES | key:- | default:- | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+- aangepast_op | timestamp | null:YES | key:- | default:- | -
+
+## medewerkers
+- gebruiker_id | int | null:NO | key:PRI | default:- | -
+- personeelsnummer | varchar(255) | null:YES | key:- | default:- | -
+- medewerker_type | varchar(255) | null:NO | key:- | default:- | -
+- functie | varchar(255) | null:YES | key:- | default:- | -
+- dienst | varchar(255) | null:YES | key:- | default:- | -
+
+## mentoren
+- gebruiker_id | int | null:NO | key:PRI | default:- | -
+- bedrijf_id | int | null:NO | key:MUL | default:- | -
+- functie | varchar(255) | null:NO | key:- | default:- | -
+- telefoon | varchar(255) | null:YES | key:- | default:- | -
+- mag_stageovereenkomst_tekenen | tinyint(1) | null:YES | key:- | default:0 | -
+- uitnodiging_status | varchar(255) | null:YES | key:- | default:- | -
+- uitnodiging_token | varchar(255) | null:YES | key:- | default:- | -
+- uitnodiging_vervalt_op | timestamp | null:YES | key:- | default:- | -
+- geactiveerd_op | timestamp | null:YES | key:- | default:- | -
+
+## planning_momenten
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- stagedossier_id | int | null:NO | key:MUL | default:- | -
+- type | varchar(255) | null:NO | key:- | default:- | -
+- status | varchar(255) | null:NO | key:- | default:- | -
+- gepland_op | timestamp | null:YES | key:- | default:- | -
+- locatie | varchar(255) | null:YES | key:- | default:- | -
+- voorgesteld_door_id | int | null:YES | key:MUL | default:- | -
+- bevestigd_door_id | int | null:YES | key:MUL | default:- | -
+- alternatief_voorstel | text | null:YES | key:- | default:- | -
+- verslag | text | null:YES | key:- | default:- | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+- aangepast_op | timestamp | null:YES | key:- | default:- | -
+
+## stage_regels
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- opleiding | varchar(255) | null:NO | key:- | default:- | -
+- academiejaar | varchar(255) | null:NO | key:- | default:- | -
+- stagevenster_start | date | null:NO | key:- | default:- | -
+- stagevenster_einde | date | null:NO | key:- | default:- | -
+- minimum_weken | int | null:NO | key:- | default:- | -
+- minimum_uren | int | null:NO | key:- | default:- | -
+- standaard_uren_per_week | int | null:YES | key:- | default:- | -
+- status | varchar(255) | null:NO | key:- | default:- | -
+- aangemaakt_door_id | int | null:YES | key:MUL | default:- | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+- aangepast_op | timestamp | null:YES | key:- | default:- | -
+
+## stagedossiers
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- dossiernummer | varchar(255) | null:NO | key:UNI | default:- | -
+- stagevoorstel_id | int | null:NO | key:UNI | default:- | -
+- student_id | int | null:NO | key:MUL | default:- | -
+- bedrijf_id | int | null:NO | key:MUL | default:- | -
+- stagebegeleider_id | int | null:NO | key:MUL | default:- | -
+- mentor_id | int | null:YES | key:MUL | default:- | -
+- status | varchar(255) | null:NO | key:- | default:- | -
+- opleiding | varchar(255) | null:NO | key:- | default:- | -
+- academiejaar | varchar(255) | null:NO | key:- | default:- | -
+- startdatum | date | null:NO | key:- | default:- | -
+- einddatum | date | null:NO | key:- | default:- | -
+- aantal_weken | int | null:NO | key:- | default:- | -
+- uren_per_week | int | null:NO | key:- | default:- | -
+- totaal_uren | int | null:NO | key:- | default:- | -
+- verzekering_in_orde | tinyint(1) | null:YES | key:- | default:0 | -
+- praktische_afspraken | text | null:YES | key:- | default:- | -
+- praktische_afspraken_gedeeld_op | timestamp | null:YES | key:- | default:- | -
+- eindresultaat | decimal(4,2) | null:YES | key:- | default:- | -
+- eindresultaat_vrijgegeven_op | timestamp | null:YES | key:- | default:- | -
+- eindoverzicht_gegenereerd_op | timestamp | null:YES | key:- | default:- | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+- aangepast_op | timestamp | null:YES | key:- | default:- | -
+
+## stageovereenkomsten
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- stagedossier_id | int | null:NO | key:UNI | default:- | -
+- status | varchar(255) | null:NO | key:- | default:- | -
+- bestand_url | text | null:YES | key:- | default:- | -
+- versie_nummer | int | null:YES | key:- | default:1 | -
+- student_getekend_op | timestamp | null:YES | key:- | default:- | -
+- bedrijf_getekend_op | timestamp | null:YES | key:- | default:- | -
+- opleiding_getekend_op | timestamp | null:YES | key:- | default:- | -
+- gecontroleerd_door_id | int | null:YES | key:MUL | default:- | -
+- gecontroleerd_op | timestamp | null:YES | key:- | default:- | -
+- geregistreerd_door_id | int | null:YES | key:MUL | default:- | -
+- geregistreerd_op | timestamp | null:YES | key:- | default:- | -
+- afkeurreden | text | null:YES | key:- | default:- | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+- aangepast_op | timestamp | null:YES | key:- | default:- | -
+
+## stagevoorstel_versies
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- stagevoorstel_id | int | null:NO | key:MUL | default:- | -
+- versie_nummer | int | null:NO | key:- | default:- | -
+- bedrijf_id | int | null:YES | key:MUL | default:- | -
+- bedrijf_naam | varchar(255) | null:YES | key:- | default:- | -
+- bedrijfsafdeling | varchar(255) | null:YES | key:- | default:- | -
+- bedrijfsadres | text | null:YES | key:- | default:- | -
+- mentor_naam | varchar(255) | null:NO | key:- | default:- | -
+- mentor_email | varchar(255) | null:NO | key:- | default:- | -
+- mentor_telefoon | varchar(255) | null:YES | key:- | default:- | -
+- mentor_functie | varchar(255) | null:YES | key:- | default:- | -
+- stagefunctie | varchar(255) | null:NO | key:- | default:- | -
+- opdrachtomschrijving | text | null:NO | key:- | default:- | -
+- startdatum | date | null:NO | key:- | default:- | -
+- einddatum | date | null:NO | key:- | default:- | -
+- aantal_weken | int | null:NO | key:- | default:- | -
+- uren_per_week | int | null:NO | key:- | default:- | -
+- totaal_uren | int | null:NO | key:- | default:- | -
+- ingediend_door_id | int | null:NO | key:MUL | default:- | -
+- ingediend_op | timestamp | null:YES | key:- | default:- | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+
+## stagevoorstellen
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- student_id | int | null:NO | key:MUL | default:- | -
+- bedrijf_id | int | null:YES | key:MUL | default:- | -
+- stage_regel_id | int | null:NO | key:MUL | default:- | -
+- voorlopige_stagebegeleider_id | int | null:YES | key:MUL | default:- | -
+- status | varchar(255) | null:NO | key:- | default:- | -
+- huidige_versie_nummer | int | null:YES | key:- | default:1 | -
+- ingediend_op | timestamp | null:YES | key:- | default:- | -
+- heringediend_op | timestamp | null:YES | key:- | default:- | -
+- goedgekeurd_op | timestamp | null:YES | key:- | default:- | -
+- afgekeurd_op | timestamp | null:YES | key:- | default:- | -
+- ingetrokken_op | timestamp | null:YES | key:- | default:- | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+- aangepast_op | timestamp | null:YES | key:- | default:- | -
+
+## studenten
+- gebruiker_id | int | null:NO | key:PRI | default:- | -
+- studentennummer | varchar(255) | null:NO | key:UNI | default:- | -
+- opleiding | varchar(255) | null:NO | key:- | default:- | -
+- klasgroep | varchar(255) | null:YES | key:- | default:- | -
+- academiejaar | varchar(255) | null:NO | key:- | default:- | -
+
+## systeem_meldingen
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- ontvanger_id | int | null:YES | key:MUL | default:- | -
+- aangemaakt_door_id | int | null:YES | key:MUL | default:- | -
+- stagevoorstel_id | int | null:YES | key:MUL | default:- | -
+- stagedossier_id | int | null:YES | key:MUL | default:- | -
+- document_id | int | null:YES | key:MUL | default:- | -
+- logboek_week_id | int | null:YES | key:MUL | default:- | -
+- type | varchar(255) | null:NO | key:- | default:- | -
+- ernst | varchar(255) | null:NO | key:- | default:- | -
+- titel | varchar(255) | null:NO | key:- | default:- | -
+- bericht | text | null:NO | key:- | default:- | -
+- status | varchar(255) | null:NO | key:- | default:- | -
+- kanaal | varchar(255) | null:YES | key:- | default:- | -
+- foutcode | varchar(255) | null:YES | key:- | default:- | -
+- foutdetails | text | null:YES | key:- | default:- | -
+- gelezen_op | timestamp | null:YES | key:- | default:- | -
+- opgelost_op | timestamp | null:YES | key:- | default:- | -
+- aangemaakt_op | timestamp | null:YES | key:- | default:- | -
+
+## voorstel_beslissingen
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- stagevoorstel_id | int | null:NO | key:MUL | default:- | -
+- stagevoorstel_versie_id | int | null:NO | key:MUL | default:- | -
+- beslist_door_id | int | null:NO | key:MUL | default:- | -
+- beslissing | varchar(255) | null:NO | key:- | default:- | -
+- feedback | text | null:YES | key:- | default:- | -
+- motivering | text | null:YES | key:- | default:- | -
+- uitzondering_motivering | text | null:YES | key:- | default:- | -
+- beslist_op | timestamp | null:NO | key:- | default:- | -
+
+## voorstel_checklist
+- id | int | null:NO | key:PRI | default:- | auto_increment
+- stagevoorstel_versie_id | int | null:NO | key:MUL | default:- | -
+- criterium | varchar(255) | null:NO | key:- | default:- | -
+- is_verplicht | tinyint(1) | null:YES | key:- | default:1 | -
+- is_in_orde | tinyint(1) | null:NO | key:- | default:- | -
+- opmerking | text | null:YES | key:- | default:- | -
+- gecontroleerd_door_id | int | null:YES | key:MUL | default:- | -
+- gecontroleerd_op | timestamp | null:YES | key:- | default:- | -

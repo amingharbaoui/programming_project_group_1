@@ -1,0 +1,260 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap");
+
+:root {
+	--red: #E2001A;
+	--red-dark: #b80015;
+	--red-light: #fdedef;
+	--red-mid: #f7c3ca;
+
+	--dark: #0a0a0a;
+	--gray: #374151;
+	--sub: #374151;
+	--faint: #9ca3af;
+	--muted: #f7f7f7;
+	--border: #e9e9e9;
+	--white: #ffffff;
+
+	--green: #1B5E2F;
+	--green-bg: #E8F5ED;
+	--amber: #854F0B;
+	--amber-bg: #FFF3E0;
+	--blue: #185FA5;
+	--blue-bg: #E6F1FB;
+
+	--sidebar: 252px;
+	--font: "DM Sans", sans-serif;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	font-family: var(--font);
+	background: var(--muted);
+	color: var(--dark);
+}
+
+/* Layout */
+.main {
+	min-height: 100vh;
+	display: flex;
+	background: var(--muted);
+}
+
+.sidebar {
+	width: var(--sidebar);
+	min-height: 100vh;
+	background: var(--white);
+	border-right: 1px solid var(--border);
+	padding: 18px 14px;
+}
+
+.navbar {
+	height: 68px;
+	background: var(--white);
+	border-bottom: 1px solid var(--border);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 0 24px;
+}
+
+/* Cards */
+.card {
+	background: var(--white);
+	border-radius: 10px;
+	border: 0.5px solid var(--border);
+	padding: 16px 18px;
+	margin-bottom: 12px;
+}
+
+.card_title {
+	font-size: 13px;
+	font-weight: 600;
+	margin-bottom: 12px;
+	display: flex;
+	align-items: center;
+	gap: 7px;
+}
+
+.car_subtitle {
+	font-size: 12px;
+	color: var(--sub);
+	line-height: 1.5;
+}
+
+/* Buttons */
+.btn {
+	border: 0.5px solid var(--border);
+	background: var(--white);
+	color: var(--gray);
+	border-radius: 8px;
+	padding: 8px 12px;
+	font-family: var(--font);
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.btn:hover {
+	background: var(--muted);
+	color: var(--dark);
+}
+
+.btn.primary {
+	background: var(--red);
+	border-color: var(--red);
+	color: var(--white);
+}
+
+.btn.primary:hover {
+	background: var(--red-dark);
+}
+
+.btn.danger {
+	background: var(--red-light);
+	border-color: var(--red-mid);
+	color: var(--red);
+}
+
+.btn.sm {
+	padding: 5px 9px;
+	font-size: 12px;
+	border-radius: 7px;
+}
+
+/* Status badges */
+.status {
+	font-size: 11px;
+	padding: 2.5px 9px;
+	border-radius: 12px;
+	white-space: nowrap;
+	font-weight: 500;
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+
+.s_wacht,
+.s_amber {
+	background: var(--amber-bg);
+	color: var(--amber);
+}
+
+.s_ok {
+	background: var(--green-bg);
+	color: var(--green);
+}
+
+.s_info {
+	background: var(--blue-bg);
+	color: var(--blue);
+}
+
+.s_rood {
+	background: var(--red-light);
+	color: var(--red);
+}
+
+.s_grijs {
+	background: #f0f0ee;
+	color: var(--sub);
+}
+
+/* Tables */
+.tbl {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 13px;
+}
+
+.tbl th {
+	text-align: left;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.4px;
+	color: var(--sub);
+	font-weight: 700;
+	padding: 10px 8px;
+	border-bottom: 1px solid var(--border);
+}
+
+.tbl td {
+	padding: 11px 8px;
+	border-bottom: 1px solid var(--border);
+	vertical-align: middle;
+}
+
+.tbl tr:last-child td {
+	border-bottom: none;
+}
+
+.tbl .right {
+	text-align: right;
+	white-space: nowrap;
+}
+
+/* Forms */
+.form_row {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.form_group {
+	margin-bottom: 12px;
+}
+
+.form_label {
+	display: block;
+	font-size: 12px;
+	font-weight: 600;
+	margin-bottom: 5px;
+	color: var(--dark);
+}
+
+.form_input,
+.form_select,
+.form_textarea {
+	width: 100%;
+	border: 0.5px solid var(--border);
+	border-radius: 8px;
+	padding: 9px 10px;
+	font-family: var(--font);
+	font-size: 13px;
+	color: var(--dark);
+	background: var(--white);
+	outline: none;
+}
+
+.form_input:focus,
+.form_select:focus,
+.form_textarea:focus {
+	border-color: var(--red);
+	box-shadow: 0 0 0 3px var(--red-light);
+}
+
+.form_textarea {
+	min-height: 90px;
+	resize: vertical;
+}
+
+/* Grids */
+.grid_2 {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.grid_3 {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 12px;
+}
