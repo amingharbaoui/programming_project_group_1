@@ -137,7 +137,21 @@ export default function StudentLogbookPage() {
         </form>
       </div>
 
-      
+      {/* Overzicht van ingediende weken */}
+      {weken.length > 0 && (
+        <div className="card">
+          <div className="card_title">
+            <i className="ti ti-list" />
+            Ingediende weken
+          </div>
+          {weken.map((week) => (
+            <div key={week.id} className="kv">
+              <span className="k">Week {week.week_nummer}</span>
+              <span className="v">{week.aantal_uren}u</span>
+            </div>
+          ))}
+        </div>
+      )}
 
     </div>
   );
