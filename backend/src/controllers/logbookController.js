@@ -1,0 +1,513 @@
+const db = require("../config/db");
+const { ok, fail } = require("../utils/response");
+
+function getUserId(req, fallbackId) {
+  return Number(req.header("x-user-id") || req.body.userId || fallbackId);
+}
+
+function normalizeDate(value) {
+  if (!value) return null;
+  return value;
+}
+
+function sumHours(days) {
+  return days.reduce((total, day) => total + Number(day.aantalUren || day.aantal_uren || 0), 0);
+}
+
+async function findLatestDossierForStudent(connection, studentId) {
+  const [rows] = await connection.query(
+    `
+    SELECT id
+    FROM stagedossiers
+    WHERE student_id = ?
+    ORDER BY aangemaakt_op DESC
+    LIMIT 1
+    `,
+    [studentId]
+  );
+
+  return rows[0]?.id || null;
+}
+
+async function getDossierMeta(connection, dossierId) {
+  const [rows] = await connection.query(
+    `
+    SELECT id, mentor_id, stagebegeleider_id
+    FROM stagedossiers
+    WHERE id = ?
+    LIMIT 1
+    `,
+    [dossierId]
+  );
+
+  return rows[0] || null;
+}
+
+
+async function getValidMentorIdForWeek(connection, weekId, requestedMentorId) {
+  const [rows] = await connection.query(
+    `
+    SELECT 
+      lw.mentor_id AS week_mentor_id,
+      d.mentor_id AS dossier_mentor_id
+    FROM logboek_weken lw
+    JOIN stagedossiers d ON d.id = lw.stagedossier_id
+    WHERE lw.id = ?
+    LIMIT 1
+    `,
+    [weekId]
+  );
+
+  const data = rows[0];
+  const candidates = [
+    requestedMentorId,
+    data?.week_mentor_id,
+    data?.dossier_mentor_id
+  ].filter(Boolean);
+
+  for (const id of candidates) {
+    const [valid] = await connection.query(
+      "SELECT gebruiker_id FROM mentoren WHERE gebruiker_id = ? LIMIT 1",
+      [id]
+    );
+
+    if (valid.length > 0) return id;
+  }
+
+  return null;
+}
+
+async function getValidDocentIdForWeek(connection, weekId, requestedDocentId) {
+  const [rows] = await connection.query(
+    `
+    SELECT 
+      lw.docent_id AS week_docent_id,
+      d.stagebegeleider_id AS dossier_docent_id
+    FROM logboek_weken lw
+    JOIN stagedossiers d ON d.id = lw.stagedossier_id
+    WHERE lw.id = ?
+    LIMIT 1
+    `,
+    [weekId]
+  );
+
+  const data = rows[0];
+  const candidates = [
+    requestedDocentId,
+    data?.week_docent_id,
+    data?.dossier_docent_id
+  ].filter(Boolean);
+
+  for (const id of candidates) {
+    const [valid] = await connection.query(
+      "SELECT gebruiker_id FROM medewerkers WHERE gebruiker_id = ? LIMIT 1",
+      [id]
+    );
+
+    if (valid.length > 0) return id;
+  }
+
+  return null;
+}
+
+async function createLogbook(req, res) {
+  const studentId = getUserId(req, 1);
+
+  const {
+    stagedossierId,
+    stagedossier_id,
+    weekNummer,
+    week_nummer,
+    weekStart,
+    week_start,
+    weekEinde,
+    week_einde,
+    dagen,
+    days
+  } = req.body;
+
+  const finalDays = dagen || days || [];
+  const finalWeekNummer = Number(weekNummer || week_nummer);
+  const finalWeekStart = normalizeDate(weekStart || week_start);
+  const finalWeekEinde = normalizeDate(weekEinde || week_einde);
+
+  if (!finalWeekNummer || !finalWeekStart || !finalWeekEinde) {
+    return fail(res, 400, "weekNummer, weekStart en weekEinde zijn verplicht");
+  }
+
+  if (!Array.isArray(finalDays) || finalDays.length === 0) {
+    return fail(res, 400, "Minstens ��n logboekdag is verplicht");
+  }
+
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    let dossierId = Number(stagedossierId || stagedossier_id);
+
+    if (!dossierId) {
+      dossierId = await findLatestDossierForStudent(connection, studentId);
+    }
+
+    if (!dossierId) {
+      await connection.rollback();
+      return fail(res, 404, "Geen stagedossier gevonden voor deze student");
+    }
+
+    const dossier = await getDossierMeta(connection, dossierId);
+
+    if (!dossier) {
+      await connection.rollback();
+      return fail(res, 404, "Stagedossier niet gevonden");
+    }
+
+    const totaalUren = sumHours(finalDays);
+
+    const [existingWeeks] = await connection.query(
+      `
+      SELECT id
+      FROM logboek_weken
+      WHERE stagedossier_id = ?
+        AND week_nummer = ?
+      LIMIT 1
+      `,
+      [dossierId, finalWeekNummer]
+    );
+
+    let weekId;
+
+    if (existingWeeks.length > 0) {
+      weekId = existingWeeks[0].id;
+
+      await connection.query(
+        `
+        UPDATE logboek_weken
+        SET week_start = ?,
+            week_einde = ?,
+            status = 'ingediend',
+            totaal_uren = ?,
+            ingediend_op = NOW(),
+            mentor_id = ?,
+            docent_id = ?,
+            herindiening_nodig = 0,
+            aangepast_op = NOW()
+        WHERE id = ?
+        `,
+        [
+          finalWeekStart,
+          finalWeekEinde,
+          totaalUren,
+          dossier.mentor_id || null,
+          dossier.stagebegeleider_id || null,
+          weekId
+        ]
+      );
+
+      await connection.query(
+        "DELETE FROM logboek_dagen WHERE logboek_week_id = ?",
+        [weekId]
+      );
+    } else {
+      const [weekResult] = await connection.query(
+        `
+        INSERT INTO logboek_weken
+        (
+          stagedossier_id,
+          week_nummer,
+          week_start,
+          week_einde,
+          status,
+          totaal_uren,
+          ingediend_op,
+          mentor_id,
+          docent_id,
+          herindiening_nodig,
+          aangemaakt_op,
+          aangepast_op
+        )
+        VALUES (?, ?, ?, ?, 'ingediend', ?, NOW(), ?, ?, 0, NOW(), NOW())
+        `,
+        [
+          dossierId,
+          finalWeekNummer,
+          finalWeekStart,
+          finalWeekEinde,
+          totaalUren,
+          dossier.mentor_id || null,
+          dossier.stagebegeleider_id || null
+        ]
+      );
+
+      weekId = weekResult.insertId;
+    }
+
+    for (const day of finalDays) {
+      await connection.query(
+        `
+        INSERT INTO logboek_dagen
+        (
+          logboek_week_id,
+          datum,
+          status,
+          titel,
+          uitgevoerde_taken,
+          reflectie,
+          problemen,
+          leerpunten,
+          aantal_uren,
+          aangemaakt_op,
+          aangepast_op
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        `,
+        [
+          weekId,
+          day.datum,
+          day.status || "ingediend",
+          day.titel || null,
+          day.uitgevoerdeTaken || day.uitgevoerde_taken || null,
+          day.reflectie || null,
+          day.problemen || null,
+          day.leerpunten || null,
+          Number(day.aantalUren || day.aantal_uren || 0)
+        ]
+      );
+    }
+
+    await connection.commit();
+
+    return ok(
+      res,
+      {
+        weekId,
+        stagedossierId: dossierId,
+        weekNummer: finalWeekNummer,
+        status: "ingediend",
+        totaalUren
+      },
+      "Logboekweek ingediend"
+    );
+  } catch (error) {
+    await connection.rollback();
+    return fail(res, 500, "Logboek indienen mislukt", error.message);
+  } finally {
+    connection.release();
+  }
+}
+
+async function getLogbooksByStudent(req, res) {
+  const studentId = Number(req.params.studentId || req.query.studentId || 1);
+
+  try {
+    const [weeks] = await db.query(
+      `
+      SELECT
+        lw.id,
+        lw.stagedossier_id,
+        lw.week_nummer,
+        lw.week_start,
+        lw.week_einde,
+        lw.status,
+        lw.totaal_uren,
+        lw.ingediend_op,
+        lw.mentor_id,
+        lw.mentor_feedback,
+        lw.mentor_nagekeken_op,
+        lw.docent_id,
+        lw.docent_feedback,
+        lw.docent_nagekeken_op,
+        lw.herindiening_nodig,
+        lw.blokkade,
+
+        d.dossiernummer,
+        d.student_id,
+        b.naam AS bedrijf_naam
+      FROM logboek_weken lw
+      JOIN stagedossiers d ON d.id = lw.stagedossier_id
+      JOIN bedrijven b ON b.id = d.bedrijf_id
+      WHERE d.student_id = ?
+      ORDER BY lw.week_nummer DESC
+      `,
+      [studentId]
+    );
+
+    const weekIds = weeks.map((week) => week.id);
+
+    if (weekIds.length === 0) {
+      return ok(res, [], "Geen logboeken gevonden");
+    }
+
+    const [days] = await db.query(
+      `
+      SELECT
+        id,
+        logboek_week_id,
+        datum,
+        status,
+        titel,
+        uitgevoerde_taken,
+        reflectie,
+        problemen,
+        leerpunten,
+        aantal_uren
+      FROM logboek_dagen
+      WHERE logboek_week_id IN (?)
+      ORDER BY datum ASC
+      `,
+      [weekIds]
+    );
+
+    const daysByWeek = {};
+
+    for (const day of days) {
+      if (!daysByWeek[day.logboek_week_id]) {
+        daysByWeek[day.logboek_week_id] = [];
+      }
+
+      daysByWeek[day.logboek_week_id].push(day);
+    }
+
+    const result = weeks.map((week) => ({
+      ...week,
+      dagen: daysByWeek[week.id] || []
+    }));
+
+    return ok(res, result, "Logboeken opgehaald");
+  } catch (error) {
+    return fail(res, 500, "Logboeken ophalen mislukt", error.message);
+  }
+}
+
+
+async function mentorCheckLogbookWeek(req, res) {
+  const weekId = Number(req.params.weekId);
+  const requestedMentorId = getUserId(req, 4);
+
+  const {
+    feedback,
+    mentorFeedback,
+    herindieningNodig,
+    blokkade
+  } = req.body;
+
+  const needsResubmission = Boolean(herindieningNodig);
+  const connection = await db.getConnection();
+
+  try {
+    const [existing] = await connection.query(
+      "SELECT id FROM logboek_weken WHERE id = ? LIMIT 1",
+      [weekId]
+    );
+
+    if (existing.length === 0) {
+      return fail(res, 404, "Logboekweek niet gevonden");
+    }
+
+    const validMentorId = await getValidMentorIdForWeek(connection, weekId, requestedMentorId);
+
+    await connection.query(
+      `
+      UPDATE logboek_weken
+      SET status = ?,
+          mentor_id = COALESCE(?, mentor_id),
+          mentor_feedback = ?,
+          mentor_nagekeken_op = NOW(),
+          herindiening_nodig = ?,
+          blokkade = COALESCE(?, blokkade),
+          aangepast_op = NOW()
+      WHERE id = ?
+      `,
+      [
+        needsResubmission ? "teruggestuurd_door_mentor" : "afgecheckt_door_mentor",
+        validMentorId,
+        mentorFeedback || feedback || null,
+        needsResubmission ? 1 : 0,
+        blokkade || null,
+        weekId
+      ]
+    );
+
+    const [rows] = await connection.query(
+      "SELECT * FROM logboek_weken WHERE id = ?",
+      [weekId]
+    );
+
+    return ok(res, rows[0], "Mentorcontrole opgeslagen");
+  } catch (error) {
+    return fail(res, 500, "Mentorcontrole mislukt", error.message);
+  } finally {
+    connection.release();
+  }
+}
+
+
+
+async function docentReviewLogbookWeek(req, res) {
+  const weekId = Number(req.params.weekId);
+  const requestedDocentId = getUserId(req, 5);
+
+  const {
+    feedback,
+    docentFeedback,
+    herindieningNodig,
+    blokkade
+  } = req.body;
+
+  const needsResubmission = Boolean(herindieningNodig);
+  const connection = await db.getConnection();
+
+  try {
+    const [existing] = await connection.query(
+      "SELECT id FROM logboek_weken WHERE id = ? LIMIT 1",
+      [weekId]
+    );
+
+    if (existing.length === 0) {
+      return fail(res, 404, "Logboekweek niet gevonden");
+    }
+
+    const validDocentId = await getValidDocentIdForWeek(connection, weekId, requestedDocentId);
+
+    await connection.query(
+      `
+      UPDATE logboek_weken
+      SET status = ?,
+          docent_id = COALESCE(?, docent_id),
+          docent_feedback = ?,
+          docent_nagekeken_op = NOW(),
+          herindiening_nodig = ?,
+          blokkade = COALESCE(?, blokkade),
+          aangepast_op = NOW()
+      WHERE id = ?
+      `,
+      [
+        needsResubmission ? "teruggestuurd_door_docent" : "goedgekeurd_door_docent",
+        validDocentId,
+        docentFeedback || feedback || null,
+        needsResubmission ? 1 : 0,
+        blokkade || null,
+        weekId
+      ]
+    );
+
+    const [rows] = await connection.query(
+      "SELECT * FROM logboek_weken WHERE id = ?",
+      [weekId]
+    );
+
+    return ok(res, rows[0], "Docentcontrole opgeslagen");
+  } catch (error) {
+    return fail(res, 500, "Docentcontrole mislukt", error.message);
+  } finally {
+    connection.release();
+  }
+}
+
+
+module.exports = {
+  createLogbook,
+  getLogbooksByStudent,
+  mentorCheckLogbookWeek,
+  docentReviewLogbookWeek
+};
