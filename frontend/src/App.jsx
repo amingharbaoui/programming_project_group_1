@@ -3,7 +3,7 @@ import { AuthProvider } from "./context/AuthContext";
 import AppLayout from "./components/layout/AppLayout";
 import LoginPage from "./features/student/pages/LoginPage";
 
-import StudentDashboard from "./features/student/pages/StudentDashboard";
+// import StudentDashboard from "./features/student/pages/StudentDashboard";
 import StageApplicationPage from "./features/student/pages/StageApplicationPage";
 import MyInternshipPage from "./features/student/pages/MyInternshipPage";
 import StudentLogbookPage from "./features/student/pages/StudentLogbookPage";
@@ -36,7 +36,7 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/" element={<Navigate to="/login" replace />} />
           <Route element={<AppLayout />}>
-           <Route path="/student" element={<StudentDashboard />} />
+           <Route path="/student" element={<MyInternshipPage />} />
             <Route path="/student/application" element={<StageApplicationPage />} />
             <Route path="/student/internship" element={<MyInternshipPage />} />
             <Route path="/student/logbook" element={<StudentLogbookPage />} />
