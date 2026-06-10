@@ -1,6 +1,6 @@
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
-import Topbar from "./Topbar";
+import Topbar from "./Navbar";
 
 export default function AppLayout() {
   return (
@@ -8,7 +8,7 @@ export default function AppLayout() {
       <Sidebar />
 
       <div style={{ flex: 1 }}>
-        <Topbar />
+        <Navbar />
 
         <main style={{ padding: "24px" }}>
           <Outlet />

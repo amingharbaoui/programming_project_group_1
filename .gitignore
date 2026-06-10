@@ -20,5 +20,3 @@ build/
 # logs
 *.log
 npm-debug.log*
-.env
-backend/.env
