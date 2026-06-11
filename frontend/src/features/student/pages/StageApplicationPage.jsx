@@ -25,6 +25,7 @@ export default function StageApplicationPage() {
   }
 
   // aanvraag indienen
+  // aanvraag indienen
   async function handleSubmit(e) {
     e.preventDefault();
 
@@ -49,6 +50,7 @@ export default function StageApplicationPage() {
       setError(err.response?.data?.message || err.message || "Stagevoorstel indienen mislukt");
     }
   }
+
   // Toon successmelding na indienen
   if (submitted) {
     return (
@@ -78,7 +80,7 @@ export default function StageApplicationPage() {
 
       <div className="page-header">
         <h1>Stagevoorstel</h1>
-        <p>Vul alles in Ã¢â‚¬â€ je kan tussentijds opslaan als concept</p>
+        <p>Vul alles in ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â je kan tussentijds opslaan als concept</p>
       </div>
 
       {error && (
@@ -129,7 +131,7 @@ export default function StageApplicationPage() {
             </div>
           </div>
 
-          {/* Opdracht Ã¢â‚¬â€ nieuw: opdrachtTitel en technologieen toegevoegd */}
+          {/* Opdracht ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â nieuw: opdrachtTitel en technologieen toegevoegd */}
           <div className="card">
             <div className="card_title">
               <i className="ti ti-clipboard-text" />
@@ -161,7 +163,7 @@ export default function StageApplicationPage() {
                 <input className="form_input" type="date" name="eindDatum" value={form.eindDatum} onChange={handleChange} />
               </div>
             </div>
-            <p>Moet binnen het stagevenster van de opleiding vallen: 9 feb Ã¢â‚¬â€œ 26 jun 2026.</p>
+            <p>Moet binnen het stagevenster van de opleiding vallen: 9 feb ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 26 jun 2026.</p>
           </div>
 
           <div className="actions">
