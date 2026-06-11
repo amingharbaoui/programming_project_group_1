@@ -9,7 +9,6 @@ import MyInternshipPage from "./features/student/pages/MyInternshipPage";
 import StudentLogbookPage from "./features/student/pages/StudentLogbookPage";
 import StudentEvaluationPage from "./features/student/pages/StudentEvaluationPage";
 
-import CommitteeDashboard from "./features/committee/pages/CommitteeDashboard";
 import ApplicationsPage from "./features/committee/pages/ApplicationsPage";
 
 import AdminDashboard from "./features/admin/pages/AdminDashboard";
@@ -42,7 +41,7 @@ export default function App() {
             <Route path="/student/logbook" element={<StudentLogbookPage />} />
             <Route path="/student/evaluation" element={<StudentEvaluationPage />} />
 
-            <Route path="/committee" element={<CommitteeDashboard />} />
+           <Route path="/committee" element={<ApplicationsPage />} />
             <Route path="/committee/applications" element={<ApplicationsPage />} />
 
             <Route path="/admin" element={<AdminDashboard />} />

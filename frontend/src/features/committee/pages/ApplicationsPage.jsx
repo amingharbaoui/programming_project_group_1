@@ -193,7 +193,7 @@ export default function ApplicationsPage() {
       )}
 
       {!loading && !error && applications.length > 0 && (
-        <div className="grid-2">
+        <div className="grid_2">
           {applications.map((app) => (
             <div className="card" key={`detail-${app.id}`}>
               <div className="card-title">
