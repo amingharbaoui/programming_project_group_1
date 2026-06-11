@@ -95,3 +95,69 @@
 .page-inner .card {
 	overflow: hidden;
 }
+
+/* Zorgt dat de inhoud van een pagina niet over de volledige breedte gaat. */
+.page-inner {
+	max-width: 1200px;
+	margin: 0 auto;
+	padding: 24px;
+}
+
+/* Bovenste gedeelte van een pagina. */
+.page-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 20px;
+}
+
+/* Titel bovenaan een kaart/card. */
+.card-title {
+	font-size: 13px;
+	font-weight: 600;
+	margin-bottom: 12px;
+	display: flex;
+	align-items: center;
+	gap: 7px;
+}
+
+/* Key-Value layout. */
+.kv {
+	display: flex;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 4px 0;
+}
+
+/* Container voor meerdere knoppen. */
+.actions {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+/* Wordt getoond wanneer er geen gegevens zijn.*/
+.empty-state {
+	text-align: center;
+	padding: 32px;
+	color: var(--sub);
+}
+
+/* Styling voor labels in key-value blokken */
+.k {
+	font-weight: 600;
+	color: var(--gray);
+}
+
+/* Styling voor waarden in key-value blokken */
+.v {
+	color: var(--dark);
+	text-align: right;
+}
+
+/* Ondertitel in cards */
+.card-subtitle {
+	font-size: 12px;
+	color: var(--sub);
+	line-height: 1.5;
+}
