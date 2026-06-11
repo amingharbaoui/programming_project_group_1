@@ -1,0 +1,97 @@
+.page-inner {
+	padding: 24px;
+}
+
+.page-header {
+	margin-bottom: 18px;
+}
+
+.page-header h1 {
+	margin: 0 0 6px;
+	font-size: 28px;
+	font-weight: 700;
+	color: var(--dark);
+}
+
+.page-header p {
+	margin: 0;
+	font-size: 14px;
+	color: var(--sub);
+}
+
+.toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 10px;
+}
+
+.actions {
+	display: flex;
+	justify-content: flex-end;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.muted {
+	color: var(--sub);
+	font-size: 12px;
+	line-height: 1.45;
+}
+
+.empty-state {
+	padding: 28px 16px;
+	text-align: center;
+	color: var(--sub);
+	background: var(--white);
+	border: 0.5px dashed var(--border);
+	border-radius: 10px;
+}
+
+.kv {
+	display: grid;
+	grid-template-columns: 120px 1fr;
+	gap: 8px;
+	padding: 8px 0;
+	border-bottom: 1px solid var(--border);
+}
+
+.kv:last-child {
+	border-bottom: none;
+}
+
+.k {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--sub);
+}
+
+.v {
+	font-size: 13px;
+	color: var(--dark);
+	word-break: break-word;
+}
+
+.page-inner .card-subtitle {
+	font-size: 12px;
+	color: var(--sub);
+	line-height: 1.5;
+}
+
+.page-inner .tbl td strong {
+	font-size: 13px;
+	color: var(--dark);
+}
+
+.page-inner .tbl td {
+	line-height: 1.45;
+}
+
+.page-inner .status {
+	vertical-align: middle;
+}
+
+.page-inner .card {
+	overflow: hidden;
+}
