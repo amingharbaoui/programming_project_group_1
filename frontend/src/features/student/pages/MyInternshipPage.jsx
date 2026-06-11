@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiRequest } from "../../../services/api";
+import "./MyInternshipPage.css"
 
 export default function MyInternshipPage() {
   const navigate = useNavigate();
