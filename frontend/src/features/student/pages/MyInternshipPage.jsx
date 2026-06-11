@@ -18,7 +18,7 @@ export default function MyInternshipPage() {
   const [internship, setInternship] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Demo data — David vervangt later door GET /api/internships/my
+  // Demo data, David vervang dit!
   const demoInternship = {
     status: "ingediend",
     bedrijfNaam: "Demo bedrijf",
