@@ -7,6 +7,10 @@ const api = axios.create({
   }
 });
 
+export function setApiUserId(userId) {
+  api.defaults.headers.common["x-user-id"] = String(userId);
+}
+
 export async function apiRequest(method, url, data = null) {
   const res = await api({ method, url, data });
   return res.data;

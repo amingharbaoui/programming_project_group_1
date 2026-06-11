@@ -1,5 +1,6 @@
 import { createContext, useContext, useState } from "react";
 import { ROLES } from "../constants/roles";
+import { setApiUserId } from "../services/api";
 
 const AuthContext = createContext(null);
 
@@ -35,7 +36,9 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(demoUsers.student);
 
   function switchRole(role) {
-    setUser(demoUsers[role]);
+    const nextUser = demoUsers[role];
+    setUser(nextUser);
+    setApiUserId(nextUser.id);
   }
 
   return (
