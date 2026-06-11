@@ -37,6 +37,7 @@ export default function App() {
             <Route path="/student/logbook" element={<StudentLogbookPage />} />
             <Route path="/student/evaluation" element={<StudentEvaluationPage />} />
 
+            <Route path="/committee" element={<Navigate to="/committee/applications" replace />} />
             <Route path="/committee/applications" element={<ApplicationsPage />} />
 
             <Route path="/admin/dossiers" element={<DossiersPage />} />
