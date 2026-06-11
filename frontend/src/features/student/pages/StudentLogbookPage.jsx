@@ -1,75 +1,74 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 import { apiRequest } from "../../../services/api";
 
 export default function StudentLogbookPage() {
-  const navigate = useNavigate();
-  const [weken, setWeken] = useState([]);
+  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(null);
-  const [succes, setSucces] = useState(false);
 
-  // Formulier state voor een nieuwe logboekweek
-  const [form, setForm] = useState({
-    weekNummer: "",
-    taken: "",
-    reflectie: "",
-    leerpunten: "",
-    aantalUren: "",
+  // State structuur aangepast aan spec — 5 dagen per week
+  const [logbook, setLogbook] = useState({
+    stagedossierId: 1,
+    weekNummer: 1,
+    weekStart: "",
+    weekEinde: "",
+    dagen: [
+      { datum: "", titel: "", uitgevoerdeTaken: "", reflectie: "", problemen: "", aantalUren: 0 },
+      { datum: "", titel: "", uitgevoerdeTaken: "", reflectie: "", problemen: "", aantalUren: 0 },
+      { datum: "", titel: "", uitgevoerdeTaken: "", reflectie: "", problemen: "", aantalUren: 0 },
+      { datum: "", titel: "", uitgevoerdeTaken: "", reflectie: "", problemen: "", aantalUren: 0 },
+      { datum: "", titel: "", uitgevoerdeTaken: "", reflectie: "", problemen: "", aantalUren: 0 },
+    ],
   });
 
-  function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
+  // Wijzig een veld van de week zelf (weekNummer, weekStart, weekEinde)
+  function handleWeekChange(e) {
+    setLogbook({ ...logbook, [e.target.name]: e.target.value });
   }
 
-  // Haal bestaande logboekweken op bij het laden
-  useEffect(() => {
-    async function fetchLogboek() {
-      try {
-        const data = await apiRequest("GET", "/logbooks/1");
-        if (data.data) {
-          setWeken(data.data);
-        }
-      } catch (err) {
-        console.error("Kan logboek niet ophalen:", err);
-      }
-    }
-    fetchLogboek();
-  }, []);
+  // Wijzig een veld van een specifieke dag
+  function handleDagChange(index, e) {
+    const updatedDagen = [...logbook.dagen];
+    updatedDagen[index] = {
+      ...updatedDagen[index],
+      [e.target.name]: e.target.name === "aantalUren"
+        ? Number(e.target.value)
+        : e.target.value,
+    };
+    setLogbook({ ...logbook, dagen: updatedDagen });
+  }
 
-  // Stuur nieuwe week in naar de backend
-  async function handleSubmit(e) {
+  // Bereken het totaal aantal uren over alle dagen
+  const totaalUren = logbook.dagen.reduce((sum, dag) => sum + (Number(dag.aantalUren) || 0), 0);
+
+  // Submit logt data naar console — David koppelt later POST /api/logbooks
+  function handleSubmit(e) {
     e.preventDefault();
-    setError(null);
-    setSucces(false);
+    console.log("logboek klaar voor backend", logbook);
+    setSubmitted(true);
+  }
 
-    try {
-      await apiRequest("POST", "/logbooks", {
-        studentId: 1,
-        weekNummer: Number(form.weekNummer),
-        taken: form.taken,
-        reflectie: form.reflectie,
-        leerpunten: form.leerpunten,
-        aantalUren: Number(form.aantalUren),
-      });
-
-      setSucces(true);
-
-      // Reset formulier na indienen
-      setForm({
-        weekNummer: "",
-        taken: "",
-        reflectie: "",
-        leerpunten: "",
-        aantalUren: "",
-      });
-
-      // Herlaad de weken
-      const data = await apiRequest("GET", "/logbooks/1");
-      if (data.data) setWeken(data.data);
-
-    } catch (err) {
-      setError(err.response?.data?.message || "Er is iets misgegaan");
-    }
+  // Toon successmelding na indienen
+  if (submitted) {
+    return (
+      <div className="page-inner">
+        <div className="page-header">
+          <h1>Logboek</h1>
+        </div>
+        <div className="card">
+          <div className="card_title">
+            <i className="ti ti-circle-check" />
+            Week ingediend
+          </div>
+          <p>Week {logbook.weekNummer} is ingediend. Totaal: {totaalUren} uren.</p>
+          <div className="actions">
+            <button className="btn primary" onClick={() => setSubmitted(false)}>
+              <i className="ti ti-plus" />
+              Nieuwe week invullen
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -80,78 +79,87 @@ export default function StudentLogbookPage() {
         <p>Vul wekelijks je activiteiten in</p>
       </div>
 
-      {/* Fout- en succesbericht */}
       {error && (
         <div className="card">
           <p className="status s_rood">{error}</p>
         </div>
       )}
-      {succes && (
+
+      <form onSubmit={handleSubmit}>
+
+        {/* Week info */}
         <div className="card">
-          <p className="status s_ok">Week succesvol ingediend.</p>
-        </div>
-      )}
-
-      {/* Formulier voor nieuwe week */}
-      <div className="card">
-        <div className="card_title">
-          <i className="ti ti-pencil" />
-          Nieuwe week invullen
-        </div>
-
-        <form onSubmit={handleSubmit}>
-
+          <div className="card_title">
+            <i className="ti ti-calendar" />
+            Week informatie
+          </div>
           <div className="form_row">
             <div className="form_group">
               <label className="form_label">Weeknummer<span className="req">*</span></label>
-              <input className="form_input" type="number" name="weekNummer" value={form.weekNummer} onChange={handleChange} placeholder="1" />
+              <input className="form_input" type="number" name="weekNummer" value={logbook.weekNummer} onChange={handleWeekChange} placeholder="1" />
             </div>
             <div className="form_group">
-              <label className="form_label">Aantal uren<span className="req">*</span></label>
-              <input className="form_input" type="number" name="aantalUren" value={form.aantalUren} onChange={handleChange} placeholder="38" />
+              <label className="form_label">Totaal uren</label>
+              {/* Automatisch berekend op basis van alle dagen */}
+              <input className="form_input" type="number" value={totaalUren} readOnly />
             </div>
           </div>
-
-          <div className="form_group">
-            <label className="form_label">Taken<span className="req">*</span></label>
-            <textarea className="form_textarea" name="taken" value={form.taken} onChange={handleChange} placeholder="Wat heb je deze week gedaan?" />
-          </div>
-
-          <div className="form_group">
-            <label className="form_label">Reflectie<span className="req">*</span></label>
-            <textarea className="form_textarea" name="reflectie" value={form.reflectie} onChange={handleChange} placeholder="Hoe verliep de week?" />
-          </div>
-
-          <div className="form_group">
-            <label className="form_label">Problemen / leerpunten</label>
-            <textarea className="form_textarea" name="leerpunten" value={form.leerpunten} onChange={handleChange} placeholder="Wat liep moeilijk? Wat heb je geleerd?" />
-          </div>
-
-          <div className="actions">
-            <button type="submit" className="btn primary">
-              <i className="ti ti-send" />
-              Week indienen
-            </button>
-          </div>
-
-        </form>
-      </div>
-
-      {/* Overzicht van ingediende weken */}
-      {weken.length > 0 && (
-        <div className="card">
-          <div className="card_title">
-            <i className="ti ti-list" />
-            Ingediende weken
-          </div>
-          {weken.map((week) => (
-            <div key={week.id} className="kv">
-              <span className="k">Week {week.week_nummer}</span>
-              <span className="v">{week.aantal_uren}u</span>
+          <div className="form_row">
+            <div className="form_group">
+              <label className="form_label">Week start<span className="req">*</span></label>
+              <input className="form_input" type="date" name="weekStart" value={logbook.weekStart} onChange={handleWeekChange} />
             </div>
-          ))}
+            <div className="form_group">
+              <label className="form_label">Week einde<span className="req">*</span></label>
+              <input className="form_input" type="date" name="weekEinde" value={logbook.weekEinde} onChange={handleWeekChange} />
+            </div>
+          </div>
         </div>
-      )}
+
+        {/* 5 dagen invullen */}
+        {logbook.dagen.map((dag, index) => (
+          <div className="card" key={index}>
+            <div className="card_title">
+              <i className="ti ti-sun" />
+              Dag {index + 1}
+            </div>
+            <div className="form_row">
+              <div className="form_group">
+                <label className="form_label">Datum</label>
+                <input className="form_input" type="date" name="datum" value={dag.datum} onChange={(e) => handleDagChange(index, e)} />
+              </div>
+              <div className="form_group">
+                <label className="form_label">Aantal uren</label>
+                <input className="form_input" type="number" name="aantalUren" value={dag.aantalUren} onChange={(e) => handleDagChange(index, e)} placeholder="8" />
+              </div>
+            </div>
+            <div className="form_group">
+              <label className="form_label">Titel</label>
+              <input className="form_input" type="text" name="titel" value={dag.titel} onChange={(e) => handleDagChange(index, e)} placeholder="Wat was het hoofdthema van de dag?" />
+            </div>
+            <div className="form_group">
+              <label className="form_label">Uitgevoerde taken</label>
+              <textarea className="form_textarea" name="uitgevoerdeTaken" value={dag.uitgevoerdeTaken} onChange={(e) => handleDagChange(index, e)} placeholder="Wat heb je gedaan?" />
+            </div>
+            <div className="form_group">
+              <label className="form_label">Reflectie</label>
+              <textarea className="form_textarea" name="reflectie" value={dag.reflectie} onChange={(e) => handleDagChange(index, e)} placeholder="Hoe verliep de dag?" />
+            </div>
+            <div className="form_group">
+              <label className="form_label">Problemen / leerpunten</label>
+              <textarea className="form_textarea" name="problemen" value={dag.problemen} onChange={(e) => handleDagChange(index, e)} placeholder="Wat liep moeilijk? Wat heb je geleerd?" />
+            </div>
+          </div>
+        ))}
+
+        <div className="actions">
+          <button type="submit" className="btn primary">
+            <i className="ti ti-send" />
+            Logboek indienen
+          </button>
+        </div>
+
+      </form>
 
     </div>
   );
