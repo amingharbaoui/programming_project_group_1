@@ -5,10 +5,21 @@ import { apiRequest } from "../../../services/api";
 export default function MyInternshipPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [ingediend, setIngediend] = useState(location.state?.ingediend || false);
   const [showPopup, setShowPopup] = useState(location.state?.ingediend || false);
   const [voorstelOpen, setVoorstelOpen] = useState(false);
   const [internship, setInternship] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Demo data — David vervangt later door GET /api/internships/my
+  const demoInternship = {
+    status: "ingediend",
+    bedrijfNaam: "Demo bedrijf",
+    mentorNaam: "Demo mentor",
+    startDatum: "2026-02-09",
+    eindDatum: "2026-06-26",
+    opdrachtTitel: "Stageopdracht applicatieontwikkeling",
+    opdrachtOmschrijving: "Student werkt mee aan een interne webapplicatie.",
+  };
 
   // Status configuratie met bijhorende CSS klasse, icoon en label
   const statusConfig = {
@@ -18,27 +29,51 @@ export default function MyInternshipPage() {
     aanpassingen_gevraagd: { cls: "s_amber", icon: "ti-pencil", label: "Aanpassingen gevraagd" },
   };
 
-  const status = statusConfig[internship?.status] || statusConfig["ingediend"];
+  // Gebruik backend data als die beschikbaar is, anders demo data
+  const data = internship || demoInternship;
+  const status = statusConfig[data.status] || statusConfig["ingediend"];
+  const ingediend = !!internship || location.state?.ingediend;
 
   function handleBegrepen() {
     setShowPopup(false);
+  }
+
+  // Datums formatteren van ISO naar leesbaar formaat
+  function formatDatum(datum) {
+    if (!datum) return "—";
+    return new Date(datum).toLocaleDateString("nl-BE");
   }
 
   // Haal het voorstel op bij het laden van de pagina
   useEffect(() => {
     async function fetchInternship() {
       try {
-        const data = await apiRequest("GET", "/internships/my");
-        if (data.data) {
-          setInternship(data.data);
-          setIngediend(true);
+        const res = await apiRequest("GET", "/internships/my");
+        if (res.data) {
+          setInternship(res.data);
         }
       } catch (err) {
         console.error("Kan stage niet ophalen:", err);
+      } finally {
+        setLoading(false);
       }
     }
     fetchInternship();
   }, []);
+
+  // Laadscherm terwijl backend geraadpleegd wordt
+  if (loading) {
+    return (
+      <div className="page-inner">
+        <div className="page-header">
+          <h1>Mijn stage</h1>
+        </div>
+        <div className="card">
+          <p>Laden...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="page-inner">
@@ -127,7 +162,7 @@ export default function MyInternshipPage() {
             </div>
           </div>
 
-          {/* Huidige status van het voorstel */}
+          {/* Huidige status */}
           <div className="card">
             <div className="card_title">
               <i className="ti ti-info-circle" />
@@ -139,19 +174,15 @@ export default function MyInternshipPage() {
             </span>
           </div>
 
-          {/* Begeleiding — komt van de backend */}
+          {/* Begeleiding — altijd zichtbaar */}
           <div className="card">
             <div className="card_title">
               <i className="ti ti-users" />
               Begeleiding
             </div>
-            <div className="kv">
-              <span className="k">Mentor</span>
-              <span className="status s_amber">In afwachting</span>
-            </div>
-            <div className="kv"><span className="k">Naam</span><span className="v">{internship?.mentor_naam || "—"}</span></div>
-            <div className="kv"><span className="k">Bedrijf</span><span className="v">{internship?.bedrijf_naam || "—"}</span></div>
-            <div className="kv"><span className="k">E-mail</span><span className="v">{internship?.mentor_email || "—"}</span></div>
+            <div className="kv"><span className="k">Naam</span><span className="v">{data.mentorNaam || data.mentor_naam || "—"}</span></div>
+            <div className="kv"><span className="k">Bedrijf</span><span className="v">{data.bedrijfNaam || data.bedrijf_naam || "—"}</span></div>
+            <div className="kv"><span className="k">E-mail</span><span className="v">{data.mentorEmail || data.mentor_email || "—"}</span></div>
             <div className="kv"><span className="k">Stagebegeleider</span><span className="v">—</span></div>
           </div>
 
@@ -159,7 +190,7 @@ export default function MyInternshipPage() {
           <div className="card" onClick={() => setVoorstelOpen(!voorstelOpen)}>
             <div className="card_title">
               <i className="ti ti-file-description" />
-              Je voorstel zoals ingediend — nog niet goedgekeurd
+              Volledig voorstel bekijken
               <i className={`ti ${voorstelOpen ? "ti-chevron-up" : "ti-chevron-down"}`} />
             </div>
           </div>
@@ -172,18 +203,17 @@ export default function MyInternshipPage() {
                     <i className="ti ti-building" />
                     Bedrijf
                   </div>
-                  <div className="kv"><span className="k">Naam</span><span className="v">{internship?.bedrijf_naam || "—"}</span></div>
-                  <div className="kv"><span className="k">Afdeling</span><span className="v">{internship?.bedrijfsafdeling || "—"}</span></div>
-                  <div className="kv"><span className="k">Adres</span><span className="v">—</span></div>
+                  <div className="kv"><span className="k">Naam</span><span className="v">{data.bedrijfNaam || data.bedrijf_naam || "—"}</span></div>
+                  <div className="kv"><span className="k">Afdeling</span><span className="v">{data.bedrijfsafdeling || "—"}</span></div>
                 </div>
                 <div className="card">
                   <div className="card_title">
                     <i className="ti ti-calendar" />
                     Periode
                   </div>
-                  <div className="kv"><span className="k">Start</span><span className="v">{internship?.startdatum || "—"}</span></div>
-                  <div className="kv"><span className="k">Einde</span><span className="v">{internship?.einddatum || "—"}</span></div>
-                  <div className="kv"><span className="k">Uren/week</span><span className="v">{internship?.uren_per_week ? `${internship.uren_per_week}u` : "—"}</span></div>
+                  <div className="kv"><span className="k">Start</span><span className="v">{formatDatum(data.startDatum || data.startdatum)}</span></div>
+                  <div className="kv"><span className="k">Einde</span><span className="v">{formatDatum(data.eindDatum || data.einddatum)}</span></div>
+                  <div className="kv"><span className="k">Uren/week</span><span className="v">{data.uren_per_week ? `${data.uren_per_week}u` : "—"}</span></div>
                 </div>
               </div>
 
@@ -192,9 +222,9 @@ export default function MyInternshipPage() {
                   <i className="ti ti-user-check" />
                   Mentor
                 </div>
-                <div className="kv"><span className="k">Naam</span><span className="v">{internship?.mentor_naam || "—"}</span></div>
-                <div className="kv"><span className="k">Functie</span><span className="v">{internship?.mentor_functie || "—"}</span></div>
-                <div className="kv"><span className="k">E-mail</span><span className="v">{internship?.mentor_email || "—"}</span></div>
+                <div className="kv"><span className="k">Naam</span><span className="v">{data.mentorNaam || data.mentor_naam || "—"}</span></div>
+                <div className="kv"><span className="k">Functie</span><span className="v">{data.mentorFunctie || data.mentor_functie || "—"}</span></div>
+                <div className="kv"><span className="k">E-mail</span><span className="v">{data.mentorEmail || data.mentor_email || "—"}</span></div>
               </div>
 
               <div className="card">
@@ -202,8 +232,8 @@ export default function MyInternshipPage() {
                   <i className="ti ti-clipboard-text" />
                   Opdracht
                 </div>
-                <div className="kv"><span className="k">Functie</span><span className="v">{internship?.stagefunctie || "—"}</span></div>
-                <p>{internship?.opdrachtomschrijving || "—"}</p>
+                <div className="kv"><span className="k">Titel</span><span className="v">{data.opdrachtTitel || data.stagefunctie || "—"}</span></div>
+                <p>{data.opdrachtOmschrijving || data.opdrachtomschrijving || "—"}</p>
               </div>
 
               <div className="card">
@@ -216,7 +246,7 @@ export default function MyInternshipPage() {
           )}
 
           {/* Knop naar logboek — alleen zichtbaar als stage goedgekeurd is */}
-          {internship?.status === "goedgekeurd" && (
+          {data.status === "goedgekeurd" && (
             <div className="card">
               <div className="card_title">
                 <i className="ti ti-notebook" />
