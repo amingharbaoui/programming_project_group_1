@@ -24,3 +24,4 @@ idea
 *.njsproj
 *.sln
 *.sw?
+node_modules/
