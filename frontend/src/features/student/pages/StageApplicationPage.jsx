@@ -24,11 +24,31 @@ export default function StageApplicationPage() {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
-  // Submit logt data naar console 
-  function handleSubmit(e) {
+  // aanvraag indienen
+  // aanvraag indienen
+  async function handleSubmit(e) {
     e.preventDefault();
-    console.log("stage aanvraag klaar voor backend", form);
-    setSubmitted(true);
+
+    const payload = {
+      bedrijfNaam: form.bedrijfNaam,
+      bedrijfsadres: form.bedrijfAdres,
+      mentorNaam: form.mentorNaam,
+      mentorEmail: form.mentorEmail,
+      mentorFunctie: form.mentorFunctie,
+      stagefunctie: form.opdrachtTitel,
+      opdrachtomschrijving: form.opdrachtOmschrijving,
+      startdatum: form.startDatum,
+      einddatum: form.eindDatum,
+      urenPerWeek: 38,
+    };
+
+    try {
+      setError(null);
+      await apiRequest("POST", "/internships", payload);
+      setSubmitted(true);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Stagevoorstel indienen mislukt");
+    }
   }
 
   // Toon successmelding na indienen
@@ -60,7 +80,7 @@ export default function StageApplicationPage() {
 
       <div className="page-header">
         <h1>Stagevoorstel</h1>
-        <p>Vul alles in — je kan tussentijds opslaan als concept</p>
+        <p>Vul alles in ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â je kan tussentijds opslaan als concept</p>
       </div>
 
       {error && (
@@ -111,7 +131,7 @@ export default function StageApplicationPage() {
             </div>
           </div>
 
-          {/* Opdracht — nieuw: opdrachtTitel en technologieen toegevoegd */}
+          {/* Opdracht ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Â nieuw: opdrachtTitel en technologieen toegevoegd */}
           <div className="card">
             <div className="card_title">
               <i className="ti ti-clipboard-text" />
@@ -143,7 +163,7 @@ export default function StageApplicationPage() {
                 <input className="form_input" type="date" name="eindDatum" value={form.eindDatum} onChange={handleChange} />
               </div>
             </div>
-            <p>Moet binnen het stagevenster van de opleiding vallen: 9 feb – 26 jun 2026.</p>
+            <p>Moet binnen het stagevenster van de opleiding vallen: 9 feb ÃƒÂ¢Ã¢â€šÂ¬Ã¢â‚¬Å“ 26 jun 2026.</p>
           </div>
 
           <div className="actions">
