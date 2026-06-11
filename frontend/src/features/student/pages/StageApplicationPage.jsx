@@ -5,35 +5,54 @@ import { apiRequest } from "../../../services/api";
 export default function StageApplicationPage() {
   const navigate = useNavigate();
   const [error, setError] = useState(null);
+  // Nieuwe state: submitted voor successmelding, gewijzigd: state namen aangepast aan spec
+  const [submitted, setSubmitted] = useState(false);
 
   const [form, setForm] = useState({
     bedrijfNaam: "",
-    bedrijfsafdeling: "",
-    bedrijfsadres: "",
+    bedrijfAdres: "",       
     mentorNaam: "",
-    mentorFunctie: "",
     mentorEmail: "",
-    mentorTelefoon: "",
-    stagefunctie: "",
-    urenPerWeek: "",
-    opdrachtomschrijving: "",
-    startdatum: "",
-    einddatum: "",
+    mentorFunctie: "",
+    startDatum: "",         
+    eindDatum: "",          
+    opdrachtTitel: "",      
+    opdrachtOmschrijving: "", 
   });
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
-  async function handleSubmit(e) {
+  // Submit logt data naar console 
+  function handleSubmit(e) {
     e.preventDefault();
-    setError(null);
-    try {
-      await apiRequest("POST", "/internships", form);
-      navigate("/student/internship", { state: { ingediend: true } });
-    } catch (err) {
-      setError(err.response?.data?.message || "Er is iets misgegaan");
-    }
+    console.log("stage aanvraag klaar voor backend", form);
+    setSubmitted(true);
+  }
+
+  // Toon successmelding na indienen
+  if (submitted) {
+    return (
+      <div className="page-inner">
+        <div className="page-header">
+          <h1>Stagevoorstel</h1>
+        </div>
+        <div className="card">
+          <div className="card_title">
+            <i className="ti ti-circle-check" />
+            Stagevoorstel ingediend
+          </div>
+          <p>Je stagevoorstel is klaar voor verwerking. Je krijgt een melding na de beoordeling.</p>
+          <div className="actions">
+            <button className="btn primary" onClick={() => navigate("/student/internship")}>
+              <i className="ti ti-arrow-right" />
+              Naar mijn stage
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -54,27 +73,23 @@ export default function StageApplicationPage() {
 
         <form onSubmit={handleSubmit}>
 
+          {/* Bedrijfsgegevens */}
           <div className="card">
             <div className="card_title">
               <i className="ti ti-building" />
               Bedrijf
             </div>
-            <div className="form_row">
-              <div className="form_group">
-                <label className="form_label">Bedrijfsnaam<span className="req">*</span></label>
-                <input className="form_input" type="text" name="bedrijfNaam" value={form.bedrijfNaam} onChange={handleChange} placeholder="Naam van het bedrijf" />
-              </div>
-              <div className="form_group">
-                <label className="form_label">Afdeling</label>
-                <input className="form_input" type="text" name="bedrijfsafdeling" value={form.bedrijfsafdeling} onChange={handleChange} placeholder="Afdeling of team" />
-              </div>
+            <div className="form_group">
+              <label className="form_label">Bedrijfsnaam<span className="req">*</span></label>
+              <input className="form_input" type="text" name="bedrijfNaam" value={form.bedrijfNaam} onChange={handleChange} placeholder="Naam van het bedrijf" />
             </div>
             <div className="form_group">
               <label className="form_label">Adres<span className="req">*</span></label>
-              <input className="form_input" type="text" name="bedrijfsadres" value={form.bedrijfsadres} onChange={handleChange} placeholder="Straat nr, postcode gemeente" />
+              <input className="form_input" type="text" name="bedrijfAdres" value={form.bedrijfAdres} onChange={handleChange} placeholder="Straat nr, postcode gemeente" />
             </div>
           </div>
 
+          {/* Mentorgegevens */}
           <div className="card">
             <div className="card_title">
               <i className="ti ti-user-check" />
@@ -90,39 +105,29 @@ export default function StageApplicationPage() {
                 <input className="form_input" type="text" name="mentorFunctie" value={form.mentorFunctie} onChange={handleChange} placeholder="Functie" />
               </div>
             </div>
-            <div className="form_row">
-              <div className="form_group">
-                <label className="form_label">E-mail<span className="req">*</span></label>
-                <input className="form_input" type="email" name="mentorEmail" value={form.mentorEmail} onChange={handleChange} />
-              </div>
-              <div className="form_group">
-                <label className="form_label">Telefoon</label>
-                <input className="form_input" type="tel" name="mentorTelefoon" value={form.mentorTelefoon} onChange={handleChange} placeholder="+32 470 00 00 00" />
-              </div>
+            <div className="form_group">
+              <label className="form_label">E-mail<span className="req">*</span></label>
+              <input className="form_input" type="email" name="mentorEmail" value={form.mentorEmail} onChange={handleChange} />
             </div>
           </div>
 
+          {/* Opdracht — nieuw: opdrachtTitel en technologieen toegevoegd */}
           <div className="card">
             <div className="card_title">
               <i className="ti ti-clipboard-text" />
               Opdracht
             </div>
-            <div className="form_row">
-              <div className="form_group">
-                <label className="form_label">Functie<span className="req">*</span></label>
-                <input className="form_input" type="text" name="stagefunctie" value={form.stagefunctie} onChange={handleChange} placeholder="bv. Webdeveloper" />
-              </div>
-              <div className="form_group">
-                <label className="form_label">Uren per week<span className="req">*</span></label>
-                <input className="form_input" type="number" name="urenPerWeek" value={form.urenPerWeek} onChange={handleChange} placeholder="38" />
-              </div>
+            <div className="form_group">
+              <label className="form_label">Titel van de opdracht<span className="req">*</span></label>
+              <input className="form_input" type="text" name="opdrachtTitel" value={form.opdrachtTitel} onChange={handleChange} placeholder="bv. Webdeveloper" />
             </div>
             <div className="form_group">
               <label className="form_label">Omschrijving van de opdracht<span className="req">*</span></label>
-              <textarea className="form_textarea" name="opdrachtomschrijving" value={form.opdrachtomschrijving} onChange={handleChange} placeholder="Technologie, taken, team..." />
+              <textarea className="form_textarea" name="opdrachtOmschrijving" value={form.opdrachtOmschrijving} onChange={handleChange} placeholder="Technologie, taken, team..." />
             </div>
           </div>
 
+          {/* Stageperiode */}
           <div className="card">
             <div className="card_title">
               <i className="ti ti-calendar" />
@@ -131,11 +136,11 @@ export default function StageApplicationPage() {
             <div className="form_row">
               <div className="form_group">
                 <label className="form_label">Startdatum<span className="req">*</span></label>
-                <input className="form_input" type="date" name="startdatum" value={form.startdatum} onChange={handleChange} />
+                <input className="form_input" type="date" name="startDatum" value={form.startDatum} onChange={handleChange} />
               </div>
               <div className="form_group">
                 <label className="form_label">Einddatum<span className="req">*</span></label>
-                <input className="form_input" type="date" name="einddatum" value={form.einddatum} onChange={handleChange} />
+                <input className="form_input" type="date" name="eindDatum" value={form.eindDatum} onChange={handleChange} />
               </div>
             </div>
             <p>Moet binnen het stagevenster van de opleiding vallen: 9 feb – 26 jun 2026.</p>
