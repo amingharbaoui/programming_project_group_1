@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { apiRequest } from "../../../services/api";
+import {
+  IconCalendar, IconSend, IconPlus, IconCircleCheck
+} from "@tabler/icons-react";
 
 export default function StudentLogbookPage() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState(null);
 
-  // State structuur aangepast aan spec — 5 dagen per week
+  // State structuur met 5 dagen per week
   const [logbook, setLogbook] = useState({
     stagedossierId: 1,
     weekNummer: 1,
@@ -20,7 +22,7 @@ export default function StudentLogbookPage() {
     ],
   });
 
-  // Wijzig een veld van de week zelf (weekNummer, weekStart, weekEinde)
+  // Wijzig een veld van de week zelf
   function handleWeekChange(e) {
     setLogbook({ ...logbook, [e.target.name]: e.target.value });
   }
@@ -37,7 +39,7 @@ export default function StudentLogbookPage() {
     setLogbook({ ...logbook, dagen: updatedDagen });
   }
 
-  // Bereken het totaal aantal uren over alle dagen
+  // Totaal uren automatisch berekend
   const totaalUren = logbook.dagen.reduce((sum, dag) => sum + (Number(dag.aantalUren) || 0), 0);
 
   // Submit logt data naar console — David koppelt later POST /api/logbooks
@@ -47,7 +49,7 @@ export default function StudentLogbookPage() {
     setSubmitted(true);
   }
 
-  // Toon successmelding na indienen
+  // Successmelding na indienen
   if (submitted) {
     return (
       <div className="page-inner">
@@ -56,13 +58,13 @@ export default function StudentLogbookPage() {
         </div>
         <div className="card">
           <div className="card_title">
-            <i className="ti ti-circle-check" />
+            <IconCircleCheck size={16} />
             Week ingediend
           </div>
           <p>Week {logbook.weekNummer} is ingediend. Totaal: {totaalUren} uren.</p>
           <div className="actions">
             <button className="btn primary" onClick={() => setSubmitted(false)}>
-              <i className="ti ti-plus" />
+              <IconPlus size={16} />
               Nieuwe week invullen
             </button>
           </div>
@@ -87,10 +89,10 @@ export default function StudentLogbookPage() {
 
       <form onSubmit={handleSubmit}>
 
-        {/* Week info */}
+        {/* Week informatie */}
         <div className="card">
           <div className="card_title">
-            <i className="ti ti-calendar" />
+            <IconCalendar size={16} />
             Week informatie
           </div>
           <div className="form_row">
@@ -100,7 +102,7 @@ export default function StudentLogbookPage() {
             </div>
             <div className="form_group">
               <label className="form_label">Totaal uren</label>
-              {/* Automatisch berekend op basis van alle dagen */}
+              {/* Automatisch berekend */}
               <input className="form_input" type="number" value={totaalUren} readOnly />
             </div>
           </div>
@@ -120,7 +122,6 @@ export default function StudentLogbookPage() {
         {logbook.dagen.map((dag, index) => (
           <div className="card" key={index}>
             <div className="card_title">
-              <i className="ti ti-sun" />
               Dag {index + 1}
             </div>
             <div className="form_row">
@@ -154,7 +155,7 @@ export default function StudentLogbookPage() {
 
         <div className="actions">
           <button type="submit" className="btn primary">
-            <i className="ti ti-send" />
+            <IconSend size={16} />
             Logboek indienen
           </button>
         </div>
