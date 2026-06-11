@@ -33,6 +33,8 @@ export default function MyInternshipPage() {
   const data = internship || (location.state?.ingediend ? submittedInternship : null);
   const status = statusConfig[data?.status] || statusConfig["ingediend"];
   const ingediend = !!internship || location.state?.ingediend;
+  const decisionMessage = data?.laatste_feedback || data?.laatste_motivering || data?.feedback || data?.motivering;
+  const hasDecision = ["goedgekeurd", "afgekeurd", "aanpassingen_gevraagd"].includes(data?.status);
 
   function handleBegrepen() {
     setShowPopup(false);
@@ -174,20 +176,21 @@ export default function MyInternshipPage() {
             </span>
           </div>
 
-          {/* Feedback van de commissie, het is alleen zichtbaar als aanpassingen gevraagd */}
-          {data.status === "aanpassingen_gevraagd" && (
+          {hasDecision && (
             <div className="card">
               <div className="card_title">
                 <IconPencil size={16} />
-                Feedback van de commissie
+                Beslissing van de commissie
               </div>
-              <p>{data.laatste_feedback || data.feedback || "—"}</p>
-              <div className="actions">
-                <button className="btn primary" onClick={() => navigate("/student/application")}>
-                  <IconPencil size={16} />
-                  Aanvraag aanpassen
-                </button>
-              </div>
+              <p>{decisionMessage || "De stagecommissie heeft je voorstel beoordeeld."}</p>
+              {data.status === "aanpassingen_gevraagd" && (
+                <div className="actions">
+                  <button className="btn primary" onClick={() => navigate("/student/application")}>
+                    <IconPencil size={16} />
+                    Aanvraag aanpassen
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
