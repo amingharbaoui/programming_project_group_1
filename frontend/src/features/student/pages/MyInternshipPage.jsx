@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { apiRequest } from "../../../services/api";
 
 export default function MyInternshipPage() {
   const navigate = useNavigate();
@@ -7,23 +8,42 @@ export default function MyInternshipPage() {
   const [ingediend, setIngediend] = useState(location.state?.ingediend || false);
   const [showPopup, setShowPopup] = useState(location.state?.ingediend || false);
   const [voorstelOpen, setVoorstelOpen] = useState(false);
+  const [internship, setInternship] = useState(null);
 
+  // Status configuratie met bijhorende CSS klasse, icoon en label
   const statusConfig = {
-    pending: { cls: "s_grijs", icon: "ti-hourglass", label: "In behandeling" },
-    approved: { cls: "s_ok", icon: "ti-check", label: "Goedgekeurd" },
-    rejected: { cls: "s_rood", icon: "ti-x", label: "Afgekeurd" },
-    changes_requested: { cls: "s_amber", icon: "ti-pencil", label: "Aanpassingen gevraagd" },
+    ingediend: { cls: "s_grijs", icon: "ti-hourglass", label: "In behandeling" },
+    goedgekeurd: { cls: "s_ok", icon: "ti-check", label: "Goedgekeurd" },
+    afgekeurd: { cls: "s_rood", icon: "ti-x", label: "Afgekeurd" },
+    aanpassingen_gevraagd: { cls: "s_amber", icon: "ti-pencil", label: "Aanpassingen gevraagd" },
   };
 
-  const status = statusConfig["pending"];
+  const status = statusConfig[internship?.status] || statusConfig["ingediend"];
 
   function handleBegrepen() {
     setShowPopup(false);
   }
 
+  // Haal het voorstel op bij het laden van de pagina
+  useEffect(() => {
+    async function fetchInternship() {
+      try {
+        const data = await apiRequest("GET", "/internships/my");
+        if (data.data) {
+          setInternship(data.data);
+          setIngediend(true);
+        }
+      } catch (err) {
+        console.error("Kan stage niet ophalen:", err);
+      }
+    }
+    fetchInternship();
+  }, []);
+
   return (
     <div className="page-inner">
 
+      {/* Popup na indienen */}
       {showPopup && (
         <div className="popup-overlay">
           <div className="popup">
@@ -54,6 +74,7 @@ export default function MyInternshipPage() {
         <p>Academiejaar 2025–2026</p>
       </div>
 
+      {/* Geen stage ingediend */}
       {!ingediend ? (
 
         <div className="card">
@@ -74,6 +95,7 @@ export default function MyInternshipPage() {
 
         <>
 
+          {/* Progressbar */}
           <div className="card">
             <div className="progress-steps">
               <div className="progress-step done">
@@ -105,6 +127,7 @@ export default function MyInternshipPage() {
             </div>
           </div>
 
+          {/* Huidige status van het voorstel */}
           <div className="card">
             <div className="card_title">
               <i className="ti ti-info-circle" />
@@ -116,6 +139,7 @@ export default function MyInternshipPage() {
             </span>
           </div>
 
+          {/* Begeleiding — komt van de backend */}
           <div className="card">
             <div className="card_title">
               <i className="ti ti-users" />
@@ -125,12 +149,13 @@ export default function MyInternshipPage() {
               <span className="k">Mentor</span>
               <span className="status s_amber">In afwachting</span>
             </div>
-            <div className="kv"><span className="k">Naam</span><span className="v">—</span></div>
-            <div className="kv"><span className="k">Bedrijf</span><span className="v">—</span></div>
-            <div className="kv"><span className="k">E-mail</span><span className="v">—</span></div>
+            <div className="kv"><span className="k">Naam</span><span className="v">{internship?.mentor_naam || "—"}</span></div>
+            <div className="kv"><span className="k">Bedrijf</span><span className="v">{internship?.bedrijf_naam || "—"}</span></div>
+            <div className="kv"><span className="k">E-mail</span><span className="v">{internship?.mentor_email || "—"}</span></div>
             <div className="kv"><span className="k">Stagebegeleider</span><span className="v">—</span></div>
           </div>
 
+          {/* Uitklapbaar voorsteldetail */}
           <div className="card" onClick={() => setVoorstelOpen(!voorstelOpen)}>
             <div className="card_title">
               <i className="ti ti-file-description" />
@@ -147,8 +172,8 @@ export default function MyInternshipPage() {
                     <i className="ti ti-building" />
                     Bedrijf
                   </div>
-                  <div className="kv"><span className="k">Naam</span><span className="v">—</span></div>
-                  <div className="kv"><span className="k">Afdeling</span><span className="v">—</span></div>
+                  <div className="kv"><span className="k">Naam</span><span className="v">{internship?.bedrijf_naam || "—"}</span></div>
+                  <div className="kv"><span className="k">Afdeling</span><span className="v">{internship?.bedrijfsafdeling || "—"}</span></div>
                   <div className="kv"><span className="k">Adres</span><span className="v">—</span></div>
                 </div>
                 <div className="card">
@@ -156,9 +181,9 @@ export default function MyInternshipPage() {
                     <i className="ti ti-calendar" />
                     Periode
                   </div>
-                  <div className="kv"><span className="k">Start</span><span className="v">—</span></div>
-                  <div className="kv"><span className="k">Einde</span><span className="v">—</span></div>
-                  <div className="kv"><span className="k">Uren/week</span><span className="v">—</span></div>
+                  <div className="kv"><span className="k">Start</span><span className="v">{internship?.startdatum || "—"}</span></div>
+                  <div className="kv"><span className="k">Einde</span><span className="v">{internship?.einddatum || "—"}</span></div>
+                  <div className="kv"><span className="k">Uren/week</span><span className="v">{internship?.uren_per_week ? `${internship.uren_per_week}u` : "—"}</span></div>
                 </div>
               </div>
 
@@ -167,9 +192,9 @@ export default function MyInternshipPage() {
                   <i className="ti ti-user-check" />
                   Mentor
                 </div>
-                <div className="kv"><span className="k">Naam</span><span className="v">—</span></div>
-                <div className="kv"><span className="k">Functie</span><span className="v">—</span></div>
-                <div className="kv"><span className="k">E-mail</span><span className="v">—</span></div>
+                <div className="kv"><span className="k">Naam</span><span className="v">{internship?.mentor_naam || "—"}</span></div>
+                <div className="kv"><span className="k">Functie</span><span className="v">{internship?.mentor_functie || "—"}</span></div>
+                <div className="kv"><span className="k">E-mail</span><span className="v">{internship?.mentor_email || "—"}</span></div>
               </div>
 
               <div className="card">
@@ -177,8 +202,8 @@ export default function MyInternshipPage() {
                   <i className="ti ti-clipboard-text" />
                   Opdracht
                 </div>
-                <div className="kv"><span className="k">Functie</span><span className="v">—</span></div>
-                <p>—</p>
+                <div className="kv"><span className="k">Functie</span><span className="v">{internship?.stagefunctie || "—"}</span></div>
+                <p>{internship?.opdrachtomschrijving || "—"}</p>
               </div>
 
               <div className="card">
@@ -188,6 +213,23 @@ export default function MyInternshipPage() {
                 </button>
               </div>
             </>
+          )}
+
+          {/* Knop naar logboek — alleen zichtbaar als stage goedgekeurd is */}
+          {internship?.status === "goedgekeurd" && (
+            <div className="card">
+              <div className="card_title">
+                <i className="ti ti-notebook" />
+                Logboek
+              </div>
+              <p>Je stage is goedgekeurd. Je kan nu je logboek invullen.</p>
+              <div className="actions">
+                <button className="btn primary" onClick={() => navigate("/student/logbook")}>
+                  <i className="ti ti-arrow-right" />
+                  Naar logboek
+                </button>
+              </div>
+            </div>
           )}
 
         </>
