@@ -1,31 +1,34 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../../../services/api";
-import  "./StageApplicationPage.css"
+import "./StageApplicationPage.css";
+import {
+  IconBuilding, IconUserCheck, IconClipboardText, IconCalendar,
+  IconCircleCheck, IconArrowRight, IconDeviceFloppy, IconSend, IconChecklist
+} from "@tabler/icons-react";
 
 export default function StageApplicationPage() {
   const navigate = useNavigate();
   const [error, setError] = useState(null);
-  // Nieuwe state: submitted voor successmelding, gewijzigd: state namen aangepast aan spec
   const [submitted, setSubmitted] = useState(false);
 
   const [form, setForm] = useState({
     bedrijfNaam: "",
-    bedrijfAdres: "",       
+    bedrijfAdres: "",
     mentorNaam: "",
     mentorEmail: "",
     mentorFunctie: "",
-    startDatum: "",         
-    eindDatum: "",          
-    opdrachtTitel: "",      
-    opdrachtOmschrijving: "", 
+    startDatum: "",
+    eindDatum: "",
+    opdrachtTitel: "",
+    opdrachtOmschrijving: "",
   });
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
-  // Submit logt data naar console 
+  // Submit logt data naar console
   function handleSubmit(e) {
     e.preventDefault();
     console.log("stage aanvraag klaar voor backend", form);
@@ -41,13 +44,13 @@ export default function StageApplicationPage() {
         </div>
         <div className="card">
           <div className="card_title">
-            <i className="ti ti-circle-check" />
+            <IconCircleCheck size={16} />
             Stagevoorstel ingediend
           </div>
           <p>Je stagevoorstel is klaar voor verwerking. Je krijgt een melding na de beoordeling.</p>
           <div className="actions">
             <button className="btn primary" onClick={() => navigate("/student/internship")}>
-              <i className="ti ti-arrow-right" />
+              <IconArrowRight size={16} />
               Naar mijn stage
             </button>
           </div>
@@ -77,7 +80,7 @@ export default function StageApplicationPage() {
           {/* Bedrijfsgegevens */}
           <div className="card">
             <div className="card_title">
-              <i className="ti ti-building" />
+              <IconBuilding size={16} />
               Bedrijf
             </div>
             <div className="form_group">
@@ -93,7 +96,7 @@ export default function StageApplicationPage() {
           {/* Mentorgegevens */}
           <div className="card">
             <div className="card_title">
-              <i className="ti ti-user-check" />
+              <IconUserCheck size={16} />
               Mentor
             </div>
             <div className="form_row">
@@ -112,10 +115,10 @@ export default function StageApplicationPage() {
             </div>
           </div>
 
-          {/* Opdracht — nieuw: opdrachtTitel en technologieen toegevoegd */}
+          {/* Opdracht */}
           <div className="card">
             <div className="card_title">
-              <i className="ti ti-clipboard-text" />
+              <IconClipboardText size={16} />
               Opdracht
             </div>
             <div className="form_group">
@@ -131,7 +134,7 @@ export default function StageApplicationPage() {
           {/* Stageperiode */}
           <div className="card">
             <div className="card_title">
-              <i className="ti ti-calendar" />
+              <IconCalendar size={16} />
               Periode
             </div>
             <div className="form_row">
@@ -149,27 +152,28 @@ export default function StageApplicationPage() {
 
           <div className="actions">
             <button type="button" className="btn">
-              <i className="ti ti-device-floppy" />
+              <IconDeviceFloppy size={16} />
               Opslaan als concept
             </button>
             <button type="submit" className="btn primary">
-              <i className="ti ti-send" />
+              <IconSend size={16} />
               Indienen
             </button>
           </div>
 
         </form>
 
-        <div className="card">
+        {/* Checklist sticky — volgt mee bij scrollen */}
+        <div className="card checklist-sticky">
           <div className="card_title">
-            <i className="ti ti-checklist" />
+            <IconChecklist size={16} />
             Waar de commissie op let
           </div>
-          <p><i className="ti ti-circle-check" /> Minstens 12 weken voltijds (456 uur) binnen het stagevenster</p>
-          <p><i className="ti ti-circle-check" /> IT-gerelateerde opdracht met een ontwikkelcomponent</p>
-          <p><i className="ti ti-circle-check" /> Mentor met een technische functie binnen het bedrijf</p>
-          <p><i className="ti ti-circle-check" /> Concrete omschrijving: technologie, taken en team</p>
-          <p><i className="ti ti-circle-check" /> Stage in een professionele bedrijfsomgeving</p>
+          <p><IconCircleCheck size={14} /> Minstens 12 weken voltijds (456 uur) binnen het stagevenster</p>
+          <p><IconCircleCheck size={14} /> IT-gerelateerde opdracht met een ontwikkelcomponent</p>
+          <p><IconCircleCheck size={14} /> Mentor met een technische functie binnen het bedrijf</p>
+          <p><IconCircleCheck size={14} /> Concrete omschrijving: technologie, taken en team</p>
+          <p><IconCircleCheck size={14} /> Stage in een professionele bedrijfsomgeving</p>
         </div>
 
       </div>

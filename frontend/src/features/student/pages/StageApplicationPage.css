@@ -45,3 +45,9 @@
   color: var(--red);
   margin-left: 3px;
 }
+/* Checklist kaart sticky  */
+.checklist-sticky {
+  position: sticky;
+  top: 24px;
+  align-self: start;
+}
