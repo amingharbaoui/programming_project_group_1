@@ -18,15 +18,8 @@ export default function MyInternshipPage() {
   const [internship, setInternship] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Demo data, David vervang dit!
-  const demoInternship = {
+  const submittedInternship = {
     status: "ingediend",
-    bedrijfNaam: "Demo bedrijf",
-    mentorNaam: "Demo mentor",
-    startDatum: "2026-02-09",
-    eindDatum: "2026-06-26",
-    opdrachtTitel: "Stageopdracht applicatieontwikkeling",
-    opdrachtOmschrijving: "Student werkt mee aan een interne webapplicatie.",
   };
 
   // Status configuratie met bijhorende CSS klasse, icoon en label
@@ -37,9 +30,8 @@ export default function MyInternshipPage() {
     aanpassingen_gevraagd: { cls: "s_amber", icon: <IconPencil size={14} />, label: "Aanpassingen gevraagd" },
   };
 
-  // Gebruik backend data als die beschikbaar is, anders demo data
-  const data = internship || demoInternship;
-  const status = statusConfig[data.status] || statusConfig["ingediend"];
+  const data = internship || (location.state?.ingediend ? submittedInternship : null);
+  const status = statusConfig[data?.status] || statusConfig["ingediend"];
   const ingediend = !!internship || location.state?.ingediend;
 
   function handleBegrepen() {

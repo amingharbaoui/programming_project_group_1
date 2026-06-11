@@ -28,11 +28,28 @@ export default function StageApplicationPage() {
     setForm({ ...form, [e.target.name]: e.target.value });
   }
 
-  // Submit logt data naar console
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
-    console.log("stage aanvraag klaar voor backend", form);
-    setSubmitted(true);
+    setError(null);
+
+    try {
+      await apiRequest("POST", "/internships", {
+        bedrijfNaam: form.bedrijfNaam,
+        bedrijfsadres: form.bedrijfAdres,
+        mentorNaam: form.mentorNaam,
+        mentorEmail: form.mentorEmail,
+        mentorFunctie: form.mentorFunctie,
+        stagefunctie: form.opdrachtTitel,
+        opdrachtomschrijving: form.opdrachtOmschrijving,
+        startdatum: form.startDatum,
+        einddatum: form.eindDatum,
+        urenPerWeek: 38,
+      });
+
+      setSubmitted(true);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Stagevoorstel indienen mislukt");
+    }
   }
 
   // Toon successmelding na indienen
@@ -49,7 +66,7 @@ export default function StageApplicationPage() {
           </div>
           <p>Je stagevoorstel is klaar voor verwerking. Je krijgt een melding na de beoordeling.</p>
           <div className="actions">
-            <button className="btn primary" onClick={() => navigate("/student/internship")}>
+            <button className="btn primary" onClick={() => navigate("/student/internship", { state: { ingediend: true } })}>
               <IconArrowRight size={16} />
               Naar mijn stage
             </button>
