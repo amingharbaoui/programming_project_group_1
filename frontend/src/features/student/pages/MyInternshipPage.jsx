@@ -1,7 +1,14 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiRequest } from "../../../services/api";
-import "./MyInternshipPage.css"
+import "./MyInternshipPage.css";
+import {
+  IconSend, IconX, IconCheck, IconBriefcase, IconPlus,
+  IconInfoCircle, IconUsers, IconFileDescription, IconChevronUp,
+  IconChevronDown, IconBuilding, IconCalendar, IconUserCheck,
+  IconClipboardText, IconArrowBackUp, IconNotebook, IconArrowRight,
+  IconHourglass, IconPencil
+} from "@tabler/icons-react";
 
 export default function MyInternshipPage() {
   const navigate = useNavigate();
@@ -24,10 +31,10 @@ export default function MyInternshipPage() {
 
   // Status configuratie met bijhorende CSS klasse, icoon en label
   const statusConfig = {
-    ingediend: { cls: "s_grijs", icon: "ti-hourglass", label: "In behandeling" },
-    goedgekeurd: { cls: "s_ok", icon: "ti-check", label: "Goedgekeurd" },
-    afgekeurd: { cls: "s_rood", icon: "ti-x", label: "Afgekeurd" },
-    aanpassingen_gevraagd: { cls: "s_amber", icon: "ti-pencil", label: "Aanpassingen gevraagd" },
+    ingediend: { cls: "s_grijs", icon: <IconHourglass size={14} />, label: "In behandeling" },
+    goedgekeurd: { cls: "s_ok", icon: <IconCheck size={14} />, label: "Goedgekeurd" },
+    afgekeurd: { cls: "s_rood", icon: <IconX size={14} />, label: "Afgekeurd" },
+    aanpassingen_gevraagd: { cls: "s_amber", icon: <IconPencil size={14} />, label: "Aanpassingen gevraagd" },
   };
 
   // Gebruik backend data als die beschikbaar is, anders demo data
@@ -85,11 +92,11 @@ export default function MyInternshipPage() {
           <div className="popup">
             <div className="popup-header">
               <div className="card_title">
-                <i className="ti ti-send" />
+                <IconSend size={16} />
                 Stagevoorstel ingediend
               </div>
               <button className="btn" onClick={handleBegrepen}>
-                <i className="ti ti-x" />
+                <IconX size={16} />
               </button>
             </div>
             <div className="popup-body">
@@ -97,7 +104,7 @@ export default function MyInternshipPage() {
             </div>
             <div className="actions">
               <button className="btn primary" onClick={handleBegrepen}>
-                <i className="ti ti-check" />
+                <IconCheck size={16} />
                 Begrepen
               </button>
             </div>
@@ -115,13 +122,13 @@ export default function MyInternshipPage() {
 
         <div className="card">
           <div className="card_title">
-            <i className="ti ti-briefcase" />
+            <IconBriefcase size={16} />
             Stageaanvraag
           </div>
           <p>Je hebt nog geen stage. Alles start met je stagevoorstel: bedrijf, mentor, opdracht en periode. Na indiening bekijkt de stagecommissie je voorstel.</p>
           <div className="actions">
             <button className="btn primary" onClick={() => navigate("/student/application")}>
-              <i className="ti ti-plus" />
+              <IconPlus size={16} />
               Stagevoorstel indienen
             </button>
           </div>
@@ -136,7 +143,7 @@ export default function MyInternshipPage() {
             <div className="progress-steps">
               <div className="progress-step done">
                 <div className="progress-circle">
-                  <i className="ti ti-check" />
+                  <IconCheck size={16} />
                 </div>
                 <div className="progress-label">Voorstel</div>
               </div>
@@ -166,36 +173,36 @@ export default function MyInternshipPage() {
           {/* Huidige status */}
           <div className="card">
             <div className="card_title">
-              <i className="ti ti-info-circle" />
+              <IconInfoCircle size={16} />
               Status
             </div>
             <span className={`status ${status.cls}`}>
-              <i className={`ti ${status.icon}`} />
+              {status.icon}
               {status.label}
             </span>
           </div>
+
           {/* Feedback van de commissie, het is alleen zichtbaar als aanpassingen gevraagd */}
           {data.status === "aanpassingen_gevraagd" && (
-          <div className="card">
-            <div className="card_title">
-              <i className="ti ti-message-circle" />
-              Feedback van de commissie
+            <div className="card">
+              <div className="card_title">
+                <IconPencil size={16} />
+                Feedback van de commissie
+              </div>
+              <p>{data.laatste_feedback || data.feedback || "—"}</p>
+              <div className="actions">
+                <button className="btn primary" onClick={() => navigate("/student/application")}>
+                  <IconPencil size={16} />
+                  Aanvraag aanpassen
+                </button>
+              </div>
             </div>
-            <p>{data.laatste_feedback || data.feedback || "—"}</p>
-            <div className="actions">
-              <button className="btn primary" onClick={() => navigate("/student/application")}>
-              <i className="ti ti-pencil" />
-              Aanvraag aanpassen
-              </button>
-            </div>
-          </div>
           )}
-
 
           {/* Begeleiding — altijd zichtbaar */}
           <div className="card">
             <div className="card_title">
-              <i className="ti ti-users" />
+              <IconUsers size={16} />
               Begeleiding
             </div>
             <div className="kv"><span className="k">Naam</span><span className="v">{data.mentorNaam || data.mentor_naam || "—"}</span></div>
@@ -207,9 +214,9 @@ export default function MyInternshipPage() {
           {/* Uitklapbaar voorsteldetail */}
           <div className="card" onClick={() => setVoorstelOpen(!voorstelOpen)}>
             <div className="card_title">
-              <i className="ti ti-file-description" />
+              <IconFileDescription size={16} />
               Volledig voorstel bekijken
-              <i className={`ti ${voorstelOpen ? "ti-chevron-up" : "ti-chevron-down"}`} />
+              {voorstelOpen ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
             </div>
           </div>
 
@@ -218,7 +225,7 @@ export default function MyInternshipPage() {
               <div className="grid_2">
                 <div className="card">
                   <div className="card_title">
-                    <i className="ti ti-building" />
+                    <IconBuilding size={16} />
                     Bedrijf
                   </div>
                   <div className="kv"><span className="k">Naam</span><span className="v">{data.bedrijfNaam || data.bedrijf_naam || "—"}</span></div>
@@ -226,7 +233,7 @@ export default function MyInternshipPage() {
                 </div>
                 <div className="card">
                   <div className="card_title">
-                    <i className="ti ti-calendar" />
+                    <IconCalendar size={16} />
                     Periode
                   </div>
                   <div className="kv"><span className="k">Start</span><span className="v">{formatDatum(data.startDatum || data.startdatum)}</span></div>
@@ -237,7 +244,7 @@ export default function MyInternshipPage() {
 
               <div className="card">
                 <div className="card_title">
-                  <i className="ti ti-user-check" />
+                  <IconUserCheck size={16} />
                   Mentor
                 </div>
                 <div className="kv"><span className="k">Naam</span><span className="v">{data.mentorNaam || data.mentor_naam || "—"}</span></div>
@@ -247,7 +254,7 @@ export default function MyInternshipPage() {
 
               <div className="card">
                 <div className="card_title">
-                  <i className="ti ti-clipboard-text" />
+                  <IconClipboardText size={16} />
                   Opdracht
                 </div>
                 <div className="kv"><span className="k">Titel</span><span className="v">{data.opdrachtTitel || data.stagefunctie || "—"}</span></div>
@@ -256,7 +263,7 @@ export default function MyInternshipPage() {
 
               <div className="card">
                 <button className="btn">
-                  <i className="ti ti-arrow-back-up" />
+                  <IconArrowBackUp size={16} />
                   Voorstel intrekken
                 </button>
               </div>
@@ -267,13 +274,13 @@ export default function MyInternshipPage() {
           {data.status === "goedgekeurd" && (
             <div className="card">
               <div className="card_title">
-                <i className="ti ti-notebook" />
+                <IconNotebook size={16} />
                 Logboek
               </div>
               <p>Je stage is goedgekeurd. Je kan nu je logboek invullen.</p>
               <div className="actions">
                 <button className="btn primary" onClick={() => navigate("/student/logbook")}>
-                  <i className="ti ti-arrow-right" />
+                  <IconArrowRight size={16} />
                   Naar logboek
                 </button>
               </div>
