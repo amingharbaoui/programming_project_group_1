@@ -173,6 +173,23 @@ export default function MyInternshipPage() {
               {status.label}
             </span>
           </div>
+          {/* Feedback van de commissie, het is alleen zichtbaar als aanpassingen gevraagd */}
+          {data.status === "aanpassingen_gevraagd" && (
+          <div className="card">
+            <div className="card_title">
+              <i className="ti ti-message-circle" />
+              Feedback van de commissie
+            </div>
+            <p>{data.laatste_feedback || data.feedback || "—"}</p>
+            <div className="actions">
+              <button className="btn primary" onClick={() => navigate("/student/application")}>
+              <i className="ti ti-pencil" />
+              Aanvraag aanpassen
+              </button>
+            </div>
+          </div>
+          )}
+
 
           {/* Begeleiding — altijd zichtbaar */}
           <div className="card">
