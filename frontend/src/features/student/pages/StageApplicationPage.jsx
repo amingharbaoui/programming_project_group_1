@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../../../services/api";
+import  "./StageApplicationPage.css"
 
 export default function StageApplicationPage() {
   const navigate = useNavigate();
