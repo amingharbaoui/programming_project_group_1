@@ -70,16 +70,20 @@ export default function ApplicationsPage() {
   }
 
   function formatDate(value) {
-    if (!value) return "—";
+    if (!value) return "-";
     return new Date(value).toLocaleDateString("nl-BE");
   }
 
   function getStatusClass(status) {
-    if (status === "goedgekeurd") return "s-ok";
-    if (status === "afgekeurd") return "s-rood";
-    if (status === "aanpassingen_gevraagd") return "s-amber";
-    if (status === "ingediend") return "s-info";
-    return "s-grijs";
+    if (status === "goedgekeurd") return "s_ok";
+    if (status === "afgekeurd") return "s_rood";
+    if (status === "aanpassingen_gevraagd") return "s_amber";
+    if (status === "ingediend") return "s_info";
+    return "s_grijs";
+  }
+
+  function canDecide(status) {
+    return ["ingediend", "heringediend", "aanpassingen_gevraagd"].includes(status);
   }
 
   return (
@@ -128,65 +132,73 @@ export default function ApplicationsPage() {
             </thead>
 
             <tbody>
-              {applications.map((app) => (
-                <tr key={app.id}>
-                  <td>
-                    <strong>
-                      {app.student_voornaam} {app.student_achternaam}
-                    </strong>
-                    <br />
-                    <span className="muted">{app.studentennummer || "—"}</span>
-                  </td>
+              {applications.map((app) => {
+                const decisionOpen = canDecide(app.status);
 
-                  <td>
-                    <strong>{app.bedrijf_naam || "—"}</strong>
-                    <br />
-                    <span className="muted">{app.stagefunctie || "—"}</span>
-                  </td>
+                return (
+                  <tr key={app.id}>
+                    <td>
+                      <strong>
+                        {app.student_voornaam} {app.student_achternaam}
+                      </strong>
+                      <br />
+                      <span className="muted">{app.studentennummer || "-"}</span>
+                    </td>
 
-                  <td>
-                    {formatDate(app.startdatum)} — {formatDate(app.einddatum)}
-                    <br />
-                    <span className="muted">
-                      {app.aantal_weken || "?"} weken · {app.totaal_uren || "?"} uur
-                    </span>
-                  </td>
+                    <td>
+                      <strong>{app.bedrijf_naam || "-"}</strong>
+                      <br />
+                      <span className="muted">{app.stagefunctie || "-"}</span>
+                    </td>
 
-                  <td>
-                    <span className={`status ${getStatusClass(app.status)}`}>
-                      {app.status}
-                    </span>
-                  </td>
+                    <td>
+                      {formatDate(app.startdatum)} - {formatDate(app.einddatum)}
+                      <br />
+                      <span className="muted">
+                        {app.aantal_weken || "?"} weken - {app.totaal_uren || "?"} uur
+                      </span>
+                    </td>
 
-                  <td className="right">
-                    <div className="actions">
-                      <button
-                        className="btn primary sm"
-                        disabled={actionLoadingId === app.id}
-                        onClick={() => decideApplication(app.id, "goedgekeurd")}
-                      >
-                        Goedkeuren
-                      </button>
+                    <td>
+                      <span className={`status ${getStatusClass(app.status)}`}>
+                        {app.status}
+                      </span>
+                    </td>
 
-                      <button
-                        className="btn danger sm"
-                        disabled={actionLoadingId === app.id}
-                        onClick={() => decideApplication(app.id, "afgekeurd")}
-                      >
-                        Afkeuren
-                      </button>
+                    <td className="right">
+                      {decisionOpen ? (
+                        <div className="actions">
+                          <button
+                            className="btn primary sm"
+                            disabled={actionLoadingId === app.id}
+                            onClick={() => decideApplication(app.id, "goedgekeurd")}
+                          >
+                            Goedkeuren
+                          </button>
 
-                      <button
-                        className="btn sm"
-                        disabled={actionLoadingId === app.id}
-                        onClick={() => decideApplication(app.id, "aanpassingen_gevraagd")}
-                      >
-                        Aanpassing vragen
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                          <button
+                            className="btn danger sm"
+                            disabled={actionLoadingId === app.id}
+                            onClick={() => decideApplication(app.id, "afgekeurd")}
+                          >
+                            Afkeuren
+                          </button>
+
+                          <button
+                            className="btn sm"
+                            disabled={actionLoadingId === app.id}
+                            onClick={() => decideApplication(app.id, "aanpassingen_gevraagd")}
+                          >
+                            Aanpassing vragen
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="muted">Behandeld</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -209,17 +221,17 @@ export default function ApplicationsPage() {
 
               <div className="kv">
                 <span className="k">Mentor</span>
-                <span className="v">{app.mentor_naam || "—"}</span>
+                <span className="v">{app.mentor_naam || "-"}</span>
               </div>
 
               <div className="kv">
                 <span className="k">Mentor e-mail</span>
-                <span className="v">{app.mentor_email || "—"}</span>
+                <span className="v">{app.mentor_email || "-"}</span>
               </div>
 
               <div className="kv">
                 <span className="k">Uren/week</span>
-                <span className="v">{app.uren_per_week || "—"}</span>
+                <span className="v">{app.uren_per_week || "-"}</span>
               </div>
 
               <p className="card-subtitle" style={{ marginTop: "10px" }}>

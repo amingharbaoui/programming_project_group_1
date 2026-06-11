@@ -135,8 +135,8 @@ export default function StudentLogbookPage() {
               <IconCircleCheck size={16} />
               Week {week.weekNummer}
             </div>
-            <div className="kv"><span className="k">Start</span><span className="v">{week.weekStart || "—"}</span></div>
-            <div className="kv"><span className="k">Einde</span><span className="v">{week.weekEinde || "—"}</span></div>
+            <div className="kv"><span className="k">Start</span><span className="v">{week.weekStart || "-"}</span></div>
+            <div className="kv"><span className="k">Einde</span><span className="v">{week.weekEinde || "-"}</span></div>
             <div className="kv"><span className="k">Totaal uren</span><span className="v">{week.totaalUren}u</span></div>
           </div>
         ))}

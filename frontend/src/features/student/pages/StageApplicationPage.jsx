@@ -81,7 +81,7 @@ export default function StageApplicationPage() {
 
       <div className="page-header">
         <h1>Stagevoorstel</h1>
-        <p>Vul alles in — je kan tussentijds opslaan als concept</p>
+        <p>Vul alles in - je kan tussentijds opslaan als concept</p>
       </div>
 
       {error && (
@@ -164,7 +164,7 @@ export default function StageApplicationPage() {
                 <input className="form_input" type="date" name="eindDatum" value={form.eindDatum} onChange={handleChange} />
               </div>
             </div>
-            <p>Moet binnen het stagevenster van de opleiding vallen: 9 feb – 26 jun 2026.</p>
+            <p>Moet binnen het stagevenster van de opleiding vallen: 9 feb - 26 jun 2026.</p>
           </div>
 
           <div className="actions">

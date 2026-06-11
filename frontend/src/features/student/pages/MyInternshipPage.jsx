@@ -42,7 +42,7 @@ export default function MyInternshipPage() {
 
   // Datums formatteren van ISO naar leesbaar formaat
   function formatDatum(datum) {
-    if (!datum) return "—";
+    if (!datum) return "-";
     return new Date(datum).toLocaleDateString("nl-BE");
   }
 
@@ -108,7 +108,7 @@ export default function MyInternshipPage() {
 
       <div className="page-header">
         <h1>Mijn stage</h1>
-        <p>Academiejaar 2025–2026</p>
+        <p>Academiejaar 2025-2026</p>
       </div>
 
       {/* Geen stage ingediend */}
@@ -200,10 +200,10 @@ export default function MyInternshipPage() {
               <IconUsers size={16} />
               Begeleiding
             </div>
-            <div className="kv"><span className="k">Naam</span><span className="v">{data.mentorNaam || data.mentor_naam || "—"}</span></div>
-            <div className="kv"><span className="k">Bedrijf</span><span className="v">{data.bedrijfNaam || data.bedrijf_naam || "—"}</span></div>
-            <div className="kv"><span className="k">E-mail</span><span className="v">{data.mentorEmail || data.mentor_email || "—"}</span></div>
-            <div className="kv"><span className="k">Stagebegeleider</span><span className="v">—</span></div>
+            <div className="kv"><span className="k">Naam</span><span className="v">{data.mentorNaam || data.mentor_naam || "-"}</span></div>
+            <div className="kv"><span className="k">Bedrijf</span><span className="v">{data.bedrijfNaam || data.bedrijf_naam || "-"}</span></div>
+            <div className="kv"><span className="k">E-mail</span><span className="v">{data.mentorEmail || data.mentor_email || "-"}</span></div>
+            <div className="kv"><span className="k">Stagebegeleider</span><span className="v">-</span></div>
           </div>
 
           {/* Uitklapbaar voorsteldetail */}
@@ -223,8 +223,8 @@ export default function MyInternshipPage() {
                     <IconBuilding size={16} />
                     Bedrijf
                   </div>
-                  <div className="kv"><span className="k">Naam</span><span className="v">{data.bedrijfNaam || data.bedrijf_naam || "—"}</span></div>
-                  <div className="kv"><span className="k">Afdeling</span><span className="v">{data.bedrijfsafdeling || "—"}</span></div>
+                  <div className="kv"><span className="k">Naam</span><span className="v">{data.bedrijfNaam || data.bedrijf_naam || "-"}</span></div>
+                  <div className="kv"><span className="k">Afdeling</span><span className="v">{data.bedrijfsafdeling || "-"}</span></div>
                 </div>
                 <div className="card">
                   <div className="card_title">
@@ -233,7 +233,7 @@ export default function MyInternshipPage() {
                   </div>
                   <div className="kv"><span className="k">Start</span><span className="v">{formatDatum(data.startDatum || data.startdatum)}</span></div>
                   <div className="kv"><span className="k">Einde</span><span className="v">{formatDatum(data.eindDatum || data.einddatum)}</span></div>
-                  <div className="kv"><span className="k">Uren/week</span><span className="v">{data.uren_per_week ? `${data.uren_per_week}u` : "—"}</span></div>
+                  <div className="kv"><span className="k">Uren/week</span><span className="v">{data.uren_per_week ? `${data.uren_per_week}u` : "-"}</span></div>
                 </div>
               </div>
 
@@ -242,9 +242,9 @@ export default function MyInternshipPage() {
                   <IconUserCheck size={16} />
                   Mentor
                 </div>
-                <div className="kv"><span className="k">Naam</span><span className="v">{data.mentorNaam || data.mentor_naam || "—"}</span></div>
-                <div className="kv"><span className="k">Functie</span><span className="v">{data.mentorFunctie || data.mentor_functie || "—"}</span></div>
-                <div className="kv"><span className="k">E-mail</span><span className="v">{data.mentorEmail || data.mentor_email || "—"}</span></div>
+                <div className="kv"><span className="k">Naam</span><span className="v">{data.mentorNaam || data.mentor_naam || "-"}</span></div>
+                <div className="kv"><span className="k">Functie</span><span className="v">{data.mentorFunctie || data.mentor_functie || "-"}</span></div>
+                <div className="kv"><span className="k">E-mail</span><span className="v">{data.mentorEmail || data.mentor_email || "-"}</span></div>
               </div>
 
               <div className="card">
@@ -252,8 +252,8 @@ export default function MyInternshipPage() {
                   <IconClipboardText size={16} />
                   Opdracht
                 </div>
-                <div className="kv"><span className="k">Titel</span><span className="v">{data.opdrachtTitel || data.stagefunctie || "—"}</span></div>
-                <p>{data.opdrachtOmschrijving || data.opdrachtomschrijving || "—"}</p>
+                <div className="kv"><span className="k">Titel</span><span className="v">{data.opdrachtTitel || data.stagefunctie || "-"}</span></div>
+                <p>{data.opdrachtOmschrijving || data.opdrachtomschrijving || "-"}</p>
               </div>
 
               <div className="card">
