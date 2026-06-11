@@ -1,0 +1,146 @@
+/* Progressbar container */
+.progress-steps {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 8px 0;
+}
+
+/* Individuele stap */
+.progress-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* Cirkel rond het nummer */
+.progress-circle {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--muted);
+  border: 2px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sub);
+}
+
+/* Voltooide stap */
+.progress-step.done .progress-circle {
+  background: var(--red);
+  border-color: var(--red);
+  color: var(--white);
+}
+
+/* Actieve stap */
+.progress-step.active .progress-circle {
+  background: var(--white);
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* Label onder de cirkel */
+.progress-label {
+  font-size: 11px;
+  color: var(--sub);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.progress-step.done .progress-label,
+.progress-step.active .progress-label {
+  color: var(--dark);
+  font-weight: 600;
+}
+
+/* Lijn tussen stappen */
+.progress-line {
+  flex: 1;
+  height: 2px;
+  background: var(--border);
+  margin-bottom: 18px;
+}
+
+.progress-line.active {
+  background: var(--red);
+}
+
+/* Popup overlay */
+.popup-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+/* Popup kaart */
+.popup {
+  background: var(--white);
+  border-radius: 12px;
+  padding: 24px;
+  width: 480px;
+  max-width: 90%;
+}
+
+/* Popup header met titel en sluitknop */
+.popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+/* Popup body tekst */
+.popup-body {
+  font-size: 13px;
+  color: var(--gray);
+  line-height: 1.6;
+  margin-bottom: 16px;
+}
+
+/* Uitklapbare kaart — cursor pointer */
+.card-clickable {
+  cursor: pointer;
+}
+
+.card-clickable:hover {
+  border-color: var(--red);
+}
+
+/* Kv rij — sleutel links, waarde rechts */
+.kv {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  font-size: 12.5px;
+  padding: 5px 0;
+  border-bottom: 0.5px solid var(--border);
+}
+
+.kv:last-child {
+  border-bottom: none;
+}
+
+.kv .k {
+  color: var(--sub);
+}
+
+.kv .v {
+  font-weight: 600;
+  color: var(--dark);
+  text-align: right;
+}
+
+/* Laadtekst */
+.loading-text {
+  font-size: 13px;
+  color: var(--sub);
+}
