@@ -54,11 +54,6 @@ export default function DocentLogbooksPage() {
         {
           feedback: feedbackByWeek[weekId] || "Logboek nagekeken door docent.",
           herindieningNodig,
-        },
-        {
-          headers: {
-            "x-user-id": "5",
-          },
         }
       );
 

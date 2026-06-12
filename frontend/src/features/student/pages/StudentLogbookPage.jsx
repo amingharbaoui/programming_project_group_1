@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { apiRequest } from "../../../services/api";
+import { useAuth } from "../../../context/AuthContext";
 import {
   IconCalendar,
   IconSend,
@@ -171,7 +172,7 @@ function leegDag() {
 
 function defaultLogbook(weekNummer = 1) {
   return {
-    stagedossierId: 1,
+    stagedossierId: "",
     weekNummer,
     weekStart: "",
     weekEinde: "",
@@ -448,6 +449,7 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken }) {
 
 /* ---------- Hoofdcomponent ---------- */
 export default function StudentLogbookPage() {
+  const { user } = useAuth();
   const [loadingWeken, setLoadingWeken] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -462,7 +464,7 @@ export default function StudentLogbookPage() {
   /* Weken ophalen van backend */
   async function fetchWeken(currentWeekNummer) {
     try {
-      const res = await apiRequest("GET", "/logbooks/1");
+      const res = await apiRequest("GET", `/logbooks/${user.id}`);
       const data = Array.isArray(res.data) ? res.data : [];
       setWeken(data);
 
@@ -483,6 +485,7 @@ export default function StudentLogbookPage() {
   }
 
   useEffect(() => {
+    setLoadingWeken(true);
     fetchWeken(1);
     apiRequest("GET", "/internships/my")
       .then((res) => {
@@ -491,7 +494,7 @@ export default function StudentLogbookPage() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [user.id]);
 
   /* Beschikbaarheidslogica */
   const vandaag = new Date();
