@@ -2,7 +2,7 @@ const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 
 function getUserId(req, fallbackId) {
-  return Number(req.header("x-user-id") || req.body.userId || fallbackId);
+  return Number(req.user?.id || fallbackId);
 }
 
 function normalizeDate(value) {
@@ -32,7 +32,7 @@ async function findLatestDossierForStudent(connection, studentId) {
 async function getDossierMeta(connection, dossierId) {
   const [rows] = await connection.query(
     `
-    SELECT id, mentor_id, stagebegeleider_id
+    SELECT id, student_id, mentor_id, stagebegeleider_id
     FROM stagedossiers
     WHERE id = ?
     LIMIT 1
@@ -160,6 +160,11 @@ async function createLogbook(req, res) {
     if (!dossier) {
       await connection.rollback();
       return fail(res, 404, "Stagedossier niet gevonden");
+    }
+
+    if (dossier.student_id !== studentId) {
+      await connection.rollback();
+      return fail(res, 403, "Je mag alleen een logboek indienen voor je eigen stagedossier");
     }
 
     const totaalUren = sumHours(finalDays);
@@ -297,9 +302,41 @@ async function createLogbook(req, res) {
 }
 
 async function getLogbooksByStudent(req, res) {
-  const studentId = Number(req.params.studentId || req.query.studentId || 1);
+  const requestedStudentId = Number(req.params.studentId || req.query.studentId || req.user?.id);
+  const currentUserId = getUserId(req);
+  const currentRole = req.user?.hoofdrol;
+
+  if (!requestedStudentId) {
+    return fail(res, 400, "studentId is verplicht");
+  }
 
   try {
+    if (currentRole === "student" && requestedStudentId !== currentUserId) {
+      return fail(res, 403, "Studenten mogen alleen hun eigen logboeken bekijken");
+    }
+
+    if (currentRole === "mentor") {
+      const [linked] = await db.query(
+        "SELECT id FROM stagedossiers WHERE student_id = ? AND mentor_id = ? LIMIT 1",
+        [requestedStudentId, currentUserId]
+      );
+
+      if (linked.length === 0) {
+        return fail(res, 403, "Mentor is niet gekoppeld aan deze student");
+      }
+    }
+
+    if (currentRole === "docent") {
+      const [linked] = await db.query(
+        "SELECT id FROM stagedossiers WHERE student_id = ? AND stagebegeleider_id = ? LIMIT 1",
+        [requestedStudentId, currentUserId]
+      );
+
+      if (linked.length === 0) {
+        return fail(res, 403, "Docent is niet gekoppeld aan deze student");
+      }
+    }
+
     const [weeks] = await db.query(
       `
       SELECT
@@ -329,7 +366,7 @@ async function getLogbooksByStudent(req, res) {
       WHERE d.student_id = ?
       ORDER BY lw.week_nummer DESC
       `,
-      [studentId]
+      [requestedStudentId]
     );
 
     const weekIds = weeks.map((week) => week.id);
