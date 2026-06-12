@@ -37,11 +37,11 @@ export default function MentorLogbooksPage() {
   }
 
   function getStatusClass(status) {
-    if (status === "ingediend") return "s-info";
-    if (status === "afgecheckt_door_mentor") return "s-ok";
-    if (status === "goedgekeurd_door_docent") return "s-ok";
-    if (status?.includes("teruggestuurd")) return "s-rood";
-    return "s-grijs";
+    if (status === "ingediend") return "s_info";
+    if (status === "afgecheckt_door_mentor") return "s_ok";
+    if (status === "goedgekeurd_door_docent") return "s_ok";
+    if (status?.includes("teruggestuurd")) return "s_rood";
+    return "s_grijs";
   }
 
   async function checkWeek(weekId, herindieningNodig = false) {
@@ -73,8 +73,8 @@ export default function MentorLogbooksPage() {
   }
 
   return (
-    <div className="page-inner">
-      <div className="page-header">
+    <div className="page_inner">
+      <div className="page_header">
         <h1>Mentor logboeken</h1>
         <p>Bekijk weeklogboeken en check ze af.</p>
       </div>
@@ -85,15 +85,15 @@ export default function MentorLogbooksPage() {
 
       {loading && <div className="card"><p className="muted">Logboeken laden...</p></div>}
 
-      {error && <div className="card"><span className="status s-rood">{error}</span></div>}
+      {error && <div className="card"><span className="status s_rood">{error}</span></div>}
 
       {!loading && !error && weeks.length === 0 && (
-        <div className="empty-state">Geen logboeken gevonden.</div>
+        <div className="empty_state">Geen logboeken gevonden.</div>
       )}
 
       {!loading && !error && weeks.map((week) => (
         <div className="card" key={week.id}>
-          <div className="card-title">Week {week.week_nummer}</div>
+          <div className="card_title">Week {week.week_nummer}</div>
 
           <div className="kv">
             <span className="k">Periode</span>
@@ -133,10 +133,10 @@ export default function MentorLogbooksPage() {
             </tbody>
           </table>
 
-          <div className="form-group" style={{ marginTop: "14px" }}>
-            <label className="form-label">Feedback mentor</label>
+          <div className="form_group" style={{ marginTop: "14px" }}>
+            <label className="form_label">Feedback mentor</label>
             <textarea
-              className="form-textarea"
+              className="form_textarea"
               placeholder="Geef korte feedback op deze week..."
               value={feedbackByWeek[week.id] || ""}
               onChange={(e) =>
