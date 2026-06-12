@@ -71,7 +71,7 @@ export default function MyInternshipPage() {
           <h1>Mijn stage</h1>
         </div>
         <div className="card">
-          <p>Laden...</p>
+          <p>Bezig met laden...</p>
         </div>
       </div>
     );
