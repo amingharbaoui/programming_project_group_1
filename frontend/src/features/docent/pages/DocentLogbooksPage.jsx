@@ -37,11 +37,11 @@ export default function DocentLogbooksPage() {
   }
 
   function getStatusClass(status) {
-    if (status === "goedgekeurd_door_docent") return "s-ok";
-    if (status === "afgecheckt_door_mentor") return "s-info";
-    if (status === "ingediend") return "s-info";
-    if (status?.includes("teruggestuurd")) return "s-rood";
-    return "s-grijs";
+    if (status === "goedgekeurd_door_docent") return "s_ok";
+    if (status === "afgecheckt_door_mentor") return "s_info";
+    if (status === "ingediend") return "s_info";
+    if (status?.includes("teruggestuurd")) return "s_rood";
+    return "s_grijs";
   }
 
   async function reviewWeek(weekId, herindieningNodig = false) {
@@ -54,11 +54,6 @@ export default function DocentLogbooksPage() {
         {
           feedback: feedbackByWeek[weekId] || "Logboek nagekeken door docent.",
           herindieningNodig,
-        },
-        {
-          headers: {
-            "x-user-id": "5",
-          },
         }
       );
 
@@ -72,8 +67,8 @@ export default function DocentLogbooksPage() {
   }
 
   return (
-    <div className="page-inner">
-      <div className="page-header">
+    <div className="page_inner">
+      <div className="page_header">
         <h1>Docent logboeken</h1>
         <p>Bekijk logboeken, mentorfeedback en geef docentfeedback.</p>
       </div>
@@ -90,19 +85,19 @@ export default function DocentLogbooksPage() {
 
       {error && (
         <div className="card">
-          <span className="status s-rood">{error}</span>
+          <span className="status s_rood">{error}</span>
         </div>
       )}
 
       {!loading && !error && weeks.length === 0 && (
-        <div className="empty-state">
+        <div className="empty_state">
           Geen logboeken gevonden.
         </div>
       )}
 
       {!loading && !error && weeks.map((week) => (
         <div className="card" key={week.id}>
-          <div className="card-title">Week {week.week_nummer}</div>
+          <div className="card_title">Week {week.week_nummer}</div>
 
           <div className="kv">
             <span className="k">Periode</span>
@@ -149,11 +144,11 @@ export default function DocentLogbooksPage() {
             </tbody>
           </table>
 
-          <div className="form-group" style={{ marginTop: "14px" }}>
-            <label className="form-label">Feedback docent</label>
+          <div className="form_group" style={{ marginTop: "14px" }}>
+            <label className="form_label">Feedback docent</label>
 
             <textarea
-              className="form-textarea"
+              className="form_textarea"
               placeholder="Geef feedback als docent..."
               value={feedbackByWeek[week.id] || ""}
               onChange={(e) =>

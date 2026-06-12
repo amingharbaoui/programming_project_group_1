@@ -94,6 +94,21 @@ async function getMentorIdByEmail(connection, email) {
   return rows[0]?.gebruiker_id || null;
 }
 
+async function getDefaultMentorId(connection) {
+  const [rows] = await connection.query(
+    `
+    SELECT m.gebruiker_id
+    FROM mentoren m
+    JOIN gebruikers g ON g.id = m.gebruiker_id
+    WHERE g.status = 'actief'
+    ORDER BY m.gebruiker_id
+    LIMIT 1
+    `
+  );
+
+  return rows[0]?.gebruiker_id || null;
+}
+
 async function createInternship(req, res) {
   const studentId = getUserId(req, 1);
 
@@ -545,7 +560,7 @@ async function createDossierAfterApproval(connection, stagevoorstelId) {
     throw new Error("Geen stagebegeleider gevonden voor stagedossier");
   }
 
-  const mentorId = await getMentorIdByEmail(connection, data.mentor_email);
+  const mentorId = await getMentorIdByEmail(connection, data.mentor_email) || await getDefaultMentorId(connection);
 
   const dossiernummer = `DOS-${new Date().getFullYear()}-${String(stagevoorstelId).padStart(4, "0")}`;
 
