@@ -52,8 +52,8 @@ export function AuthProvider({ children }) {
 
   function switchRole(roleOrUserKey) {
     const nextUser = demoUsers[roleOrUserKey] || demoUsers.student;
+    setApiUserId(nextUser.id)
     setUser(nextUser);
-    setApiUserId(nextUser.id);
   }
 
   return (
