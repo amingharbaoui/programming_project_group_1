@@ -1,0 +1,77 @@
+:root {
+	--sidebar-sm: 60px;
+}
+
+.sidebar {
+	width: var(--sidebar);
+	flex-shrink: 0;
+	background: var(--white);
+	border-right: 1px solid var(--border);
+	display: flex;
+	flex-direction: column;
+	height: 100vh;
+	overflow: hidden;
+	transition: width .22s ease;
+}
+.sidebar.collapsed { width: var(--sidebar-sm); }
+
+.brand {
+	padding: 12px 16px;
+	border-bottom: 1px solid var(--border);
+	display: flex;
+	align-items: center;
+	justify-content: flex-start;
+	overflow: hidden;
+	height: 68px;
+}
+.brand-full { display: flex; align-items: center; gap: 10px; white-space: nowrap; min-width: 0; }
+.brand-compact { display: none; align-items: center; justify-content: center; width: 100%; }
+.sidebar.collapsed .brand-full { display: none; }
+.sidebar.collapsed .brand-compact { display: flex; }
+
+.ehb-badge {
+	width: 40px;
+	height: 28px;
+	background: var(--red);
+	border-radius: 4px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+.brand-logo { width: 160px; height: auto; display: block; }
+.brand-icon-img { height: 36px; width: auto; display: block; }
+
+.sidebar-nav { flex: 1; padding: 12px 0 6px; overflow-y: auto; display: flex; flex-direction: column; }
+.nav-item {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 9px 16px;
+	font-size: 13.5px;
+	color: var(--gray);
+	cursor: pointer;
+	border-left: 3px solid transparent;
+	transition: background .12s, color .12s;
+	white-space: nowrap;
+	text-decoration: none;
+}
+.nav-item:hover { background: var(--muted); color: var(--dark); }
+.nav-item.active { color: var(--red); background: var(--red-light); border-left-color: var(--red); font-weight: 500; }
+.nav-item i { font-size: 18px; flex-shrink: 0; width: 18px; }
+.sidebar.collapsed .nav-item { justify-content: center; padding: 11px 0; border-left: none; }
+.sidebar.collapsed .nav-item .label { display: none; }
+
+.sidebar-footer {
+	padding: 12px 16px;
+	border-top: 1px solid var(--border);
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	overflow: hidden;
+}
+.sidebar.collapsed .sidebar-footer { justify-content: center; padding: 10px 4px; }
+.ehb-logo { height: 54px; width: auto; display: block; }
+.ehb-logo-small { display: none; }
+.sidebar.collapsed .ehb-logo-wide { display: none; }
+.sidebar.collapsed .ehb-logo-small { display: block; width: 44px; height: auto; }
