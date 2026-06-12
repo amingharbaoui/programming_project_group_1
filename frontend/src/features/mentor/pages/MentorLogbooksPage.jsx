@@ -1,24 +1,48 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
+import { useAuth } from "../../../context/AuthContext";
+
+// Demo studenten die gekoppeld kunnen zijn aan een mentor.
+// De backend beslist zelf of de ingelogde mentor toegang heeft.
+const DEMO_STUDENTEN = [
+  { id: 1, naam: "Demo Student" },
+  { id: 6, naam: "Demo Student 2" },
+  { id: 7, naam: "Demo Student 3" },
+  { id: 8, naam: "Demo Student 4" },
+];
+
+function getStatusClass(status) {
+  if (status === "ingediend") return "s_info";
+  if (status === "afgecheckt_door_mentor") return "s_ok";
+  if (status === "goedgekeurd_door_docent") return "s_ok";
+  if (status?.includes("teruggestuurd")) return "s_rood";
+  return "s_grijs";
+}
+
+function formatDate(value) {
+  if (!value) return "-";
+  return new Date(value).toLocaleDateString("nl-BE");
+}
 
 export default function MentorLogbooksPage() {
+  const { user } = useAuth();
+
+  const [studentId, setStudentId] = useState(1);
   const [weeks, setWeeks] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Per week houden we apart feedback bij.
   const [feedbackByWeek, setFeedbackByWeek] = useState({});
-
-  // Hiermee blokkeren we tijdelijk de knop terwijl de backend bezig is.
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
-  async function loadLogbooks() {
+  async function loadLogbooks(sid) {
     try {
       setLoading(true);
       setError("");
-
-      // Demo: student 1 heeft normaal een stagedossier en logboek.
-      const response = await api.get("/mentor/logbooks/1");
+      setWeeks([]);
+      const response = await api.get(`/mentor/logbooks/${sid}`, {
+        headers: { "x-user-id": String(user.id) },
+      });
       setWeeks(response.data.data || []);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Logboeken ophalen mislukt");
@@ -28,37 +52,30 @@ export default function MentorLogbooksPage() {
   }
 
   useEffect(() => {
-    loadLogbooks();
+    loadLogbooks(studentId);
   }, []);
 
-  function formatDate(value) {
-    if (!value) return "-";
-    return new Date(value).toLocaleDateString("nl-BE");
-  }
-
-  function getStatusClass(status) {
-    if (status === "ingediend") return "s_info";
-    if (status === "afgecheckt_door_mentor") return "s_ok";
-    if (status === "goedgekeurd_door_docent") return "s_ok";
-    if (status?.includes("teruggestuurd")) return "s_rood";
-    return "s_grijs";
+  function handleStudentChange(e) {
+    const newId = Number(e.target.value);
+    setStudentId(newId);
+    setFeedbackByWeek({});
+    loadLogbooks(newId);
   }
 
   async function checkWeek(weekId, herindieningNodig = false) {
     try {
       setActionLoadingId(weekId);
 
-      // Deze call stuurt mentorfeedback naar de backend.
-      await api.patch(
-        `/mentor/logbooks/${weekId}/check`,
-        {
-          feedback: feedbackByWeek[weekId] || "Week nagekeken door mentor.",
-          herindieningNodig,
-        }
-      );
+      // Geen hardcoded x-user-id — de api instantie gebruikt automatisch
+      // de ingelogde gebruiker (ingesteld via AuthContext/setApiUserId).
+      await api.patch(`/mentor/logbooks/${weekId}/check`, {
+        feedback: feedbackByWeek[weekId] || "Week nagekeken door mentor.",
+        herindieningNodig,
+      }, {
+        headers: { "x-user-id": String(user.id) },
+      });
 
-      // Na opslaan halen we opnieuw data op zodat status/feedback refreshen.
-      await loadLogbooks();
+      await loadLogbooks(studentId);
     } catch (err) {
       alert(err.response?.data?.message || err.message || "Mentorcontrole mislukt");
     } finally {
@@ -66,23 +83,56 @@ export default function MentorLogbooksPage() {
     }
   }
 
+  const geselecteerdeStudent = DEMO_STUDENTEN.find((s) => s.id === studentId);
+
   return (
     <div className="page_inner">
       <div className="page_header">
-        <h1>Mentor logboeken</h1>
-        <p>Bekijk weeklogboeken en check ze af.</p>
+        <div>
+          <h1>Mentor logboeken</h1>
+          <p>Bekijk weeklogboeken en check ze af.</p>
+        </div>
+        <button className="btn sm" onClick={() => loadLogbooks(studentId)}>
+          Vernieuwen
+        </button>
       </div>
 
-      <button className="btn primary" onClick={loadLogbooks}>
-        Vernieuwen
-      </button>
+      {/* Student selector */}
+      <div className="card" style={{ marginBottom: "12px" }}>
+        <div className="card_title">Student kiezen</div>
+        <div className="form_group">
+          <label className="form_label">Stagiair</label>
+          <select
+            className="form_input"
+            value={studentId}
+            onChange={handleStudentChange}
+          >
+            {DEMO_STUDENTEN.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.naam} (ID {s.id})
+              </option>
+            ))}
+          </select>
+        </div>
+        <p className="muted">
+          Ingelogd als: <strong>{user?.name}</strong> (ID {user?.id})
+        </p>
+      </div>
 
-      {loading && <div className="card"><p className="muted">Logboeken laden...</p></div>}
+      {loading && (
+        <div className="card">
+          <p className="muted">Logboeken laden...</p>
+        </div>
+      )}
 
-      {error && <div className="card"><span className="status s_rood">{error}</span></div>}
+      {error && (
+        <div className="card">
+          <span className="status s_rood">{error}</span>
+        </div>
+      )}
 
       {!loading && !error && weeks.length === 0 && (
-        <div className="empty_state">Geen logboeken gevonden.</div>
+        <div className="empty_state">Geen logboeken gevonden voor deze student.</div>
       )}
 
       {!loading && !error && weeks.map((week) => (
@@ -91,7 +141,7 @@ export default function MentorLogbooksPage() {
 
           <div className="kv">
             <span className="k">Periode</span>
-            <span className="v">{formatDate(week.week_start)} - {formatDate(week.week_einde)}</span>
+            <span className="v">{formatDate(week.week_start)} – {formatDate(week.week_einde)}</span>
           </div>
 
           <div className="kv">
@@ -104,7 +154,14 @@ export default function MentorLogbooksPage() {
             <span className="v">{week.totaal_uren || 0}</span>
           </div>
 
-          <table className="tbl">
+          {week.mentor_feedback && (
+            <div className="kv">
+              <span className="k">Jouw feedback</span>
+              <span className="v">{week.mentor_feedback}</span>
+            </div>
+          )}
+
+          <table className="tbl" style={{ marginTop: "12px" }}>
             <thead>
               <tr>
                 <th>Datum</th>
@@ -134,15 +191,12 @@ export default function MentorLogbooksPage() {
               placeholder="Geef korte feedback op deze week..."
               value={feedbackByWeek[week.id] || ""}
               onChange={(e) =>
-                setFeedbackByWeek({
-                  ...feedbackByWeek,
-                  [week.id]: e.target.value,
-                })
+                setFeedbackByWeek({ ...feedbackByWeek, [week.id]: e.target.value })
               }
             />
           </div>
 
-          <div className="actions">
+          <div className="actions" style={{ marginTop: "8px" }}>
             <button
               className="btn"
               disabled={actionLoadingId === week.id}
@@ -150,7 +204,6 @@ export default function MentorLogbooksPage() {
             >
               Aanpassing vragen
             </button>
-
             <button
               className="btn primary"
               disabled={actionLoadingId === week.id}
