@@ -4,8 +4,11 @@ const {
   getAdminDossierById,
   updateAdminDossierStatus
 } = require("../controllers/internshipController");
+const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
 
 const router = express.Router();
+
+router.use(authenticateDemoUser, requireRole("administratie"));
 
 router.get("/dossiers", getAdminDossiers);
 router.get("/dossiers/:id", getAdminDossierById);
