@@ -228,6 +228,11 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken }) {
   }
 
   function handleDagBevestigen(index) {
+    const dag = logbook.dagen[index];
+    if (!dag.datum) {
+      alert(`Vul een datum in voor dag ${index + 1} voor je bevestigt.`);
+      return;
+    }
     const updated = [...ingediendeDagen];
     updated[index] = true;
     setIngediendeDagen(updated);
@@ -509,19 +514,32 @@ export default function StudentLogbookPage() {
   async function handleWeekIndienen(e) {
     e.preventDefault();
     setError(null);
-    setSaving(true);
 
-    const huidig = editWeek ? weekNaarFormulier(editWeek) : logbook;
-    // Merge met huidige form state als we aan het bewerken zijn
-    const payload = editWeek ? logbook : logbook;
+    // Client-side validatie vóór de API-call
+    if (!logbook.weekStart || !logbook.weekEinde) {
+      setError("Vul de startdatum en einddatum van de week in.");
+      return;
+    }
+
+    if (logbook.weekStart > logbook.weekEinde) {
+      setError("De startdatum moet voor of op de einddatum liggen.");
+      return;
+    }
+
+    if (Number(logbook.weekNummer) < 1) {
+      setError("Weeknummer moet minimaal 1 zijn.");
+      return;
+    }
+
+    setSaving(true);
 
     try {
       await apiRequest("POST", "/logbooks", {
-        stagedossierId: payload.stagedossierId,
-        weekNummer: Number(payload.weekNummer),
-        weekStart: payload.weekStart,
-        weekEinde: payload.weekEinde,
-        dagen: payload.dagen.map((dag) => ({
+        stagedossierId: logbook.stagedossierId,
+        weekNummer: Number(logbook.weekNummer),
+        weekStart: logbook.weekStart,
+        weekEinde: logbook.weekEinde,
+        dagen: logbook.dagen.map((dag) => ({
           datum: dag.datum,
           titel: dag.titel,
           uitgevoerdeTaken: dag.uitgevoerdeTaken,
@@ -533,10 +551,17 @@ export default function StudentLogbookPage() {
       });
 
       setEditWeek(null);
-      await fetchWeken(payload.weekNummer);
+      await fetchWeken(logbook.weekNummer);
       setSubmitted(true);
     } catch (err) {
-      setError("Week indienen mislukt. Controleer je gegevens en probeer opnieuw.");
+      const backendMsg = err.response?.data?.message;
+      if (backendMsg?.toLowerCase().includes("stagedossier")) {
+        setError("Je hebt nog geen actief stagedossier. Neem contact op met je stagebegeleider.");
+      } else if (backendMsg?.includes("afgesloten")) {
+        setError("Deze week is afgesloten en kan niet meer aangepast worden.");
+      } else {
+        setError(backendMsg || "Week indienen mislukt. Controleer je gegevens en probeer opnieuw.");
+      }
       console.error(err);
     } finally {
       setSaving(false);
