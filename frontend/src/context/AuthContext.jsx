@@ -10,23 +10,38 @@ const demoUsers = {
     name: "Demo Student",
     role: ROLES.STUDENT,
   },
+  student2: {
+    id: 6,
+    name: "Demo Student 2",
+    role: ROLES.STUDENT,
+  },
+  student3: {
+    id: 7,
+    name: "Demo Student 3",
+    role: ROLES.STUDENT,
+  },
+  student4: {
+    id: 8,
+    name: "Demo Student 4",
+    role: ROLES.STUDENT,
+  },
   stagecommissie: {
     id: 2,
     name: "Demo Stagecommissie",
     role: ROLES.COMMITTEE,
   },
   administratie: {
-    id: 3,
+    id: 4,
     name: "Demo Administratie",
     role: ROLES.ADMIN,
   },
   mentor: {
-    id: 4,
+    id: 5,
     name: "Demo Mentor",
     role: ROLES.MENTOR,
   },
   docent: {
-    id: 5,
+    id: 3,
     name: "Demo Docent",
     role: ROLES.DOCENT,
   },
@@ -35,8 +50,8 @@ const demoUsers = {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(demoUsers.student);
 
-  function switchRole(role) {
-    const nextUser = demoUsers[role];
+  function switchRole(roleOrUserKey) {
+    const nextUser = demoUsers[roleOrUserKey] || demoUsers.student;
     setUser(nextUser);
     setApiUserId(nextUser.id);
   }
