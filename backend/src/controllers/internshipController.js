@@ -501,6 +501,7 @@ async function createDossierAfterApproval(connection, stagevoorstelId) {
   );
 
   if (existing.length > 0) {
+    await ensureDossierAdminRecords(connection, existing[0].id);
     return existing[0].id;
   }
 
@@ -589,7 +590,55 @@ async function createDossierAfterApproval(connection, stagevoorstelId) {
     ]
   );
 
+  await ensureDossierAdminRecords(connection, result.insertId);
+
   return result.insertId;
+}
+
+async function ensureDossierAdminRecords(connection, dossierId) {
+  await connection.query(
+    `
+    INSERT INTO stageovereenkomsten
+      (stagedossier_id, status, versie_nummer, aangemaakt_op, aangepast_op)
+    VALUES (?, 'klaar_voor_student', 1, NOW(), NOW())
+    ON DUPLICATE KEY UPDATE
+      aangepast_op = VALUES(aangepast_op)
+    `,
+    [dossierId]
+  );
+
+  await connection.query(
+    `
+    INSERT INTO documenten
+      (
+        stagedossier_id,
+        document_soort_id,
+        status,
+        versie_nummer,
+        zichtbaar_voor_student,
+        zichtbaar_voor_docent,
+        zichtbaar_voor_mentor,
+        aangemaakt_op,
+        aangepast_op
+      )
+    SELECT
+      ?,
+      ds.id,
+      'ontbreekt',
+      1,
+      1,
+      1,
+      CASE WHEN ds.type = 'stageovereenkomst' THEN 1 ELSE 0 END,
+      NOW(),
+      NOW()
+    FROM document_soorten ds
+    WHERE ds.status = 'actief'
+      AND ds.is_verplicht = 1
+    ON DUPLICATE KEY UPDATE
+      aangepast_op = VALUES(aangepast_op)
+    `,
+    [dossierId]
+  );
 }
 
 async function getAdminDossiers(req, res) {
@@ -608,7 +657,36 @@ async function getAdminDossiers(req, res) {
         d.uren_per_week,
         d.totaal_uren,
         d.verzekering_in_orde,
+        d.praktische_afspraken,
         d.eindresultaat,
+
+        so.status AS overeenkomst_status,
+
+        (
+          SELECT COUNT(*)
+          FROM documenten doc
+          JOIN document_soorten ds ON ds.id = doc.document_soort_id
+          WHERE doc.stagedossier_id = d.id
+            AND ds.is_verplicht = 1
+        ) AS verplichte_documenten,
+
+        (
+          SELECT COUNT(*)
+          FROM documenten doc
+          JOIN document_soorten ds ON ds.id = doc.document_soort_id
+          WHERE doc.stagedossier_id = d.id
+            AND ds.is_verplicht = 1
+            AND doc.status IN ('goedgekeurd', 'geregistreerd')
+        ) AS documenten_in_orde,
+
+        (
+          SELECT COUNT(*)
+          FROM documenten doc
+          JOIN document_soorten ds ON ds.id = doc.document_soort_id
+          WHERE doc.stagedossier_id = d.id
+            AND ds.is_verplicht = 1
+            AND doc.status IN ('ontbreekt', 'afgekeurd')
+        ) AS documenten_te_controleren,
 
         sg.voornaam AS student_voornaam,
         sg.achternaam AS student_achternaam,
@@ -632,6 +710,7 @@ async function getAdminDossiers(req, res) {
       JOIN bedrijven b ON b.id = d.bedrijf_id
       LEFT JOIN gebruikers mg ON mg.id = d.mentor_id
       JOIN gebruikers dg ON dg.id = d.stagebegeleider_id
+      LEFT JOIN stageovereenkomsten so ON so.stagedossier_id = d.id
       ORDER BY d.aangemaakt_op DESC
       `
     );
@@ -706,7 +785,55 @@ async function getAdminDossierById(req, res) {
       return fail(res, 404, "Dossier niet gevonden");
     }
 
-    return ok(res, rows[0], "Admin dossier detail opgehaald");
+    const [documents] = await db.query(
+      `
+      SELECT
+        doc.id,
+        doc.status,
+        doc.versie_nummer,
+        doc.bestand_naam,
+        doc.opgeladen_op,
+        doc.gecontroleerd_op,
+        doc.afkeurreden,
+        ds.naam,
+        ds.type,
+        ds.is_verplicht
+      FROM documenten doc
+      JOIN document_soorten ds ON ds.id = doc.document_soort_id
+      WHERE doc.stagedossier_id = ?
+      ORDER BY ds.is_verplicht DESC, ds.id ASC
+      `,
+      [dossierId]
+    );
+
+    const [agreements] = await db.query(
+      `
+      SELECT
+        id,
+        status,
+        versie_nummer,
+        student_getekend_op,
+        bedrijf_getekend_op,
+        opleiding_getekend_op,
+        gecontroleerd_op,
+        geregistreerd_op,
+        afkeurreden
+      FROM stageovereenkomsten
+      WHERE stagedossier_id = ?
+      LIMIT 1
+      `,
+      [dossierId]
+    );
+
+    return ok(
+      res,
+      {
+        ...rows[0],
+        stageovereenkomst: agreements[0] || null,
+        documenten: documents
+      },
+      "Admin dossier detail opgehaald"
+    );
   } catch (error) {
     return fail(res, 500, "Dossier detail ophalen mislukt", error.message);
   }
