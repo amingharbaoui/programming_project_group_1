@@ -2,7 +2,7 @@ const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 
 function getUserId(req, fallbackId) {
-  return Number(req.header("x-user-id") || req.body.userId || fallbackId);
+  return Number(req.user?.id || fallbackId);
 }
 
 function calculateWeeks(startdatum, einddatum) {
@@ -258,7 +258,7 @@ async function createInternship(req, res) {
 }
 
 async function getMyInternship(req, res) {
-  const studentId = Number(req.header("x-user-id") || req.query.studentId || 1);
+  const studentId = getUserId(req);
 
   try {
     const [rows] = await db.query(

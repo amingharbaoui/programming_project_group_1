@@ -4,8 +4,11 @@ const {
   getLogbooksByStudent,
   mentorCheckLogbookWeek
 } = require("../controllers/logbookController");
+const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
 
 const router = express.Router();
+
+router.use(authenticateDemoUser, requireRole("mentor"));
 
 router.get("/students", list("Mentor studenten"));
 router.get("/logbooks/:studentId", getLogbooksByStudent);
