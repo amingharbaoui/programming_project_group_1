@@ -54,12 +54,6 @@ export default function MentorLogbooksPage() {
         {
           feedback: feedbackByWeek[weekId] || "Week nagekeken door mentor.",
           herindieningNodig,
-        },
-        {
-          headers: {
-            // Demo-user: mentor heeft id 4.
-            "x-user-id": "4",
-          },
         }
       );
 
