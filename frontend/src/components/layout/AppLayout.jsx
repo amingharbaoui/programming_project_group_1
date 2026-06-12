@@ -1,16 +1,20 @@
+import "./AppLayout.css";
+import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 
 export default function AppLayout() {
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
-    <div style={{ display: "flex", minHeight: "100vh" }}>
-      <Sidebar />
+    <div className="main">
+      <Sidebar collapsed={collapsed} />
 
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <Navbar />
+      <div className="content-wrap">
+        <Navbar onToggle={() => setCollapsed((c) => !c)} />
 
-        <main style={{ padding: "24px" }}>
+        <main className="page-scroll">
           <Outlet />
         </main>
       </div>
