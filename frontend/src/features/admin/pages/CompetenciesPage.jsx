@@ -1,7 +1,26 @@
+import { useEffect, useState } from "react";
 import "./CompetenciesPage.css";
 import { IconArchive, IconChecks, IconCopyPlus, IconEdit, IconListDetails, IconTrash,} from "@tabler/icons-react";
+import api from "../../../services/api";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function CompetenciesPage() {
+  const { user } = useAuth();
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function checkAccess() {
+      try {
+        setError("");
+        await api.get("/competencies");
+      } catch (err) {
+        setError(err.response?.data?.message || "Competenties ophalen mislukt");
+      }
+    }
+
+    checkAccess();
+  }, [user.id]);
+
   return (
       <div className="competencies_page">
         <div className="competencies_main">
@@ -13,6 +32,7 @@ export default function CompetenciesPage() {
                 Versioneerbaar beheer, wijzigingen gelden voor nieuwe dossiers en
                 niet stilzwijgend voor lopende evaluaties.
               </p>
+              {error && <p>{error}</p>}
             </div>
 
             <div className="competencies_hero_actions">

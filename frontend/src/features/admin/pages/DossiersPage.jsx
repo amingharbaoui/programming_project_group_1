@@ -1,23 +1,58 @@
+import { useEffect, useState } from "react";
 import "./DossiersPage.css";
 import "../../../index.css";
+import api from "../../../services/api";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function DossiersPage() {
-  const dossiers = [
-    {
-      id: 1,
-      initials: "MP",
-      student: "Milan Peeters",
-      opleiding: "3 Toegepaste Informatica",
-      bedrijf: "Nodea Software",
-      begeleider: "K. Wouters",
-      begeleiderStatus: "Definitief gekoppeld",
-      dossiernr: "DOS-2026-014",
-      overeenkomst: "Volledig ondertekend",
-      documenten: "Te controleren",
-      status: "In controle bij administratie",
-      actie: "Controleren",
-    },
-  ];
+  const { user } = useAuth();
+  const [dossiers, setDossiers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadDossiers() {
+      try {
+        setLoading(true);
+        setError("");
+        const response = await api.get("/admin/dossiers");
+        setDossiers(response.data.data || []);
+      } catch (err) {
+        setError(err.response?.data?.message || "Dossiers ophalen mislukt");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadDossiers();
+  }, [user.id]);
+
+  function formatDossier(dossier) {
+    const student = `${dossier.student_voornaam || ""} ${dossier.student_achternaam || ""}`.trim();
+    const docent = `${dossier.docent_voornaam || ""} ${dossier.docent_achternaam || ""}`.trim();
+    const documenten = `${dossier.documenten_in_orde || 0}/${dossier.verplichte_documenten || 0} in orde`;
+
+    return {
+      id: dossier.id,
+      initials: student
+        .split(" ")
+        .filter(Boolean)
+        .map((part) => part[0])
+        .join("")
+        .slice(0, 2)
+        .toUpperCase() || "ST",
+      student: student || "Onbekende student",
+      opleiding: dossier.opleiding || dossier.academiejaar || "-",
+      bedrijf: dossier.bedrijf_naam || "-",
+      begeleider: docent || "Nog niet gekoppeld",
+      begeleiderStatus: dossier.mentor_voornaam ? "Mentor gekoppeld" : "Mentor ontbreekt",
+      dossiernr: dossier.dossiernummer,
+      overeenkomst: dossier.overeenkomst_status || "Nog niet gestart",
+      documenten,
+      status: dossier.status,
+      actie: "Controleren"
+    };
+  }
 
   return (
       <div className="page">
@@ -44,7 +79,28 @@ export default function DossiersPage() {
             </thead>
 
             <tbody>
-            {dossiers.map((dossier) => (
+            {loading && (
+                <tr>
+                  <td colSpan="8">Dossiers laden...</td>
+                </tr>
+            )}
+
+            {!loading && error && (
+                <tr>
+                  <td colSpan="8">{error}</td>
+                </tr>
+            )}
+
+            {!loading && !error && dossiers.length === 0 && (
+                <tr>
+                  <td colSpan="8">Geen dossiers gevonden.</td>
+                </tr>
+            )}
+
+            {!loading && !error && dossiers.map((rawDossier) => {
+              const dossier = formatDossier(rawDossier);
+
+              return (
                 <tr key={dossier.id}>
                   <td>
                     <div className="student_cell">
@@ -89,7 +145,8 @@ export default function DossiersPage() {
                     </button>
                   </td>
                 </tr>
-            ))}
+              );
+            })}
             </tbody>
           </table>
         </div>

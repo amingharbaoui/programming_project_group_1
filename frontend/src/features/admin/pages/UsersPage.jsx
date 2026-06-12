@@ -1,39 +1,43 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import "./UsersPage.css";
 import "../../../index.css";
 import { IconUser, IconUserPlus, IconEye } from "@tabler/icons-react";
+import api from "../../../services/api";
+import { useAuth } from "../../../context/AuthContext";
 
 export default function UsersPage() {
-  const users = [
-    {
-      naam: "Milan Peeters",
-      email: "milan.peeters@student.ehb.be",
-      rol: "Student",
-      status: "Actief",
-      koppeling: "Dossier DOS-2026-014",
-    },
-    {
-      naam: "K. Wouters",
-      email: "k.wouters@ehb.be",
-      rol: "Docent",
-      status: "Actief",
-      koppeling: "Stagebegeleider van Milan Peeters",
-    },
-    {
-      naam: "Sofie Maris",
-      email: "sofie.maris@nodea.be",
-      rol: "Mentor extern",
-      status: "Uitgenodigd",
-      koppeling: "Nodea Software",
-    },
-    {
-      naam: "S. Bogaerts",
-      email: "s.bogaerts@ehb.be",
-      rol: "Administratie",
-      status: "Actief",
-      koppeling: "Beheerder",
-    },
-  ];
+  const { user } = useAuth();
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadUsers() {
+      try {
+        setLoading(true);
+        setError("");
+        const response = await api.get("/users");
+        setUsers(response.data.data || []);
+      } catch (err) {
+        setError(err.response?.data?.message || "Gebruikers ophalen mislukt");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadUsers();
+  }, [user.id]);
+
+  function formatUser(user) {
+    return {
+      id: user.id,
+      naam: `${user.voornaam || ""} ${user.achternaam || ""}`.trim() || "Onbekende gebruiker",
+      email: user.email,
+      rol: user.hoofdrol,
+      status: user.status,
+      koppeling: user.hoofdrol === "administratie" ? "Beheerder" : "-"
+    };
+  }
 
   return (
       <div className="users-page">
@@ -68,25 +72,47 @@ export default function UsersPage() {
             </thead>
 
             <tbody>
-            {users.map((user, index) => (
-                <tr key={index}>
-                  <td className="user-name">{user.naam}</td>
-                  <td>{user.email}</td>
-                  <td>
-                  <span className={`badge role-${user.rol.toLowerCase().replace(/\s+/g, "-")}`}>
-                    {user.rol}
-                  </span>
-                  </td>
-                  <td>{user.status}</td>
-                  <td>{user.koppeling}</td>
-                  <td>
-                    <button className="btn sm">
-                      <IconEye size={16} stroke={2} />
-                      Bekijken
-                    </button>
-                  </td>
-                </tr>
-            ))}
+            {loading && (
+              <tr>
+                <td colSpan="6">Gebruikers laden...</td>
+              </tr>
+            )}
+
+            {!loading && error && (
+              <tr>
+                <td colSpan="6">{error}</td>
+              </tr>
+            )}
+
+            {!loading && !error && users.length === 0 && (
+              <tr>
+                <td colSpan="6">Geen gebruikers gevonden.</td>
+              </tr>
+            )}
+
+            {!loading && !error && users.map((rawUser) => {
+              const user = formatUser(rawUser);
+
+              return (
+                  <tr key={user.id}>
+                    <td className="user-name">{user.naam}</td>
+                    <td>{user.email}</td>
+                    <td>
+                    <span className={`badge role-${user.rol.toLowerCase().replace(/\s+/g, "-")}`}>
+                      {user.rol}
+                    </span>
+                    </td>
+                    <td>{user.status}</td>
+                    <td>{user.koppeling}</td>
+                    <td>
+                      <button className="btn sm">
+                        <IconEye size={16} stroke={2} />
+                        Bekijken
+                      </button>
+                    </td>
+                  </tr>
+              );
+            })}
             </tbody>
           </table>
         </div>
