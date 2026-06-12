@@ -1,0 +1,133 @@
+.page {
+	padding: 18px 16px 24px;
+}
+
+.page_header {
+	margin-bottom: 16px;
+}
+
+.page_header h1 {
+	margin: 0;
+	font-size: 26px;
+	font-weight: 700;
+	letter-spacing: -0.4px;
+	color: var(--dark);
+}
+
+.page_header p {
+	margin: 6px 0 0;
+	font-size: 13px;
+	color: var(--sub);
+	line-height: 1.5;
+}
+
+.dossiers_card {
+	padding: 18px 18px 8px;
+	overflow-x: auto;
+}
+
+.dossiers_tbl {
+	min-width: 1220px;
+}
+
+.dossiers_tbl th {
+	padding-top: 14px;
+	padding-bottom: 14px;
+	font-size: 11px;
+	letter-spacing: 0.6px;
+	color: var(--faint);
+}
+
+.dossiers_tbl td {
+	padding-top: 22px;
+	padding-bottom: 22px;
+}
+
+.student_cell {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	min-width: 210px;
+}
+
+.student_avatar {
+	width: 44px;
+	height: 44px;
+	border-radius: 999px;
+	background: var(--red-light);
+	color: var(--red);
+	font-size: 13px;
+	font-weight: 700;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.student_info {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+.student_name {
+	font-size: 14px;
+	font-weight: 700;
+	color: var(--dark);
+	line-height: 1.35;
+}
+
+.student_meta {
+	font-size: 12px;
+	color: var(--faint);
+	line-height: 1.5;
+	max-width: 150px;
+}
+
+.cell_main {
+	font-size: 13px;
+	color: var(--dark);
+	line-height: 1.45;
+}
+
+.cell_sub {
+	margin-top: 3px;
+	font-size: 12px;
+	color: var(--faint);
+	line-height: 1.45;
+}
+
+.cell_dossier {
+	font-size: 12px;
+	color: var(--faint);
+	white-space: nowrap;
+}
+
+.dossiers_action_btn {
+	min-width: 132px;
+	justify-content: center;
+}
+
+.dossiers_tbl td:nth-child(2) {
+	min-width: 170px;
+}
+
+.dossiers_tbl td:nth-child(3) {
+	min-width: 190px;
+}
+
+.dossiers_tbl td:nth-child(4) {
+	min-width: 140px;
+}
+
+.dossiers_tbl td:nth-child(5) {
+	min-width: 190px;
+}
+
+.dossiers_tbl td:nth-child(6) {
+	min-width: 120px;
+}
+
+.dossiers_tbl td:nth-child(7) {
+	min-width: 210px;
+}

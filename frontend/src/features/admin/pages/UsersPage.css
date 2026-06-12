@@ -1,0 +1,123 @@
+.users-page {
+	padding: 24px;
+	background: #f7f7f7;
+	min-height: 100vh;
+	font-family: "DM Sans", sans-serif;
+	color: #111827;
+}
+
+.page-header {
+	margin-bottom: 20px;
+}
+
+.page-header h1 {
+	font-size: 26px;
+	margin: 0;
+	font-weight: 700;
+}
+
+.page-header p {
+	margin-top: 6px;
+	font-size: 14px;
+	color: #6b7280;
+}
+
+.card {
+	background: #ffffff;
+	border: 1px solid #e5e7eb;
+	border-radius: 16px;
+	padding: 20px;
+}
+
+.card-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-bottom: 16px;
+}
+
+.card-header h2 {
+	margin: 0;
+	font-size: 18px;
+}
+
+.users-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.users-table th,
+.users-table td {
+	text-align: left;
+	padding: 14px 12px;
+	border-bottom: 1px solid #f0f0f0;
+	font-size: 14px;
+}
+
+.users-table th {
+	color: #6b7280;
+	font-weight: 600;
+}
+
+.user-name {
+	font-weight: 600;
+	color: #111827;
+}
+
+.badge {
+	display: inline-block;
+	padding: 6px 10px;
+	border-radius: 999px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.role-student {
+	background: #eaf2ff;
+	color: #1d4ed8;
+}
+
+.role-docent {
+	background: #f3f4f6;
+	color: #4b5563;
+}
+
+.role-mentor-extern {
+	background: #fff4e5;
+	color: #a16207;
+}
+
+.role-administratie {
+	background: #fdecec;
+	color: #e2001a;
+}
+
+.primary-btn {
+	background: #e2001a;
+	color: white;
+	border: none;
+	padding: 10px 14px;
+	border-radius: 10px;
+	cursor: pointer;
+	font-family: inherit;
+	font-weight: 600;
+}
+
+.btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 7px 14px;
+	border-radius: 6px;
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	border: 0.5px solid #d9d9d9;
+	background: white;
+	color: #111;
+}
+
+.btn.sm {
+	font-size: 12px;
+	padding: 4px 10px;
+}
