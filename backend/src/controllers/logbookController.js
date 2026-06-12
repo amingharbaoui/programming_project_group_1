@@ -135,8 +135,23 @@ async function createLogbook(req, res) {
     return fail(res, 400, "weekNummer, weekStart en weekEinde zijn verplicht");
   }
 
+  if (finalWeekNummer < 1) {
+    return fail(res, 400, "Weeknummer moet minimaal 1 zijn");
+  }
+
+  if (finalWeekStart > finalWeekEinde) {
+    return fail(res, 400, "Weekstart moet voor of op de einddatum liggen");
+  }
+
   if (!Array.isArray(finalDays) || finalDays.length === 0) {
-    return fail(res, 400, "Minstens ��n logboekdag is verplicht");
+    return fail(res, 400, "Minstens één logboekdag is verplicht");
+  }
+
+  for (const day of finalDays) {
+    const uren = Number(day.aantalUren || day.aantal_uren || 0);
+    if (uren < 0) {
+      return fail(res, 400, "Aantal uren per dag kan niet negatief zijn");
+    }
   }
 
   const connection = await db.getConnection();
@@ -184,6 +199,16 @@ async function createLogbook(req, res) {
 
     if (existingWeeks.length > 0) {
       weekId = existingWeeks[0].id;
+
+      const [weekStatus] = await connection.query(
+        "SELECT status FROM logboek_weken WHERE id = ? LIMIT 1",
+        [weekId]
+      );
+
+      if (weekStatus[0]?.status === "afgesloten") {
+        await connection.rollback();
+        return fail(res, 409, "Deze week is afgesloten en kan niet meer aangepast worden");
+      }
 
       await connection.query(
         `
@@ -268,7 +293,7 @@ async function createLogbook(req, res) {
         `,
         [
           weekId,
-          day.datum,
+          day.datum || null,
           day.status || "ingediend",
           day.titel || null,
           day.uitgevoerdeTaken || day.uitgevoerde_taken || null,
