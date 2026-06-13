@@ -1,5 +1,20 @@
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
+const { meld } = require("../utils/notify");
+
+async function notifyStudentOfWeek(connection, weekId, opts) {
+  try {
+    const [rows] = await connection.query(
+      "SELECT d.student_id FROM logboek_weken lw JOIN stagedossiers d ON d.id = lw.stagedossier_id WHERE lw.id = ? LIMIT 1",
+      [weekId]
+    );
+    if (rows[0]?.student_id) {
+      await meld(rows[0].student_id, { ...opts, logboekWeekId: weekId });
+    }
+  } catch (error) {
+    console.error("Melding logboek mislukt:", error.message);
+  }
+}
 
 function getUserId(req, fallbackId) {
   return Number(req.user?.id || fallbackId);
@@ -495,6 +510,14 @@ async function mentorCheckLogbookWeek(req, res) {
       [weekId]
     );
 
+    await notifyStudentOfWeek(connection, weekId, {
+      titel: needsResubmission ? "Logboek: aanpassing gevraagd" : "Logboek afgecheckt door mentor",
+      bericht: needsResubmission
+        ? "Je mentor vraagt een aanpassing aan je logboekweek."
+        : "Je mentor heeft je logboekweek afgecheckt.",
+      aangemaaktDoorId: validMentorId || null
+    });
+
     return ok(res, rows[0], "Mentorcontrole opgeslagen");
   } catch (error) {
     return fail(res, 500, "Mentorcontrole mislukt", error.message);
@@ -557,6 +580,14 @@ async function docentReviewLogbookWeek(req, res) {
       "SELECT * FROM logboek_weken WHERE id = ?",
       [weekId]
     );
+
+    await notifyStudentOfWeek(connection, weekId, {
+      titel: needsResubmission ? "Logboek: aanpassing gevraagd" : "Logboek nagekeken door docent",
+      bericht: needsResubmission
+        ? "Je docent vraagt een aanpassing aan je logboekweek."
+        : "Je docent heeft je logboekweek nagekeken.",
+      aangemaaktDoorId: validDocentId || null
+    });
 
     return ok(res, rows[0], "Docentcontrole opgeslagen");
   } catch (error) {
