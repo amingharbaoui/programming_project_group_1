@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { ROLES } from "../../constants/roles";
 import { NAVIGATION } from "../../constants/navigation";
+import NotificationBell from "./NotificationBell";
 
 export default function Navbar({ onToggle }) {
   const { user, switchRole } = useAuth();
@@ -40,6 +41,8 @@ export default function Navbar({ onToggle }) {
           <option value={ROLES.DOCENT}>Docent</option>
         </select>
       </span>
+
+      <NotificationBell />
 
       <div className="topbar-user">
         <div className="avatar">{initials}</div>
