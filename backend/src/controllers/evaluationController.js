@@ -145,7 +145,134 @@ async function getEvaluationsForStudent(req, res) {
   }
 }
 
+async function loadEvaluationWithDossier(conn, evaluationId) {
+  const [rows] = await conn.query(
+    `
+    SELECT e.id, e.type, e.status, e.stagedossier_id,
+           d.student_id, d.mentor_id, d.stagebegeleider_id
+    FROM evaluaties e
+    JOIN stagedossiers d ON d.id = e.stagedossier_id
+    WHERE e.id = ?
+    LIMIT 1
+    `,
+    [evaluationId]
+  );
+  return rows[0] || null;
+}
+
+function userMayEditAsRole(dossier, role, userId) {
+  if (role === "student") return dossier.student_id === userId;
+  if (role === "mentor") return dossier.mentor_id === userId;
+  if (role === "docent") return dossier.stagebegeleider_id === userId;
+  return false;
+}
+
+// Student/mentor/docent slaat zijn scores + motivatie per competentie op (alleen bij open evaluatie).
+async function saveScores(req, res) {
+  const evaluationId = Number(req.params.evaluationId);
+  const role = req.user?.hoofdrol;
+  const userId = getUserId(req);
+  const ingediend = Boolean(req.body.ingediend);
+  const scores = Array.isArray(req.body.scores) ? req.body.scores : [];
+
+  if (!evaluationId) {
+    return fail(res, 400, "Ongeldig evaluatie-id");
+  }
+  if (!["student", "mentor", "docent"].includes(role)) {
+    return fail(res, 403, "Deze rol kan geen scores invullen");
+  }
+  if (scores.length === 0) {
+    return fail(res, 400, "Geen scores meegegeven");
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const evaluatie = await loadEvaluationWithDossier(conn, evaluationId);
+    if (!evaluatie) {
+      await conn.rollback();
+      return fail(res, 404, "Evaluatie niet gevonden");
+    }
+    if (evaluatie.status === "niet_open") {
+      await conn.rollback();
+      return fail(res, 409, "Deze evaluatie is nog niet geopend");
+    }
+    if (evaluatie.status === "vrijgegeven") {
+      await conn.rollback();
+      return fail(res, 409, "Deze evaluatie is al vrijgegeven en kan niet meer aangepast worden");
+    }
+    if (!userMayEditAsRole(evaluatie, role, userId)) {
+      await conn.rollback();
+      return fail(res, 403, "Je bent niet gekoppeld aan deze evaluatie");
+    }
+
+    // Bij indienen moeten alle actieve competenties een score hebben.
+    if (ingediend) {
+      const active = await getActiveCompetencies(conn);
+      const ingevuld = scores
+        .filter((s) => s.score !== null && s.score !== undefined && s.score !== "")
+        .map((s) => Number(s.competentieId || s.competentie_id));
+      const ontbreekt = active.filter((c) => !ingevuld.includes(c.id));
+      if (ontbreekt.length > 0) {
+        await conn.rollback();
+        return fail(res, 400, `Nog niet alle competenties ingevuld (${ontbreekt.length} ontbreken)`);
+      }
+    }
+
+    for (const s of scores) {
+      const competentieId = Number(s.competentieId || s.competentie_id);
+      if (!competentieId) continue;
+      const scoreValue = s.score === "" || s.score === undefined ? null : s.score;
+
+      await conn.query(
+        `
+        INSERT INTO competentie_scores
+          (evaluatie_id, competentie_id, ingevuld_door_id, rol, score, motivering, feedback, ingediend, ingediend_op, aangemaakt_op, aangepast_op)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        ON DUPLICATE KEY UPDATE
+          score = VALUES(score),
+          motivering = VALUES(motivering),
+          feedback = VALUES(feedback),
+          ingediend = VALUES(ingediend),
+          ingediend_op = VALUES(ingediend_op),
+          aangepast_op = NOW()
+        `,
+        [
+          evaluationId,
+          competentieId,
+          userId,
+          role,
+          scoreValue,
+          s.motivering || s.motivatie || null,
+          s.feedback || null,
+          ingediend ? 1 : 0,
+          ingediend ? new Date() : null
+        ]
+      );
+    }
+
+    // Status van de evaluatie bijwerken wanneer een rol indient.
+    if (ingediend) {
+      if (role === "student") {
+        await conn.query("UPDATE evaluaties SET status = 'student_ingediend', student_ingediend_op = NOW(), aangepast_op = NOW() WHERE id = ?", [evaluationId]);
+      } else if (role === "mentor") {
+        await conn.query("UPDATE evaluaties SET status = 'mentor_ingediend', mentor_ingediend_op = NOW(), aangepast_op = NOW() WHERE id = ?", [evaluationId]);
+      }
+    }
+
+    await conn.commit();
+    return ok(res, { evaluatieId: evaluationId, rol: role, ingediend }, ingediend ? "Scores ingediend" : "Scores opgeslagen");
+  } catch (error) {
+    await conn.rollback();
+    return fail(res, 500, "Scores opslaan mislukt", error.message);
+  } finally {
+    conn.release();
+  }
+}
+
 module.exports = {
   openEvaluation,
-  getEvaluationsForStudent
+  getEvaluationsForStudent,
+  saveScores
 };
