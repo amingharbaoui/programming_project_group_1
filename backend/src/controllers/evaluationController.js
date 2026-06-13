@@ -148,7 +148,7 @@ async function getEvaluationsForStudent(req, res) {
 async function loadEvaluationWithDossier(conn, evaluationId) {
   const [rows] = await conn.query(
     `
-    SELECT e.id, e.type, e.status, e.stagedossier_id,
+    SELECT e.id, e.type, e.status, e.stagedossier_id, e.eindcijfer,
            d.student_id, d.mentor_id, d.stagebegeleider_id
     FROM evaluaties e
     JOIN stagedossiers d ON d.id = e.stagedossier_id
@@ -271,8 +271,143 @@ async function saveScores(req, res) {
   }
 }
 
+function mayActAsDocent(evaluatie, role, userId) {
+  if (role === "administratie") return true;
+  if (role === "docent") return evaluatie.stagebegeleider_id === userId;
+  return false;
+}
+
+// Docent registreert (tussentijds) of berekent het eindresultaat (finaal) uit de docentscores.
+async function calculateResult(req, res) {
+  const evaluationId = Number(req.params.evaluationId);
+  const role = req.user?.hoofdrol;
+  const userId = getUserId(req);
+  const eindpresentatieScore = req.body.eindpresentatieScore ?? req.body.eindpresentatie_score ?? null;
+
+  if (!evaluationId) {
+    return fail(res, 400, "Ongeldig evaluatie-id");
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const evaluatie = await loadEvaluationWithDossier(conn, evaluationId);
+    if (!evaluatie) {
+      await conn.rollback();
+      return fail(res, 404, "Evaluatie niet gevonden");
+    }
+    if (!mayActAsDocent(evaluatie, role, userId)) {
+      await conn.rollback();
+      return fail(res, 403, "Alleen de gekoppelde docent of administratie kan dit doen");
+    }
+    if (evaluatie.status === "vrijgegeven") {
+      await conn.rollback();
+      return fail(res, 409, "Resultaat is al vrijgegeven");
+    }
+
+    // Gewogen gemiddelde van de docentscores per competentie.
+    const [rows] = await conn.query(
+      `
+      SELECT cs.competentie_id, cs.score, c.gewicht_percentage
+      FROM competentie_scores cs
+      JOIN competenties c ON c.id = cs.competentie_id
+      WHERE cs.evaluatie_id = ? AND cs.rol = 'docent'
+      `,
+      [evaluationId]
+    );
+
+    const active = await getActiveCompetencies(conn);
+    const gescoord = rows.filter((r) => r.score !== null && r.score !== undefined);
+    if (gescoord.length < active.length) {
+      await conn.rollback();
+      return fail(res, 400, "Docent heeft nog niet alle competenties gescoord");
+    }
+
+    const totaalGewicht = gescoord.reduce((s, r) => s + Number(r.gewicht_percentage || 0), 0);
+    if (totaalGewicht <= 0) {
+      await conn.rollback();
+      return fail(res, 400, "Gewichten ontbreken op de competenties");
+    }
+    const gewogen = gescoord.reduce((s, r) => s + Number(r.score) * Number(r.gewicht_percentage || 0), 0) / totaalGewicht;
+    const competentieScore = Math.round(gewogen * 100) / 100;
+
+    const isFinaal = evaluatie.type === "finaal";
+    const eindcijfer = isFinaal ? competentieScore : null;
+    const nieuweStatus = isFinaal ? "klaar_voor_vrijgave" : "geregistreerd";
+
+    await conn.query(
+      `
+      UPDATE evaluaties
+      SET competentie_score = ?, eindcijfer = ?, eindpresentatie_score = COALESCE(?, eindpresentatie_score),
+          status = ?, docent_geregistreerd_op = NOW(), aangepast_op = NOW()
+      WHERE id = ?
+      `,
+      [competentieScore, eindcijfer, eindpresentatieScore, nieuweStatus, evaluationId]
+    );
+
+    await conn.commit();
+    return ok(res, { evaluatieId: evaluationId, competentieScore, eindcijfer, status: nieuweStatus }, isFinaal ? "Eindresultaat berekend" : "Tussentijdse evaluatie geregistreerd");
+  } catch (error) {
+    await conn.rollback();
+    return fail(res, 500, "Resultaat berekenen mislukt", error.message);
+  } finally {
+    conn.release();
+  }
+}
+
+// Docent geeft het berekende eindresultaat vrij; dan pas zichtbaar voor de student.
+async function releaseResult(req, res) {
+  const evaluationId = Number(req.params.evaluationId);
+  const role = req.user?.hoofdrol;
+  const userId = getUserId(req);
+
+  if (!evaluationId) {
+    return fail(res, 400, "Ongeldig evaluatie-id");
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const evaluatie = await loadEvaluationWithDossier(conn, evaluationId);
+    if (!evaluatie) {
+      await conn.rollback();
+      return fail(res, 404, "Evaluatie niet gevonden");
+    }
+    if (!mayActAsDocent(evaluatie, role, userId)) {
+      await conn.rollback();
+      return fail(res, 403, "Alleen de gekoppelde docent of administratie kan vrijgeven");
+    }
+    if (evaluatie.status !== "klaar_voor_vrijgave") {
+      await conn.rollback();
+      return fail(res, 409, "Resultaat moet eerst berekend worden voor het vrijgegeven kan worden");
+    }
+
+    await conn.query(
+      "UPDATE evaluaties SET status = 'vrijgegeven', vrijgegeven_door_id = ?, vrijgegeven_op = NOW(), aangepast_op = NOW() WHERE id = ?",
+      [userId, evaluationId]
+    );
+
+    await conn.query(
+      "UPDATE stagedossiers SET eindresultaat = ?, eindresultaat_vrijgegeven_op = NOW(), status = 'resultaat_vrijgegeven', aangepast_op = NOW() WHERE id = ?",
+      [evaluatie.eindcijfer, evaluatie.stagedossier_id]
+    );
+
+    await conn.commit();
+    return ok(res, { evaluatieId: evaluationId, eindcijfer: evaluatie.eindcijfer, status: "vrijgegeven" }, "Eindresultaat vrijgegeven");
+  } catch (error) {
+    await conn.rollback();
+    return fail(res, 500, "Vrijgeven mislukt", error.message);
+  } finally {
+    conn.release();
+  }
+}
+
 module.exports = {
   openEvaluation,
   getEvaluationsForStudent,
-  saveScores
+  saveScores,
+  calculateResult,
+  releaseResult
 };
