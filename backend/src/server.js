@@ -13,6 +13,7 @@ const docentRoutes = require("./routes/docentRoutes");
 const logbookRoutes = require("./routes/logbookRoutes");
 const competencyRoutes = require("./routes/competencyRoutes");
 const evaluationRoutes = require("./routes/evaluationRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ app.use("/api/docent", docentRoutes);
 app.use("/api/logbooks", logbookRoutes);
 app.use("/api/competencies", competencyRoutes);
 app.use("/api/evaluations", evaluationRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
