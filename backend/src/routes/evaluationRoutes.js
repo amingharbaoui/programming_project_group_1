@@ -1,13 +1,18 @@
 const express = require("express");
-const { list, action } = require("../controllers/placeholderController");
+const {
+  openEvaluation,
+  getEvaluationsForStudent
+} = require("../controllers/evaluationController");
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-router.use(authenticateDemoUser, requireRole("student", "mentor", "docent"));
+router.use(authenticateDemoUser);
 
-router.get("/:studentId", list("Evaluaties ophalen"));
-router.post("/", action("Evaluatie aanmaken"));
-router.patch("/:id", action("Evaluatie aanpassen"));
+// Admin/docent opent een evaluatiemoment voor een dossier.
+router.post("/open", requireRole("administratie", "docent"), openEvaluation);
+
+// Lezen door de betrokken rollen (student enkel eigen dossier; mentor/docent indien gekoppeld).
+router.get("/:studentId", requireRole("student", "mentor", "docent", "administratie"), getEvaluationsForStudent);
 
 module.exports = router;
