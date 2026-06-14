@@ -13,6 +13,8 @@ const docentRoutes = require("./routes/docentRoutes");
 const logbookRoutes = require("./routes/logbookRoutes");
 const competencyRoutes = require("./routes/competencyRoutes");
 const evaluationRoutes = require("./routes/evaluationRoutes");
+const contractRoutes = require("./routes/contractRoutes");
+const documentRoutes = require("./routes/documentRoutes");
 
 dotenv.config();
 
@@ -25,6 +27,7 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "x-user-id"]
 }));
 app.use(express.json());
+app.use("/uploads", express.static(require("path").join(__dirname, "../uploads")));
 
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
@@ -37,6 +40,8 @@ app.use("/api/docent", docentRoutes);
 app.use("/api/logbooks", logbookRoutes);
 app.use("/api/competencies", competencyRoutes);
 app.use("/api/evaluations", evaluationRoutes);
+app.use("/api/contracts", contractRoutes);
+app.use("/api/documents", documentRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
