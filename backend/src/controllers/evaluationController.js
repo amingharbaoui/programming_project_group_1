@@ -342,4 +342,36 @@ async function releaseResult(req, res) {
   }
 }
 
-module.exports = { openEvaluation, getEvaluationsForStudent, saveScores, calculateResult, releaseResult };
+// Lijst van studenten gekoppeld aan de huidige docent/mentor (voor de evaluatie-selector).
+async function getMyStudents(req, res) {
+  const role = req.user?.hoofdrol;
+  const userId = getUserId(req);
+
+  let where;
+  let params;
+  if (role === "docent") { where = "d.stagebegeleider_id = ?"; params = [userId]; }
+  else if (role === "mentor") { where = "d.mentor_id = ?"; params = [userId]; }
+  else if (role === "administratie") { where = "1 = 1"; params = []; }
+  else return fail(res, 403, "Geen toegang voor deze rol");
+
+  try {
+    const [rows] = await db.query(
+      `SELECT d.id AS dossier_id, d.status AS dossier_status,
+              s.gebruiker_id AS student_id, s.studentennummer,
+              g.voornaam, g.achternaam,
+              b.naam AS bedrijf_naam
+       FROM stagedossiers d
+       JOIN studenten s ON s.gebruiker_id = d.student_id
+       JOIN gebruikers g ON g.id = s.gebruiker_id
+       JOIN bedrijven b ON b.id = d.bedrijf_id
+       WHERE ${where}
+       ORDER BY g.achternaam, g.voornaam`,
+      params
+    );
+    return ok(res, rows, "Studenten opgehaald");
+  } catch (error) {
+    return fail(res, 500, "Studenten ophalen mislukt", error.message);
+  }
+}
+
+module.exports = { openEvaluation, getEvaluationsForStudent, saveScores, calculateResult, releaseResult, getMyStudents };
