@@ -1,46 +1,27 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
+import { useAuth } from "../../../context/AuthContext";
 
-// Demo data — gebruikt wanneer de backend nog geen echte studenten terugstuurt.
-const DEMO_STUDENTEN = [
-  {
-    id: 1,
-    voornaam: "Milan",
-    achternaam: "Peeters",
-    studentennummer: "202301234",
-    fase: "Lopend",
-    logboek_status: "ingediend",
-    eval_status: "open",
-    bedrijf: "Cronos Group",
-  },
-  {
-    id: 2,
-    voornaam: "Lena",
-    achternaam: "Wouters",
-    studentennummer: "202301235",
-    fase: "Lopend",
-    logboek_status: "afgecheckt_door_mentor",
-    eval_status: "nog_niet_open",
-    bedrijf: "Telenet",
-  },
-  {
-    id: 3,
-    voornaam: "Bram",
-    achternaam: "Claes",
-    studentennummer: "202301236",
-    fase: "Niet gestart",
-    logboek_status: "geen",
-    eval_status: "niet_van_toepassing",
-    bedrijf: "Proximus",
-  },
-];
+function getDossierFaseLabel(status) {
+  if (!status) return "Onbekend";
+  if (status === "actief") return "Lopend";
+  if (status === "afgerond" || status === "voltooid") return "Afgerond";
+  if (status === "in_aanvraag" || status === "aangevraagd") return "Niet gestart";
+  return "Lopend";
+}
+
+function getDossierFaseClass(status) {
+  if (status === "actief") return "s_ok";
+  if (status === "afgerond" || status === "voltooid") return "s_info";
+  return "s_grijs";
+}
 
 function getLogboekClass(status) {
   if (status === "ingediend") return "s_info";
   if (status === "afgecheckt_door_mentor") return "s_ok";
   if (status === "goedgekeurd_door_docent") return "s_ok";
   if (status?.includes("teruggestuurd")) return "s_rood";
-  if (status === "geen") return "s_grijs";
+  if (!status || status === "geen") return "s_grijs";
   return "s_grijs";
 }
 
@@ -49,29 +30,12 @@ function getLogboekLabel(status) {
   if (status === "afgecheckt_door_mentor") return "Afgetekend";
   if (status === "goedgekeurd_door_docent") return "Goedgekeurd";
   if (status?.includes("teruggestuurd")) return "Teruggestuurd";
-  if (status === "geen") return "Geen";
-  return status;
-}
-
-function getEvalClass(status) {
-  if (status === "open") return "s_amber";
-  if (status === "geregistreerd") return "s_ok";
-  if (status === "vrijgegeven") return "s_ok";
-  if (status === "nog_niet_open") return "s_grijs";
-  if (status === "niet_van_toepassing") return "s_grijs";
-  return "s_grijs";
-}
-
-function getEvalLabel(status) {
-  if (status === "open") return "Open";
-  if (status === "geregistreerd") return "Geregistreerd";
-  if (status === "vrijgegeven") return "Vrijgegeven";
-  if (status === "nog_niet_open") return "Nog niet open";
-  if (status === "niet_van_toepassing") return "N.v.t.";
+  if (!status || status === "geen") return "Geen";
   return status;
 }
 
 export default function MentorStudentsPage() {
+  const { user } = useAuth();
   const [studenten, setStudenten] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -80,13 +44,12 @@ export default function MentorStudentsPage() {
     try {
       setLoading(true);
       setError("");
-      const res = await api.get("/mentor/students");
-      const data = res.data.data || [];
-      // Backend stuurt nog geen echte data terug → demo gebruiken.
-      setStudenten(data.length > 0 ? data : DEMO_STUDENTEN);
-    } catch {
-      // Bij een fout toch demo tonen zodat de pagina bruikbaar blijft.
-      setStudenten(DEMO_STUDENTEN);
+      const res = await api.get("/mentor/students", {
+        headers: { "x-user-id": String(user.id) },
+      });
+      setStudenten(res.data.data || []);
+    } catch (err) {
+      setError(err.response?.data?.message || "Studenten ophalen mislukt");
     } finally {
       setLoading(false);
     }
@@ -120,7 +83,7 @@ export default function MentorStudentsPage() {
         </div>
       )}
 
-      {!loading && studenten.length === 0 && (
+      {!loading && !error && studenten.length === 0 && (
         <div className="empty_state">Geen stagiairs gevonden.</div>
       )}
 
@@ -134,13 +97,12 @@ export default function MentorStudentsPage() {
                 <th>Bedrijf</th>
                 <th>Fase</th>
                 <th>Logboek</th>
-                <th>Evaluatie</th>
                 <th className="right">Acties</th>
               </tr>
             </thead>
             <tbody>
               {studenten.map((s) => (
-                <tr key={s.id}>
+                <tr key={s.dossier_id}>
                   <td>
                     <strong>
                       {s.voornaam} {s.achternaam}
@@ -152,24 +114,14 @@ export default function MentorStudentsPage() {
                   <td>{s.bedrijf || "-"}</td>
 
                   <td>
-                    <span
-                      className={`status ${
-                        s.fase === "Lopend" ? "s_ok" : "s_grijs"
-                      }`}
-                    >
-                      {s.fase}
+                    <span className={`status ${getDossierFaseClass(s.dossier_status)}`}>
+                      {getDossierFaseLabel(s.dossier_status)}
                     </span>
                   </td>
 
                   <td>
                     <span className={`status ${getLogboekClass(s.logboek_status)}`}>
                       {getLogboekLabel(s.logboek_status)}
-                    </span>
-                  </td>
-
-                  <td>
-                    <span className={`status ${getEvalClass(s.eval_status)}`}>
-                      {getEvalLabel(s.eval_status)}
                     </span>
                   </td>
 

@@ -1,49 +1,20 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
-
-// Demo data — gebruikt wanneer backend nog geen echte data terugstuurt.
-const DEMO_STUDENTEN = [
-  {
-    id: 1,
-    voornaam: "Milan",
-    achternaam: "Peeters",
-    studentennummer: "202301234",
-    bedrijf: "Cronos Group",
-    mentor: "Jan Vermeersch",
-    fase: "Lopend",
-    voortgang: 60,
-    logboek_status: "ingediend",
-  },
-  {
-    id: 2,
-    voornaam: "Lena",
-    achternaam: "Wouters",
-    studentennummer: "202301235",
-    bedrijf: "Telenet",
-    mentor: "Sarah De Backer",
-    fase: "Lopend",
-    voortgang: 35,
-    logboek_status: "afgecheckt_door_mentor",
-  },
-  {
-    id: 3,
-    voornaam: "Bram",
-    achternaam: "Claes",
-    studentennummer: "202301236",
-    bedrijf: "Proximus",
-    mentor: "Tom Leclercq",
-    fase: "Niet gestart",
-    voortgang: 0,
-    logboek_status: "geen",
-  },
-];
+import { useAuth } from "../../../context/AuthContext";
 
 const FILTERS = ["Alle", "Lopend", "Niet gestart", "Afgerond"];
 
-function getStatusClass(fase) {
-  if (fase === "Lopend") return "s_ok";
-  if (fase === "Afgerond") return "s_info";
-  if (fase === "Niet gestart") return "s_grijs";
+function getDossierFaseLabel(status) {
+  if (!status) return "Onbekend";
+  if (status === "actief") return "Lopend";
+  if (status === "afgerond" || status === "voltooid") return "Afgerond";
+  if (status === "in_aanvraag" || status === "aangevraagd") return "Niet gestart";
+  return "Lopend";
+}
+
+function getDossierFaseClass(status) {
+  if (status === "actief") return "s_ok";
+  if (status === "afgerond" || status === "voltooid") return "s_info";
   return "s_grijs";
 }
 
@@ -60,34 +31,27 @@ function getLogboekLabel(status) {
   if (status === "afgecheckt_door_mentor") return "Wacht op docent";
   if (status === "goedgekeurd_door_docent") return "Goedgekeurd";
   if (status?.includes("teruggestuurd")) return "Teruggestuurd";
-  if (status === "geen") return "Geen";
+  if (!status || status === "geen") return "Geen";
   return status || "-";
 }
 
-function ProgBar({ pct }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-      <div className="prog_wrap">
-        <div className="prog_fill" style={{ width: `${pct}%` }} />
-      </div>
-      <span className="muted">{pct}%</span>
-    </div>
-  );
-}
-
 export default function DocentStudentsPage() {
+  const { user } = useAuth();
   const [studenten, setStudenten] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [filter, setFilter] = useState("Alle");
 
   async function loadStudenten() {
     try {
       setLoading(true);
-      const res = await api.get("/docent/students");
-      const data = res.data.data || [];
-      setStudenten(data.length > 0 ? data : DEMO_STUDENTEN);
-    } catch {
-      setStudenten(DEMO_STUDENTEN);
+      setError("");
+      const res = await api.get("/docent/students", {
+        headers: { "x-user-id": String(user.id) },
+      });
+      setStudenten(res.data.data || []);
+    } catch (err) {
+      setError(err.response?.data?.message || "Studenten ophalen mislukt");
     } finally {
       setLoading(false);
     }
@@ -100,7 +64,9 @@ export default function DocentStudentsPage() {
   const gefilterd =
     filter === "Alle"
       ? studenten
-      : studenten.filter((s) => s.fase === filter);
+      : studenten.filter(
+          (s) => getDossierFaseLabel(s.dossier_status) === filter
+        );
 
   return (
     <div className="page_inner">
@@ -133,7 +99,13 @@ export default function DocentStudentsPage() {
         </div>
       )}
 
-      {!loading && gefilterd.length === 0 && (
+      {error && (
+        <div className="card">
+          <span className="status s_rood">{error}</span>
+        </div>
+      )}
+
+      {!loading && !error && gefilterd.length === 0 && (
         <div className="empty_state">Geen studenten gevonden voor dit filter.</div>
       )}
 
@@ -146,7 +118,6 @@ export default function DocentStudentsPage() {
                 <th>Student</th>
                 <th>Bedrijf</th>
                 <th>Mentor</th>
-                <th>Voortgang</th>
                 <th>Logboek</th>
                 <th>Fase</th>
                 <th className="right">Acties</th>
@@ -154,7 +125,7 @@ export default function DocentStudentsPage() {
             </thead>
             <tbody>
               {gefilterd.map((s) => (
-                <tr key={s.id}>
+                <tr key={s.dossier_id}>
                   <td>
                     <strong>
                       {s.voornaam} {s.achternaam}
@@ -165,10 +136,10 @@ export default function DocentStudentsPage() {
 
                   <td>{s.bedrijf || "-"}</td>
 
-                  <td>{s.mentor || "-"}</td>
-
                   <td>
-                    <ProgBar pct={s.voortgang ?? 0} />
+                    {s.mentor_voornaam
+                      ? `${s.mentor_voornaam} ${s.mentor_achternaam}`
+                      : "-"}
                   </td>
 
                   <td>
@@ -178,8 +149,8 @@ export default function DocentStudentsPage() {
                   </td>
 
                   <td>
-                    <span className={`status ${getStatusClass(s.fase)}`}>
-                      {s.fase}
+                    <span className={`status ${getDossierFaseClass(s.dossier_status)}`}>
+                      {getDossierFaseLabel(s.dossier_status)}
                     </span>
                   </td>
 
