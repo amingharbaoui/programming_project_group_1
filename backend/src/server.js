@@ -15,6 +15,7 @@ const competencyRoutes = require("./routes/competencyRoutes");
 const evaluationRoutes = require("./routes/evaluationRoutes");
 const contractRoutes = require("./routes/contractRoutes");
 const documentRoutes = require("./routes/documentRoutes");
+const notificationRoutes = require("./routes/notificationRoutes");
 
 dotenv.config();
 
@@ -42,6 +43,7 @@ app.use("/api/competencies", competencyRoutes);
 app.use("/api/evaluations", evaluationRoutes);
 app.use("/api/contracts", contractRoutes);
 app.use("/api/documents", documentRoutes);
+app.use("/api/notifications", notificationRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

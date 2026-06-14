@@ -1,5 +1,6 @@
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
+const { meld } = require("../utils/notify");
 
 function getUserId(req, fallbackId) {
   return Number(req.user?.id || fallbackId);
@@ -255,6 +256,23 @@ async function createInternship(req, res) {
 
     await connection.commit();
 
+    // Stagecommissie verwittigen van het nieuwe voorstel (mag de hoofdactie niet breken).
+    try {
+      const [commissie] = await db.query(
+        "SELECT id FROM gebruikers WHERE hoofdrol = 'stagecommissie' AND status = 'actief'"
+      );
+      for (const lid of commissie) {
+        await meld(lid.id, {
+          titel: "Nieuw stagevoorstel",
+          bericht: `${student.voornaam} ${student.achternaam} heeft een stagevoorstel ingediend.`,
+          aangemaaktDoorId: studentId,
+          stagevoorstelId
+        });
+      }
+    } catch (notifyError) {
+      console.error("Melding stagecommissie mislukt:", notifyError.message);
+    }
+
     return ok(
       res,
       {
@@ -492,6 +510,24 @@ async function decideApplication(req, res) {
     }
 
     await connection.commit();
+
+    // Student verwittigen van de beslissing.
+    try {
+      const berichtMap = {
+        goedgekeurd: "Je stagevoorstel is goedgekeurd.",
+        afgekeurd: "Je stagevoorstel is afgekeurd.",
+        aanpassingen_gevraagd: "De stagecommissie vraagt aanpassingen aan je stagevoorstel."
+      };
+      await meld(voorstel.student_id, {
+        titel: "Beslissing stagevoorstel",
+        bericht: berichtMap[beslissing] || "Je stagevoorstel is beoordeeld.",
+        ernst: beslissing === "afgekeurd" ? "medium" : "laag",
+        aangemaaktDoorId: beslistDoorId,
+        stagevoorstelId
+      });
+    } catch (notifyError) {
+      console.error("Melding student mislukt:", notifyError.message);
+    }
 
     return ok(
       res,
