@@ -1,5 +1,6 @@
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
+const { meld } = require("../utils/notify");
 
 const GELDIGE_TYPES = ["tussentijds", "finaal"];
 
@@ -308,6 +309,30 @@ async function releaseResult(req, res) {
     );
 
     await conn.commit();
+
+    // Student (en administratie) verwittigen dat het resultaat vrijgegeven is.
+    try {
+      await meld(evaluatie.student_id, {
+        titel: "Eindresultaat vrijgegeven",
+        bericht: `Je eindresultaat (${evaluatie.eindcijfer}) is vrijgegeven.`,
+        aangemaaktDoorId: userId,
+        stagedossierId: evaluatie.stagedossier_id
+      });
+      const [admins] = await db.query(
+        "SELECT id FROM gebruikers WHERE hoofdrol = 'administratie' AND status = 'actief'"
+      );
+      for (const a of admins) {
+        await meld(a.id, {
+          titel: "Resultaat vrijgegeven",
+          bericht: "Een eindresultaat is vrijgegeven; het eindoverzicht kan opgemaakt worden.",
+          aangemaaktDoorId: userId,
+          stagedossierId: evaluatie.stagedossier_id
+        });
+      }
+    } catch (notifyError) {
+      console.error("Melding vrijgave mislukt:", notifyError.message);
+    }
+
     return ok(res, { evaluatieId: evaluationId, eindcijfer: evaluatie.eindcijfer, status: "vrijgegeven" }, "Eindresultaat vrijgegeven");
   } catch (error) {
     await conn.rollback();
