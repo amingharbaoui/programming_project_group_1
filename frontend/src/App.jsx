@@ -7,6 +7,8 @@ import StageApplicationPage from "./features/student/pages/StageApplicationPage"
 import MyInternshipPage from "./features/student/pages/MyInternshipPage";
 import StudentLogbookPage from "./features/student/pages/StudentLogbookPage";
 import StudentEvaluationPage from "./features/student/pages/StudentEvaluationPage";
+import StudentContractPage from "./features/student/pages/StudentContractPage";
+import StudentDocumentsPage from "./features/student/pages/StudentDocumentsPage";
 
 import ApplicationsPage from "./features/committee/pages/ApplicationsPage";
 
@@ -36,6 +38,8 @@ export default function App() {
             <Route path="/student/internship" element={<MyInternshipPage />} />
             <Route path="/student/logbook" element={<StudentLogbookPage />} />
             <Route path="/student/evaluation" element={<StudentEvaluationPage />} />
+            <Route path="/student/contract" element={<StudentContractPage />} />
+            <Route path="/student/documents" element={<StudentDocumentsPage />} />
 
             <Route path="/committee" element={<Navigate to="/committee/applications" replace />} />
             <Route path="/committee/applications" element={<ApplicationsPage />} />

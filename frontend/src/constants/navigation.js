@@ -6,6 +6,8 @@ export const NAVIGATION = {
     { label: "Mijn stage",    path: "/student/internship",  icon: "ti-briefcase" },
     { label: "Logboek",       path: "/student/logbook",     icon: "ti-notebook" },
     { label: "Evaluatie",     path: "/student/evaluation",  icon: "ti-clipboard-check" },
+    { label: "Stageovereenkomst", path: "/student/contract", icon: "ti-writing" },
+    { label: "Documenten",    path: "/student/documents",   icon: "ti-files" },
   ],
 
   [ROLES.COMMITTEE]: [
