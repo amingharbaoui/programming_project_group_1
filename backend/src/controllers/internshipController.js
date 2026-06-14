@@ -949,6 +949,44 @@ async function updateAdminDossierStatus(req, res) {
   }
 }
 
+// Stagebegeleider (docent) en/of mentor koppelen of wijzigen op een dossier.
+async function assignDossier(req, res) {
+  const dossierId = Number(req.params.id);
+  const docentId = req.body.stagebegeleiderId ?? req.body.stagebegeleider_id;
+  const mentorId = req.body.mentorId ?? req.body.mentor_id;
+
+  if (!dossierId) return fail(res, 400, "Ongeldig dossier-id");
+  if (docentId == null && mentorId == null) return fail(res, 400, "Geef minstens een docent of mentor op");
+
+  try {
+    const [d] = await db.query("SELECT id, student_id FROM stagedossiers WHERE id = ? LIMIT 1", [dossierId]);
+    if (d.length === 0) return fail(res, 404, "Dossier niet gevonden");
+
+    const fields = [];
+    const vals = [];
+    if (docentId != null) { fields.push("stagebegeleider_id = ?"); vals.push(Number(docentId)); }
+    if (mentorId != null) { fields.push("mentor_id = ?"); vals.push(Number(mentorId)); }
+
+    await db.query(`UPDATE stagedossiers SET ${fields.join(", ")}, aangepast_op = NOW() WHERE id = ?`, [...vals, dossierId]);
+
+    try {
+      const door = Number(req.user?.id);
+      if (docentId != null) await meld(Number(docentId), { titel: "Nieuwe student toegewezen", bericht: "Je bent gekoppeld als stagebegeleider aan een student.", aangemaaktDoorId: door, stagedossierId: dossierId });
+      if (mentorId != null) await meld(Number(mentorId), { titel: "Nieuwe stagiair toegewezen", bericht: "Je bent gekoppeld als mentor aan een student.", aangemaaktDoorId: door, stagedossierId: dossierId });
+      if (d[0].student_id) await meld(d[0].student_id, { titel: "Begeleiding bijgewerkt", bericht: "Je stagebegeleider of mentor is bijgewerkt.", aangemaaktDoorId: door, stagedossierId: dossierId });
+    } catch (notifyError) {
+      console.error("Melding toewijzing mislukt:", notifyError.message);
+    }
+
+    return ok(res, { id: dossierId }, "Toewijzing bijgewerkt");
+  } catch (error) {
+    if (error.code === "ER_NO_REFERENCED_ROW_2" || error.code === "ER_NO_REFERENCED_ROW") {
+      return fail(res, 400, "Ongeldige docent of mentor (niet gevonden)");
+    }
+    return fail(res, 500, "Toewijzing mislukt", error.message);
+  }
+}
+
 module.exports = {
   createInternship,
   getMyInternship,
@@ -956,5 +994,6 @@ module.exports = {
   decideApplication,
   getAdminDossiers,
   getAdminDossierById,
-  updateAdminDossierStatus
+  updateAdminDossierStatus,
+  assignDossier
 };
