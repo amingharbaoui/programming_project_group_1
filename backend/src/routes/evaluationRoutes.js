@@ -1,13 +1,14 @@
 const express = require("express");
-const { list, action } = require("../controllers/placeholderController");
-const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
-
 const router = express.Router();
+const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
+const { getEvaluationsForStudent, saveScores } = require("../controllers/evaluationController");
 
-router.use(authenticateDemoUser, requireRole("student", "mentor", "docent"));
+router.use(authenticateDemoUser);
 
-router.get("/:studentId", list("Evaluaties ophalen"));
-router.post("/", action("Evaluatie aanmaken"));
-router.patch("/:id", action("Evaluatie aanpassen"));
+// GET /api/evaluations/:studentId — evaluaties + competenties + scores ophalen
+router.get("/:studentId", requireRole("student", "mentor", "docent", "administratie"), getEvaluationsForStudent);
+
+// POST /api/evaluations/:evaluationId/scores — scores opslaan of indienen
+router.post("/:evaluationId/scores", requireRole("student", "mentor", "docent"), saveScores);
 
 module.exports = router;
