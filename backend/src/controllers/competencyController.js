@@ -196,9 +196,37 @@ async function publishProfile(req, res) {
   }
 }
 
+async function deleteCompetency(req, res) {
+  const id = Number(req.params.id);
+
+  if (!id) {
+    return fail(res, 400, "Ongeldig competentie-id");
+  }
+
+  try {
+    const [result] = await db.query(
+      "DELETE FROM competenties WHERE id = ?",
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return fail(res, 404, "Competentie niet gevonden");
+    }
+
+    return ok(res, { id }, "Competentie verwijderd");
+  } catch (error) {
+    // FK constraint: competentie heeft nog scores gekoppeld
+    if (error.code === "ER_ROW_IS_REFERENCED_2") {
+      return fail(res, 409, "Competentie kan niet worden verwijderd omdat er scores aan gekoppeld zijn");
+    }
+    return fail(res, 500, "Competentie verwijderen mislukt", error.message);
+  }
+}
+
 module.exports = {
   listCompetencies,
   createCompetency,
   updateCompetency,
+  deleteCompetency,
   publishProfile
 };
