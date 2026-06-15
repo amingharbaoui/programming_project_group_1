@@ -29,6 +29,110 @@ function kanBeslissen(status) {
   return ["ingediend", "heringediend", "aanpassingen_gevraagd"].includes(status);
 }
 
+/* ── Vergelijkmodal (Story 14) ── */
+const VERGELIJK_VELDEN = [
+  { key: "bedrijf_naam",         label: "Bedrijfsnaam" },
+  { key: "bedrijfsafdeling",     label: "Afdeling" },
+  { key: "bedrijfsadres",        label: "Adres" },
+  { key: "mentor_naam",          label: "Mentor" },
+  { key: "mentor_email",         label: "Mentor e-mail" },
+  { key: "mentor_functie",       label: "Mentor functie" },
+  { key: "stagefunctie",         label: "Stagefunctie" },
+  { key: "opdrachtomschrijving", label: "Opdrachtomschrijving" },
+  { key: "startdatum",           label: "Startdatum",  fmt: formatDate },
+  { key: "einddatum",            label: "Einddatum",   fmt: formatDate },
+  { key: "aantal_weken",         label: "Aantal weken" },
+  { key: "uren_per_week",        label: "Uren/week" },
+];
+
+function VergelijkModal({ aanvraagId, feedbackVorige, onSluit }) {
+  const [versies, setVersies] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get(`/committee/applications/${aanvraagId}/versions`)
+      .then((r) => setVersies(r.data.data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [aanvraagId]);
+
+  const oud  = versies[versies.length - 2] || null;
+  const nieuw = versies[versies.length - 1] || null;
+
+  return (
+    <div className="popup-overlay">
+      <div className="popup" style={{ maxWidth: 820, width: "100%" }}>
+        <div className="popup-header">
+          <div className="card_title">Versies vergelijken</div>
+          <button className="btn" onClick={onSluit}>✕</button>
+        </div>
+
+        <div className="popup-body">
+          {loading && <p style={{ color: "var(--sub)", fontSize: 13 }}>Versies laden…</p>}
+
+          {!loading && (!oud || !nieuw) && (
+            <p style={{ color: "var(--sub)", fontSize: 13 }}>Slechts één versie beschikbaar — niets te vergelijken.</p>
+          )}
+
+          {!loading && oud && nieuw && (
+            <>
+              {feedbackVorige && (
+                <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--red-light)", borderRadius: 8, fontSize: 12.5, color: "var(--red)" }}>
+                  <strong>Eerdere feedback aan student:</strong> {feedbackVorige}
+                </div>
+              )}
+
+              {/* Kolomhoofden */}
+              <div style={{ display: "grid", gridTemplateColumns: "140px 1fr 1fr", gap: 8, marginBottom: 8 }}>
+                <span />
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--sub)", textTransform: "uppercase", letterSpacing: .3 }}>
+                  Versie {oud.versie_nummer} (oud)
+                </span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--sub)", textTransform: "uppercase", letterSpacing: .3 }}>
+                  Versie {nieuw.versie_nummer} (nieuw)
+                </span>
+              </div>
+
+              {VERGELIJK_VELDEN.map(({ key, label, fmt }) => {
+                const oudVal  = fmt ? fmt(oud[key])  : (oud[key]  ?? "–");
+                const nieuwVal = fmt ? fmt(nieuw[key]) : (nieuw[key] ?? "–");
+                const gewijzigd = String(oud[key] ?? "") !== String(nieuw[key] ?? "");
+                return (
+                  <div
+                    key={key}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "140px 1fr 1fr",
+                      gap: 8,
+                      padding: "7px 0",
+                      borderBottom: "0.5px solid var(--border)",
+                      background: gewijzigd ? "#fffbeb" : "transparent",
+                      borderRadius: gewijzigd ? 6 : 0,
+                      paddingLeft: gewijzigd ? 6 : 0,
+                    }}
+                  >
+                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--sub)" }}>{label}</span>
+                    <span style={{ fontSize: 13, color: gewijzigd ? "#92400e" : "var(--dark)", textDecoration: gewijzigd ? "line-through" : "none", opacity: gewijzigd ? .7 : 1 }}>
+                      {oudVal}
+                    </span>
+                    <span style={{ fontSize: 13, color: gewijzigd ? "#16a34a" : "var(--dark)", fontWeight: gewijzigd ? 600 : 400 }}>
+                      {nieuwVal}
+                    </span>
+                  </div>
+                );
+              })}
+            </>
+          )}
+        </div>
+
+        <div className="actions" style={{ padding: "12px 20px", borderTop: "1px solid var(--border)" }}>
+          <button className="btn" onClick={onSluit}>Sluiten</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ── Beoordelingsmodal ── */
 function BeoordelingModal({ aanvraag, onSluit, onBeslissing }) {
   const [criteria, setCriteria]         = useState({});
@@ -229,7 +333,8 @@ export default function ApplicationsPage() {
   const [aanvragen, setAanvragen]       = useState([]);
   const [loading, setLoading]           = useState(true);
   const [fout, setFout]                 = useState("");
-  const [geselecteerd, setGeselecteerd] = useState(null); // aanvraag in modal
+  const [geselecteerd, setGeselecteerd] = useState(null);
+  const [vergelijk, setVergelijk]       = useState(null); // aanvraag voor vergelijkmodal
 
   async function laadAanvragen() {
     try {
@@ -257,6 +362,14 @@ export default function ApplicationsPage() {
           aanvraag={geselecteerd}
           onSluit={() => setGeselecteerd(null)}
           onBeslissing={laadAanvragen}
+        />
+      )}
+
+      {vergelijk && (
+        <VergelijkModal
+          aanvraagId={vergelijk.id}
+          feedbackVorige={vergelijk.laatste_feedback}
+          onSluit={() => setVergelijk(null)}
         />
       )}
 
@@ -317,9 +430,16 @@ export default function ApplicationsPage() {
                     <td>v{a.huidige_versie_nummer || 1}</td>
                     <td><span className={`status ${statusKlasse(a.status)}`}>{a.status}</span></td>
                     <td className="right">
-                      <button className="btn primary sm" onClick={() => setGeselecteerd(a)}>
-                        Beoordelen
-                      </button>
+                      <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                        {(a.huidige_versie_nummer > 1) && (
+                          <button className="btn sm" onClick={() => setVergelijk(a)}>
+                            Vergelijken
+                          </button>
+                        )}
+                        <button className="btn primary sm" onClick={() => setGeselecteerd(a)}>
+                          Beoordelen
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
