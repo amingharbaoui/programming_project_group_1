@@ -15,6 +15,7 @@ export default function StageApplicationPage() {
   const [conceptOpgeslagen, setConceptOpgeslagen] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [heeftConcept, setHeeftConcept] = useState(false);
+  const [huidigStatus, setHuidigStatus] = useState(null);
 
   const [form, setForm] = useState({
     bedrijfNaam: "",
@@ -40,6 +41,7 @@ export default function StageApplicationPage() {
         if (!laadbaar.includes(data.status)) return;
 
         if (data.status === "concept") setHeeftConcept(true);
+        setHuidigStatus(data.status);
 
         setForm({
           bedrijfNaam:           data.bedrijf_naam        || "",
@@ -94,19 +96,24 @@ export default function StageApplicationPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
+    const payload = {
+      bedrijfNaam:          form.bedrijfNaam,
+      bedrijfsadres:        form.bedrijfAdres,
+      mentorNaam:           form.mentorNaam,
+      mentorEmail:          form.mentorEmail,
+      mentorFunctie:        form.mentorFunctie,
+      stagefunctie:         form.opdrachtTitel,
+      opdrachtomschrijving: form.opdrachtOmschrijving,
+      startdatum:           form.startDatum,
+      einddatum:            form.eindDatum,
+      urenPerWeek:          38,
+    };
+    // Bij aanpassingen_gevraagd → nieuwe versie aanmaken via herindienen
+    const endpoint = huidigStatus === "aanpassingen_gevraagd"
+      ? "/internships/my/herindienen"
+      : "/internships";
     try {
-      await apiRequest("POST", "/internships", {
-        bedrijfNaam:          form.bedrijfNaam,
-        bedrijfsadres:        form.bedrijfAdres,
-        mentorNaam:           form.mentorNaam,
-        mentorEmail:          form.mentorEmail,
-        mentorFunctie:        form.mentorFunctie,
-        stagefunctie:         form.opdrachtTitel,
-        opdrachtomschrijving: form.opdrachtOmschrijving,
-        startdatum:           form.startDatum,
-        einddatum:            form.eindDatum,
-        urenPerWeek:          38,
-      });
+      await apiRequest("POST", endpoint, payload);
       setSubmitted(true);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Stagevoorstel indienen mislukt");
