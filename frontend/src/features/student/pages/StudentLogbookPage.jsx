@@ -40,7 +40,7 @@ function StatusBadge({ status }) {
 }
 
 /* ---------- Ingediende week component ---------- */
-function LogboekWeek({ week, onBewerken }) {
+function LogboekWeek({ week, onBewerken, onVernieuwen }) {
   const [open, setOpen] = useState(false);
 
   const aanpassingNodig =
@@ -136,6 +136,11 @@ function LogboekWeek({ week, onBewerken }) {
             </div>
           )}
 
+          {/* Antwoordveld op feedback */}
+          {!aanpassingNodig && (week.mentor_feedback || week.docent_feedback) && (
+            <AntwoordBlok week={week} onAntwoordOpgeslagen={onVernieuwen} />
+          )}
+
           {/* Dag rijen */}
           {(week.dagen || []).map((dag, i) => (
             <div className="dag-rij" key={i}>
@@ -159,6 +164,69 @@ function LogboekWeek({ week, onBewerken }) {
 }
 
 /* ---------- Hulpfuncties ---------- */
+function AntwoordBlok({ week, onAntwoordOpgeslagen }) {
+  const [open, setOpen]       = useState(false);
+  const [tekst, setTekst]     = useState(week.student_antwoord || "");
+  const [bezig, setBezig]     = useState(false);
+  const [opgeslagen, setOpgeslagen] = useState(false);
+
+  async function verstuur() {
+    if (!tekst.trim()) return;
+    setBezig(true);
+    try {
+      await apiRequest("PATCH", `/logbooks/weeks/${week.id}/antwoord`, { antwoord: tekst });
+      setOpgeslagen(true);
+      setOpen(false);
+      if (onAntwoordOpgeslagen) onAntwoordOpgeslagen();
+    } catch {
+      /* stil falen */
+    } finally {
+      setBezig(false);
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      {week.student_antwoord && !open && (
+        <div className="fb-blok" style={{ borderLeftColor: "var(--blue, #3b82f6)" }}>
+          <div className="fb-wie" style={{ color: "var(--blue, #3b82f6)" }}>
+            Jouw antwoord
+          </div>
+          <div className="fb-wat">"{week.student_antwoord}"</div>
+        </div>
+      )}
+      {!open && (
+        <button
+          className="btn ghost sm"
+          style={{ paddingLeft: 0, fontSize: 12.5 }}
+          onClick={() => { setOpen(true); setOpgeslagen(false); }}
+        >
+          <IconMessage size={13} />
+          {week.student_antwoord ? "Antwoord bewerken" : "Beantwoorden"}
+        </button>
+      )}
+      {open && (
+        <div style={{ marginTop: 6 }}>
+          <textarea
+            className="form_textarea"
+            style={{ minHeight: 44, fontSize: 12.5 }}
+            placeholder="Je antwoord…"
+            value={tekst}
+            onChange={(e) => setTekst(e.target.value)}
+            autoFocus
+          />
+          <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+            <button className="btn primary sm" onClick={verstuur} disabled={bezig || !tekst.trim()}>
+              {bezig ? "Bezig…" : "Verstuur"}
+            </button>
+            <button className="btn sm" onClick={() => setOpen(false)}>Annuleer</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function leegDag() {
   return {
     datum: "",
@@ -677,6 +745,7 @@ export default function StudentLogbookPage() {
                 key={week.id}
                 week={week}
                 onBewerken={handleBewerken}
+                onVernieuwen={() => fetchWeken()}
               />
             ))}
         </div>
