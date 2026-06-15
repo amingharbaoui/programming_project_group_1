@@ -1225,6 +1225,52 @@ async function getApplicationVersions(req, res) {
   }
 }
 
+// Herinnering sturen naar de partij die de stageovereenkomst nog moet ondertekenen (story 20).
+async function sendContractReminder(req, res) {
+  const dossierId = Number(req.params.id);
+  if (!dossierId) return fail(res, 400, "Ongeldig dossier-id");
+
+  try {
+    const [rows] = await db.query(
+      `SELECT d.id, d.student_id, d.mentor_id,
+              o.status AS ov_status, o.student_getekend_op, o.bedrijf_getekend_op, o.opleiding_getekend_op
+       FROM stagedossiers d
+       LEFT JOIN stageovereenkomsten o ON o.stagedossier_id = d.id
+       WHERE d.id = ? LIMIT 1`,
+      [dossierId]
+    );
+    if (rows.length === 0) return fail(res, 404, "Dossier niet gevonden");
+    const d = rows[0];
+    if (!d.ov_status) return fail(res, 400, "Er is nog geen overeenkomst voor dit dossier");
+    if (["volledig_ondertekend", "geregistreerd"].includes(d.ov_status)) {
+      return fail(res, 400, "De overeenkomst is al volledig ondertekend");
+    }
+
+    let ontvangerId = null;
+    let wie = null;
+    if (!d.student_getekend_op) { ontvangerId = d.student_id; wie = "student"; }
+    else if (!d.bedrijf_getekend_op) { ontvangerId = d.mentor_id; wie = "mentor/bedrijf"; }
+    else { wie = "opleiding"; }
+
+    if (!ontvangerId) {
+      return fail(res, 400, `Wacht op handtekening van: ${wie} (geen gekoppelde gebruiker om te herinneren)`);
+    }
+
+    await meld(ontvangerId, {
+      titel: "Herinnering: handtekening stageovereenkomst",
+      bericht: "Gelieve de stageovereenkomst te ondertekenen zodat de stage kan starten.",
+      type: "herinnering",
+      ernst: "medium",
+      aangemaaktDoorId: Number(req.user?.id),
+      stagedossierId: dossierId
+    });
+
+    return ok(res, { dossierId, herinnerd: wie }, `Herinnering verstuurd naar ${wie}`);
+  } catch (error) {
+    return fail(res, 500, "Herinnering sturen mislukt", error.message);
+  }
+}
+
 module.exports = {
   createInternship,
   saveDraft,
@@ -1238,5 +1284,6 @@ module.exports = {
   updateAdminDossierStatus,
   assignDossier,
   registerDossierStartklaar,
-  generateEindoverzicht
+  generateEindoverzicht,
+  sendContractReminder
 };
