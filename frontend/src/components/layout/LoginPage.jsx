@@ -1,6 +1,7 @@
 import React from "react";
 import "./LoginPage.css";
 import { useNavigate } from "react-router-dom";
+import logoWide from "../../assets/stageify-logo/stageify_logo_wide.png";
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -22,18 +23,13 @@ export default function LoginPage() {
 
         {/* Logo en ondertitel */}
         <div className="login_header">
-          <h1>
+          <div className="login_wrapper">
             <img
-              className="login_logo"
-              src="../../../../src/assets/stageify-logo/stageify_logo_wide.png"
-              alt="stageify wide logo"
+                className="login_logo"
+                src={logoWide}
+                alt="Stageify logo"
             />
-          </h1>
-          <p className="login_subtitle">
-            Stage Monitoring Tool · Erasmushogeschool
-            <br />
-            Brussel
-          </p>
+          </div>
         </div>
 
         {/* Inlogformulier */}

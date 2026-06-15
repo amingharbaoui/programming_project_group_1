@@ -1,7 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import AppLayout from "./components/layout/AppLayout";
-import LoginPage from "./features/student/pages/LoginPage";
+import LoginPage from "./components/layout/LoginPage.jsx";
 
 import StageApplicationPage from "./features/student/pages/StageApplicationPage";
 import MyInternshipPage from "./features/student/pages/MyInternshipPage";
