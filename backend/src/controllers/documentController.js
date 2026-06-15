@@ -2,6 +2,15 @@ const path = require("path");
 const multer = require("multer");
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
+const { meld } = require("../utils/notify");
+
+async function getDocumentStudentId(documentId) {
+  const [rows] = await db.query(
+    "SELECT d.student_id FROM documenten doc JOIN stagedossiers d ON d.id = doc.stagedossier_id WHERE doc.id = ? LIMIT 1",
+    [documentId]
+  );
+  return rows[0]?.student_id || null;
+}
 
 /* ── Multer configuratie ── */
 const storage = multer.diskStorage({
@@ -160,4 +169,56 @@ async function uploadDocument(req, res) {
   }
 }
 
-module.exports = { getDocuments, uploadDocument, uploadMiddleware, getSoorten };
+// Administratie keurt een document goed.
+async function approveDocument(req, res) {
+  const id = Number(req.params.id);
+  if (!id) return fail(res, 400, "Ongeldig document-id");
+
+  try {
+    const [r] = await db.query(
+      `UPDATE documenten
+       SET status = 'goedgekeurd', afkeurreden = NULL, gecontroleerd_door_id = ?, gecontroleerd_op = NOW(), aangepast_op = NOW()
+       WHERE id = ?`,
+      [Number(req.user?.id), id]
+    );
+    if (r.affectedRows === 0) return fail(res, 404, "Document niet gevonden");
+
+    try {
+      const studentId = await getDocumentStudentId(id);
+      if (studentId) await meld(studentId, { titel: "Document goedgekeurd", bericht: "Een van je documenten is goedgekeurd.", aangemaaktDoorId: Number(req.user?.id), documentId: id });
+    } catch (e) { console.error("Melding document goedkeuren mislukt:", e.message); }
+
+    return ok(res, { id, status: "goedgekeurd" }, "Document goedgekeurd");
+  } catch (error) {
+    return fail(res, 500, "Document goedkeuren mislukt", error.message);
+  }
+}
+
+// Administratie keurt een document af (reden verplicht).
+async function rejectDocument(req, res) {
+  const id = Number(req.params.id);
+  const reden = (req.body.afkeurreden ?? req.body.reden ?? "").trim();
+  if (!id) return fail(res, 400, "Ongeldig document-id");
+  if (!reden) return fail(res, 400, "Een afkeuringsreden is verplicht");
+
+  try {
+    const [r] = await db.query(
+      `UPDATE documenten
+       SET status = 'afgekeurd', afkeurreden = ?, gecontroleerd_door_id = ?, gecontroleerd_op = NOW(), aangepast_op = NOW()
+       WHERE id = ?`,
+      [reden, Number(req.user?.id), id]
+    );
+    if (r.affectedRows === 0) return fail(res, 404, "Document niet gevonden");
+
+    try {
+      const studentId = await getDocumentStudentId(id);
+      if (studentId) await meld(studentId, { titel: "Document afgekeurd", bericht: `Een document is afgekeurd: ${reden}`, ernst: "medium", aangemaaktDoorId: Number(req.user?.id), documentId: id });
+    } catch (e) { console.error("Melding document afkeuren mislukt:", e.message); }
+
+    return ok(res, { id, status: "afgekeurd" }, "Document afgekeurd");
+  } catch (error) {
+    return fail(res, 500, "Document afkeuren mislukt", error.message);
+  }
+}
+
+module.exports = { getDocuments, uploadDocument, uploadMiddleware, getSoorten, approveDocument, rejectDocument };

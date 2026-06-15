@@ -1204,6 +1204,27 @@ async function generateEindoverzicht(req, res) {
   }
 }
 
+// Alle versies van een stagevoorstel ophalen (voor de commissie om heringediend te vergelijken, story 14).
+async function getApplicationVersions(req, res) {
+  const id = Number(req.params.id);
+  if (!id) return fail(res, 400, "Ongeldig stagevoorstel-id");
+
+  try {
+    const [rows] = await db.query(
+      `SELECT id, versie_nummer, bedrijf_naam, bedrijfsafdeling, bedrijfsadres,
+              mentor_naam, mentor_email, mentor_functie, stagefunctie, opdrachtomschrijving,
+              startdatum, einddatum, aantal_weken, uren_per_week, totaal_uren, ingediend_op
+       FROM stagevoorstel_versies
+       WHERE stagevoorstel_id = ?
+       ORDER BY versie_nummer ASC`,
+      [id]
+    );
+    return ok(res, rows, "Versies opgehaald");
+  } catch (error) {
+    return fail(res, 500, "Versies ophalen mislukt", error.message);
+  }
+}
+
 module.exports = {
   createInternship,
   saveDraft,
@@ -1211,6 +1232,7 @@ module.exports = {
   getMyInternship,
   getCommitteeApplications,
   decideApplication,
+  getApplicationVersions,
   getAdminDossiers,
   getAdminDossierById,
   updateAdminDossierStatus,
