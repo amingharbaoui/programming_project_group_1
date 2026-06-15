@@ -142,121 +142,107 @@ async function createInternship(req, res) {
     await connection.beginTransaction();
 
     const student = await getStudentData(connection, studentId);
-
     if (!student) {
       await connection.rollback();
       return fail(res, 404, "Student niet gevonden");
     }
 
     const stageRegel = await getActiveStageRule(connection, student.opleiding, student.academiejaar);
-
     if (!stageRegel) {
       await connection.rollback();
       return fail(res, 400, "Geen actieve stage_regel gevonden");
     }
 
-    const voorlopigeStagebegeleiderId = await getDefaultDocentId(connection);
-
-    if (!voorlopigeStagebegeleiderId) {
-      await connection.rollback();
-      return fail(res, 400, "Geen docent gevonden om voorlopig te koppelen");
-    }
-
     const aantalWeken = calculateWeeks(startdatum, einddatum);
     const totaalUren = aantalWeken * finalUrenPerWeek;
 
-    const [bedrijfResult] = await connection.query(
-      `
-      INSERT INTO bedrijven
-      (naam, afdeling, adres, aangemaakt_op, aangepast_op)
-      VALUES (?, ?, ?, NOW(), NOW())
-      `,
-      [
-        finalBedrijfNaam,
-        bedrijfsafdeling || null,
-        bedrijfsadres || null
-      ]
+    // Als er al een concept bestaat, upgrade dat naar 'ingediend' i.p.v. nieuw aanmaken
+    const [conceptRows] = await connection.query(
+      "SELECT id, bedrijf_id FROM stagevoorstellen WHERE student_id = ? AND status = 'concept' ORDER BY aangemaakt_op DESC LIMIT 1",
+      [studentId]
     );
 
-    const bedrijfId = bedrijfResult.insertId;
+    let stagevoorstelId, versieId;
 
-    const [voorstelResult] = await connection.query(
-      `
-      INSERT INTO stagevoorstellen
-      (
-        student_id,
-        bedrijf_id,
-        stage_regel_id,
-        voorlopige_stagebegeleider_id,
-        status,
-        huidige_versie_nummer,
-        ingediend_op,
-        aangemaakt_op,
-        aangepast_op
-      )
-      VALUES (?, ?, ?, ?, 'ingediend', 1, NOW(), NOW(), NOW())
-      `,
-      [
-        studentId,
-        bedrijfId,
-        stageRegel.id,
-        voorlopigeStagebegeleiderId
-      ]
-    );
+    if (conceptRows.length > 0) {
+      stagevoorstelId = conceptRows[0].id;
+      const bedrijfId = conceptRows[0].bedrijf_id;
 
-    const stagevoorstelId = voorstelResult.insertId;
+      await connection.query(
+        "UPDATE bedrijven SET naam = ?, afdeling = ?, adres = ?, aangepast_op = NOW() WHERE id = ?",
+        [finalBedrijfNaam, bedrijfsafdeling || null, bedrijfsadres || null, bedrijfId]
+      );
 
-    const [versieResult] = await connection.query(
-      `
-      INSERT INTO stagevoorstel_versies
-      (
-        stagevoorstel_id,
-        versie_nummer,
-        bedrijf_id,
-        bedrijf_naam,
-        bedrijfsafdeling,
-        bedrijfsadres,
-        mentor_naam,
-        mentor_email,
-        mentor_telefoon,
-        mentor_functie,
-        stagefunctie,
-        opdrachtomschrijving,
-        startdatum,
-        einddatum,
-        aantal_weken,
-        uren_per_week,
-        totaal_uren,
-        ingediend_door_id,
-        ingediend_op,
-        aangemaakt_op
-      )
-      VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
-      `,
-      [
-        stagevoorstelId,
-        bedrijfId,
-        finalBedrijfNaam,
-        bedrijfsafdeling || null,
-        bedrijfsadres || null,
-        mentorNaam,
-        mentorEmail,
-        mentorTelefoon || null,
-        mentorFunctie || null,
-        stagefunctie,
-        opdrachtomschrijving,
-        startdatum,
-        einddatum,
-        aantalWeken,
-        finalUrenPerWeek,
-        totaalUren,
-        studentId
-      ]
-    );
+      await connection.query(
+        `UPDATE stagevoorstel_versies SET
+          bedrijf_naam = ?, bedrijfsafdeling = ?, bedrijfsadres = ?,
+          mentor_naam = ?, mentor_email = ?, mentor_telefoon = ?, mentor_functie = ?,
+          stagefunctie = ?, opdrachtomschrijving = ?,
+          startdatum = ?, einddatum = ?, aantal_weken = ?, uren_per_week = ?, totaal_uren = ?,
+          ingediend_door_id = ?, ingediend_op = NOW()
+         WHERE stagevoorstel_id = ? AND versie_nummer = 1`,
+        [
+          finalBedrijfNaam, bedrijfsafdeling || null, bedrijfsadres || null,
+          mentorNaam, mentorEmail, mentorTelefoon || null, mentorFunctie || null,
+          stagefunctie, opdrachtomschrijving,
+          startdatum, einddatum, aantalWeken, finalUrenPerWeek, totaalUren,
+          studentId, stagevoorstelId
+        ]
+      );
+
+      const [versieRows] = await connection.query(
+        "SELECT id FROM stagevoorstel_versies WHERE stagevoorstel_id = ? AND versie_nummer = 1",
+        [stagevoorstelId]
+      );
+      versieId = versieRows[0]?.id;
+
+      await connection.query(
+        "UPDATE stagevoorstellen SET status = 'ingediend', ingediend_op = NOW(), aangepast_op = NOW() WHERE id = ?",
+        [stagevoorstelId]
+      );
+    } else {
+      // Geen concept: maak alles nieuw aan
+      const voorlopigeStagebegeleiderId = await getDefaultDocentId(connection);
+      if (!voorlopigeStagebegeleiderId) {
+        await connection.rollback();
+        return fail(res, 400, "Geen docent gevonden om voorlopig te koppelen");
+      }
+
+      const [bedrijfResult] = await connection.query(
+        "INSERT INTO bedrijven (naam, afdeling, adres, aangemaakt_op, aangepast_op) VALUES (?, ?, ?, NOW(), NOW())",
+        [finalBedrijfNaam, bedrijfsafdeling || null, bedrijfsadres || null]
+      );
+      const bedrijfId = bedrijfResult.insertId;
+
+      const [voorstelResult] = await connection.query(
+        `INSERT INTO stagevoorstellen
+          (student_id, bedrijf_id, stage_regel_id, voorlopige_stagebegeleider_id, status, huidige_versie_nummer, ingediend_op, aangemaakt_op, aangepast_op)
+          VALUES (?, ?, ?, ?, 'ingediend', 1, NOW(), NOW(), NOW())`,
+        [studentId, bedrijfId, stageRegel.id, voorlopigeStagebegeleiderId]
+      );
+      stagevoorstelId = voorstelResult.insertId;
+
+      const [versieResult] = await connection.query(
+        `INSERT INTO stagevoorstel_versies
+          (stagevoorstel_id, versie_nummer, bedrijf_id, bedrijf_naam, bedrijfsafdeling, bedrijfsadres,
+           mentor_naam, mentor_email, mentor_telefoon, mentor_functie, stagefunctie, opdrachtomschrijving,
+           startdatum, einddatum, aantal_weken, uren_per_week, totaal_uren, ingediend_door_id, ingediend_op, aangemaakt_op)
+          VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        [
+          stagevoorstelId, bedrijfId,
+          finalBedrijfNaam, bedrijfsafdeling || null, bedrijfsadres || null,
+          mentorNaam, mentorEmail, mentorTelefoon || null, mentorFunctie || null,
+          stagefunctie, opdrachtomschrijving,
+          startdatum, einddatum, aantalWeken, finalUrenPerWeek, totaalUren,
+          studentId
+        ]
+      );
+      versieId = versieResult.insertId;
+    }
 
     await connection.commit();
 
-    // Stagecommissie verwittigen van het nieuwe voorstel (mag de hoofdactie niet breken).
+    // Stagecommissie verwittigen
     try {
       const [commissie] = await db.query(
         "SELECT id FROM gebruikers WHERE hoofdrol = 'stagecommissie' AND status = 'actief'"
@@ -273,20 +259,167 @@ async function createInternship(req, res) {
       console.error("Melding stagecommissie mislukt:", notifyError.message);
     }
 
-    return ok(
-      res,
-      {
-        stagevoorstelId,
-        versieId: versieResult.insertId,
-        status: "ingediend"
-      },
-      "Stagevoorstel ingediend"
-    );
+    return ok(res, { stagevoorstelId, versieId, status: "ingediend" }, "Stagevoorstel ingediend");
   } catch (error) {
     await connection.rollback();
     return fail(res, 500, "Stagevoorstel indienen mislukt", error.message);
   } finally {
     connection.release();
+  }
+}
+
+async function saveDraft(req, res) {
+  const studentId = getUserId(req);
+  const {
+    bedrijfNaam, bedrijfsnaam, bedrijfsafdeling, bedrijfsadres,
+    mentorNaam, mentorEmail, mentorTelefoon, mentorFunctie,
+    stagefunctie, opdrachtomschrijving, startdatum, einddatum, urenPerWeek
+  } = req.body;
+
+  const finalBedrijfNaam = bedrijfNaam || bedrijfsnaam || null;
+  const finalUrenPerWeek = Number(urenPerWeek || 38);
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const student = await getStudentData(conn, studentId);
+    if (!student) { await conn.rollback(); return fail(res, 404, "Student niet gevonden"); }
+
+    const stageRegel = await getActiveStageRule(conn, student.opleiding, student.academiejaar);
+    if (!stageRegel) { await conn.rollback(); return fail(res, 400, "Geen actieve stage_regel gevonden"); }
+
+    const aantalWeken = (startdatum && einddatum) ? calculateWeeks(startdatum, einddatum) : null;
+    const totaalUren = aantalWeken ? aantalWeken * finalUrenPerWeek : null;
+
+    const [existing] = await conn.query(
+      "SELECT id, bedrijf_id FROM stagevoorstellen WHERE student_id = ? AND status = 'concept' ORDER BY aangemaakt_op DESC LIMIT 1",
+      [studentId]
+    );
+
+    let stagevoorstelId;
+
+    if (existing.length > 0) {
+      stagevoorstelId = existing[0].id;
+      const bedrijfId = existing[0].bedrijf_id;
+
+      await conn.query(
+        `UPDATE bedrijven SET
+          naam = COALESCE(?, naam), afdeling = COALESCE(?, afdeling), adres = COALESCE(?, adres),
+          aangepast_op = NOW()
+         WHERE id = ?`,
+        [finalBedrijfNaam, bedrijfsafdeling || null, bedrijfsadres || null, bedrijfId]
+      );
+
+      await conn.query(
+        `UPDATE stagevoorstel_versies SET
+          bedrijf_naam       = COALESCE(?, bedrijf_naam),
+          bedrijfsafdeling   = COALESCE(?, bedrijfsafdeling),
+          bedrijfsadres      = COALESCE(?, bedrijfsadres),
+          mentor_naam        = COALESCE(?, mentor_naam),
+          mentor_email       = COALESCE(?, mentor_email),
+          mentor_telefoon    = COALESCE(?, mentor_telefoon),
+          mentor_functie     = COALESCE(?, mentor_functie),
+          stagefunctie       = COALESCE(?, stagefunctie),
+          opdrachtomschrijving = COALESCE(?, opdrachtomschrijving),
+          startdatum         = COALESCE(?, startdatum),
+          einddatum          = COALESCE(?, einddatum),
+          aantal_weken       = COALESCE(?, aantal_weken),
+          uren_per_week      = ?,
+          totaal_uren        = COALESCE(?, totaal_uren)
+         WHERE stagevoorstel_id = ? AND versie_nummer = 1`,
+        [
+          finalBedrijfNaam, bedrijfsafdeling || null, bedrijfsadres || null,
+          mentorNaam || null, mentorEmail || null, mentorTelefoon || null, mentorFunctie || null,
+          stagefunctie || null, opdrachtomschrijving || null,
+          startdatum || null, einddatum || null,
+          aantalWeken, finalUrenPerWeek, totaalUren,
+          stagevoorstelId
+        ]
+      );
+
+      await conn.query("UPDATE stagevoorstellen SET aangepast_op = NOW() WHERE id = ?", [stagevoorstelId]);
+    } else {
+      const voorlopigeStagebegeleiderId = await getDefaultDocentId(conn);
+
+      const [bedrijfResult] = await conn.query(
+        "INSERT INTO bedrijven (naam, afdeling, adres, aangemaakt_op, aangepast_op) VALUES (?, ?, ?, NOW(), NOW())",
+        [finalBedrijfNaam || "Concept", bedrijfsafdeling || null, bedrijfsadres || null]
+      );
+      const bedrijfId = bedrijfResult.insertId;
+
+      const [voorstelResult] = await conn.query(
+        `INSERT INTO stagevoorstellen
+          (student_id, bedrijf_id, stage_regel_id, voorlopige_stagebegeleider_id, status, huidige_versie_nummer, aangemaakt_op, aangepast_op)
+          VALUES (?, ?, ?, ?, 'concept', 1, NOW(), NOW())`,
+        [studentId, bedrijfId, stageRegel.id, voorlopigeStagebegeleiderId || null]
+      );
+      stagevoorstelId = voorstelResult.insertId;
+
+      await conn.query(
+        `INSERT INTO stagevoorstel_versies
+          (stagevoorstel_id, versie_nummer, bedrijf_id, bedrijf_naam, bedrijfsafdeling, bedrijfsadres,
+           mentor_naam, mentor_email, mentor_telefoon, mentor_functie, stagefunctie, opdrachtomschrijving,
+           startdatum, einddatum, aantal_weken, uren_per_week, totaal_uren, ingediend_door_id, aangemaakt_op)
+          VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        [
+          stagevoorstelId, bedrijfId,
+          finalBedrijfNaam || null, bedrijfsafdeling || null, bedrijfsadres || null,
+          mentorNaam || null, mentorEmail || null, mentorTelefoon || null, mentorFunctie || null,
+          stagefunctie || null, opdrachtomschrijving || null,
+          startdatum || null, einddatum || null,
+          aantalWeken, finalUrenPerWeek, totaalUren,
+          studentId
+        ]
+      );
+    }
+
+    await conn.commit();
+    return ok(res, { stagevoorstelId, status: "concept" }, "Concept opgeslagen");
+  } catch (err) {
+    await conn.rollback();
+    return fail(res, 500, "Concept opslaan mislukt", err.message);
+  } finally {
+    conn.release();
+  }
+}
+
+async function withdrawInternship(req, res) {
+  const studentId = getUserId(req);
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [rows] = await conn.query(
+      "SELECT id, status FROM stagevoorstellen WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1",
+      [studentId]
+    );
+
+    if (rows.length === 0) {
+      await conn.rollback();
+      return fail(res, 404, "Geen stagevoorstel gevonden");
+    }
+
+    const voorstel = rows[0];
+    const intrekbaar = ["concept", "ingediend", "aanpassingen_gevraagd", "heringediend"];
+    if (!intrekbaar.includes(voorstel.status)) {
+      await conn.rollback();
+      return fail(res, 409, `Voorstel met status '${voorstel.status}' kan niet ingetrokken worden`);
+    }
+
+    await conn.query(
+      "UPDATE stagevoorstellen SET status = 'ingetrokken', ingetrokken_op = NOW(), aangepast_op = NOW() WHERE id = ?",
+      [voorstel.id]
+    );
+
+    await conn.commit();
+    return ok(res, { stagevoorstelId: voorstel.id, status: "ingetrokken" }, "Stagevoorstel ingetrokken");
+  } catch (err) {
+    await conn.rollback();
+    return fail(res, 500, "Voorstel intrekken mislukt", err.message);
+  } finally {
+    conn.release();
   }
 }
 
@@ -951,6 +1084,8 @@ async function updateAdminDossierStatus(req, res) {
 
 module.exports = {
   createInternship,
+  saveDraft,
+  withdrawInternship,
   getMyInternship,
   getCommitteeApplications,
   decideApplication,
