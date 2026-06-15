@@ -9,6 +9,7 @@ const {
 } = require("../controllers/internshipController");
 const { getSettings, updateStageRule, updateDocumentType } = require("../controllers/settingsController");
 const { inviteMentor } = require("../controllers/userController");
+const { approveDocument, rejectDocument } = require("../controllers/documentController");
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
 
 const router = express.Router();
@@ -27,5 +28,8 @@ router.patch("/stage-rules/:id", updateStageRule);
 router.patch("/document-types/:id", updateDocumentType);
 
 router.post("/invitations", inviteMentor);
+
+router.patch("/documents/:id/approve", approveDocument);
+router.patch("/documents/:id/reject", rejectDocument);
 
 module.exports = router;
