@@ -21,9 +21,11 @@ export const NAVIGATION = {
   ],
 
   [ROLES.MENTOR]: [
-    { label: "Stagiairs", path: "/mentor/students", icon: "ti-users" },
-    { label: "Logboeken", path: "/mentor/logbooks", icon: "ti-notebook" },
-    { label: "Evaluatie", path: "/mentor/evaluation", icon: "ti-clipboard-check" },
+    { label: "Stagiairs",  path: "/mentor/students",   icon: "ti-users" },
+    { label: "Logboeken",  path: "/mentor/logbooks",   icon: "ti-notebook" },
+    { label: "Evaluatie",  path: "/mentor/evaluation", icon: "ti-clipboard-check" },
+    { label: "Contract",   path: "/mentor/contract",   icon: "ti-writing" },
+    { label: "Afspraken",  path: "/mentor/afspraken",  icon: "ti-calendar" },
   ],
 
   [ROLES.DOCENT]: [

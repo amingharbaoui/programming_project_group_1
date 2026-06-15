@@ -3,22 +3,17 @@ let currentApiUserId = "1";
 
 const api = axios.create({
   baseURL: "/api",
-  headers: {
-    "x-user-id": currentApiUserId
-  }
 });
 
+// Één interceptor die altijd de actuele user id meestuurt
+api.interceptors.request.use((config) => {
+  config.headers = config.headers || {};
+  config.headers["x-user-id"] = currentApiUserId;
+  return config;
+});
 
 export function setApiUserId(userId) {
   currentApiUserId = String(userId);
-  api.defaults.headers.common["x-user-id"] = currentApiUserId;
-  api.defaults.headers["x-user-id"] = currentApiUserId;
-
-  api.interceptors.request.use((config) => {
-    config.headers = config.headers || {};
-    config.headers["x-user-id"] = currentApiUserId;
-    return config;
-  })
 }
 
 export async function apiRequest(method, url, data = null) {
