@@ -525,6 +525,11 @@ export default function StudentLogbookPage() {
   const [submitted, setSubmitted] = useState(false);
   const [startDatum, setStartDatum] = useState(null);
 
+  // Gate: logboek alleen toegankelijk als voorstel goedgekeurd + contract getekend
+  const [voorstelStatus, setVoorstelStatus] = useState(null);
+  const [contractGetekend, setContractGetekend] = useState(false);
+  const [loadingGate, setLoadingGate] = useState(true);
+
   // null = nieuwe week invullen, week-object = bestaande week bewerken
   const [editWeek, setEditWeek] = useState(null);
   const [logbook, setLogbook] = useState(defaultLogbook(1));
@@ -554,14 +559,30 @@ export default function StudentLogbookPage() {
 
   useEffect(() => {
     setLoadingWeken(true);
-    fetchWeken(1);
+
+    // Stagevoorstel status + startdatum ophalen
     apiRequest("GET", "/internships/my")
       .then((res) => {
         if (res.data) {
-          setStartDatum(new Date(res.data.startdatum ?? res.data.startDatum));
+          setVoorstelStatus(res.data.status);
+          if (res.data.startdatum ?? res.data.startDatum) {
+            setStartDatum(new Date(res.data.startdatum ?? res.data.startDatum));
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingGate(false));
+
+    // Contract status ophalen
+    apiRequest("GET", "/contracts/my")
+      .then((res) => {
+        if (res.data?.student_getekend_op) {
+          setContractGetekend(true);
         }
       })
       .catch(() => {});
+
+    fetchWeken(1);
   }, [user.id]);
 
   /* Beschikbaarheidslogica */
@@ -577,9 +598,10 @@ export default function StudentLogbookPage() {
   const vorigeWeekOk =
     huidigFormulierWeek === 1 ||
     weken.some((w) => w.week_nummer === huidigFormulierWeek - 1);
+  // Week beschikbaar als: vorige week ingediend OF de tijd voor deze week is aangebroken
   const weekBeschikbaar =
     editWeek != null ||
-    (!weekAlIngediend && huidigFormulierWeek <= beschikbareWeek && vorigeWeekOk);
+    (!weekAlIngediend && (vorigeWeekOk || huidigFormulierWeek <= beschikbareWeek));
 
   /* Week indienen / opnieuw indienen → POST /api/logbooks (upsert) */
   async function handleWeekIndienen(e) {
@@ -669,7 +691,7 @@ export default function StudentLogbookPage() {
   }
 
   /* ---------- Render ---------- */
-  if (loadingWeken) {
+  if (loadingWeken || loadingGate) {
     return (
       <div className="page-inner">
         <div className="page-header">
@@ -677,6 +699,54 @@ export default function StudentLogbookPage() {
         </div>
         <div className="card">
           <p style={{ fontSize: 13, color: "var(--sub)" }}>Laden…</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Gate: stagevoorstel moet goedgekeurd zijn
+  if (voorstelStatus !== "goedgekeurd") {
+    const uitleg =
+      !voorstelStatus || voorstelStatus === "concept" || voorstelStatus === "ingediend"
+        ? "Je stagevoorstel is nog niet goedgekeurd door de stagecommissie."
+        : voorstelStatus === "aanpassingen_gevraagd"
+        ? "De stagecommissie heeft aanpassingen gevraagd aan je stagevoorstel."
+        : voorstelStatus === "afgekeurd"
+        ? "Je stagevoorstel werd afgekeurd."
+        : "Je stagevoorstel heeft status: " + voorstelStatus + ".";
+    return (
+      <div className="page-inner">
+        <div className="page-header">
+          <h1>Logboek</h1>
+        </div>
+        <div className="card">
+          <div className="card_title" style={{ color: "var(--red)" }}>
+            <IconLock size={16} />
+            Logboek nog niet beschikbaar
+          </div>
+          <p style={{ fontSize: 13, color: "var(--sub)" }}>
+            {uitleg} Je kan het logboek pas invullen zodra je voorstel is goedgekeurd en de stageovereenkomst getekend is.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Gate: stageovereenkomst moet getekend zijn door student
+  if (!contractGetekend) {
+    return (
+      <div className="page-inner">
+        <div className="page-header">
+          <h1>Logboek</h1>
+        </div>
+        <div className="card">
+          <div className="card_title" style={{ color: "var(--red)" }}>
+            <IconLock size={16} />
+            Stageovereenkomst nog niet getekend
+          </div>
+          <p style={{ fontSize: 13, color: "var(--sub)" }}>
+            Teken eerst de stageovereenkomst voor je het logboek kan invullen. Ga naar <strong>Mijn stage → Overeenkomst</strong>.
+          </p>
         </div>
       </div>
     );
@@ -793,7 +863,7 @@ export default function StudentLogbookPage() {
               <p style={{ fontSize: 13, color: "var(--sub)" }}>
                 {logbook.weekNummer === 1
                   ? "Je stage is nog niet gestart."
-                  : `Week ${logbook.weekNummer - 1} moet eerst ingediend worden.`}
+                  : `Week ${logbook.weekNummer} wordt beschikbaar zodra week ${logbook.weekNummer - 1} is ingediend of de bijhorende week is aangebroken.`}
               </p>
             </div>
           )}
