@@ -5,7 +5,8 @@ const {
   updateAdminDossierStatus,
   assignDossier,
   registerDossierStartklaar,
-  generateEindoverzicht
+  generateEindoverzicht,
+  sendContractReminder
 } = require("../controllers/internshipController");
 const { getSettings, updateStageRule, updateDocumentType } = require("../controllers/settingsController");
 const { inviteMentor } = require("../controllers/userController");
@@ -22,6 +23,7 @@ router.patch("/dossiers/:id/status", updateAdminDossierStatus);
 router.patch("/dossiers/:id/assign", assignDossier);
 router.patch("/dossiers/:id/startklaar", registerDossierStartklaar);
 router.post("/dossiers/:id/eindoverzicht", generateEindoverzicht);
+router.post("/dossiers/:id/reminder", sendContractReminder);
 
 router.get("/settings", getSettings);
 router.patch("/stage-rules/:id", updateStageRule);
