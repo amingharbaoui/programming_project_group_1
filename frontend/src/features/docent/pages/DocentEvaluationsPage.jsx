@@ -43,14 +43,26 @@ function ScoreKnoppen({ waarde, onChange, leesOnly }) {
   );
 }
 
+function ScoreDisplay({ waarde }) {
+  if (!waarde) return <span style={{ color: "var(--faint)", fontSize: "12px" }}>—</span>;
+  return (
+    <span style={{ fontSize: "13px", fontWeight: 600 }}>
+      {waarde}
+      <span style={{ color: "var(--faint)", fontWeight: 400, fontSize: "10px" }}>/5</span>
+    </span>
+  );
+}
+
 function EvalDetail({ evalData, activeType, userId, onRefresh }) {
   const evaluatie = evalData?.evaluaties?.find((e) => e.type === activeType) || null;
   const competenties = evalData?.competenties || [];
 
+  const studentScoresMap = {};
   const mentorScoresMap = {};
   const docentScoresBestaand = {};
   if (evaluatie) {
     for (const s of evaluatie.scores || []) {
+      if (s.rol === "student") studentScoresMap[s.competentie_id] = s.score;
       if (s.rol === "mentor") mentorScoresMap[s.competentie_id] = s.score;
       if (s.rol === "docent") docentScoresBestaand[s.competentie_id] = s.score;
     }
@@ -59,6 +71,7 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
   const [docentScores, setDocentScores] = useState({ ...docentScoresBestaand });
   const [bezig, setBezig]   = useState(false);
   const [melding, setMelding] = useState({ tekst: "", type: "" });
+  const [vrijgaveMelding, setVrijgaveMelding] = useState({ tekst: "", type: "" });
 
   // Reset scores als evaluatie verandert
   useEffect(() => {
@@ -70,6 +83,7 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
     }
     setDocentScores(nieuw);
     setMelding({ tekst: "", type: "" });
+    setVrijgaveMelding({ tekst: "", type: "" });
   }, [evaluatie?.id]);
 
   const kanInvullen =
@@ -94,6 +108,22 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
       setMelding({ tekst: "Scores opgeslagen.", type: "s_ok" });
     } catch (err) {
       setMelding({ tekst: err.response?.data?.message || "Opslaan mislukt", type: "s_rood" });
+    } finally {
+      setBezig(false);
+    }
+  }
+
+  async function handleVrijgeven() {
+    if (!evaluatie) return;
+    if (!window.confirm("Ben je zeker dat je het eindresultaat wil vrijgeven? De student zal dit kunnen zien.")) return;
+    try {
+      setBezig(true);
+      setMelding({ tekst: "", type: "" });
+      await api.post(`/evaluations/${evaluatie.id}/release`, {});
+      setVrijgaveMelding({ tekst: "Eindresultaat vrijgegeven!", type: "s_ok" });
+      onRefresh && onRefresh();
+    } catch (err) {
+      setMelding({ tekst: err.response?.data?.message || "Vrijgeven mislukt", type: "s_rood" });
     } finally {
       setBezig(false);
     }
@@ -146,107 +176,154 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
   }
 
   return (
-    <div className="grid_2" style={{ marginBottom: "12px" }}>
-      {/* Mentor scores — leesonly */}
-      <div className="card">
-        <div className="card_title">
-          Mentor{" "}
-          <span className={`status ${getEvalStatusClass(evaluatie.status)}`}>
-            {getEvalStatusLabel(evaluatie.status)}
-          </span>
-        </div>
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Competentie</th>
-              <th>Score</th>
-            </tr>
-          </thead>
-          <tbody>
-            {competenties.map((c) => (
-              <tr key={c.id}>
-                <td>
-                  <span className="status s_info" style={{ marginRight: "6px" }}>
-                    {c.code}
-                  </span>
-                  {c.naam}
-                </td>
-                <td>
-                  <ScoreKnoppen waarde={mentorScoresMap[c.id] || null} leesOnly />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {["geregistreerd", "klaar_voor_vrijgave", "vrijgegeven"].includes(evaluatie.status) && (
-          <p className="muted" style={{ marginTop: "10px", fontSize: "13px" }}>
-            Evaluatie is geregistreerd.
-          </p>
-        )}
+    <>
+    {/* Matrix — Student · Mentor · Docent scores in één tabel */}
+    <div className="card" style={{ marginBottom: "12px" }}>
+      <div className="card_title">
+        Competenties{" "}
+        <span className={`status ${getEvalStatusClass(evaluatie.status)}`}>
+          {getEvalStatusLabel(evaluatie.status)}
+        </span>
       </div>
-
-      {/* Docent scores */}
-      <div className="card">
-        <div className="card_title">
-          Docent{" "}
-          <span className={`status ${getEvalStatusClass(evaluatie.status)}`}>
-            {getEvalStatusLabel(evaluatie.status)}
-          </span>
-        </div>
-        <table className="tbl">
-          <thead>
-            <tr>
-              <th>Competentie</th>
-              <th>Score</th>
-            </tr>
-          </thead>
-          <tbody>
-            {competenties.map((c) => (
-              <tr key={c.id}>
-                <td>
-                  <span className="status s_info" style={{ marginRight: "6px" }}>
-                    {c.code}
-                  </span>
-                  {c.naam}
-                </td>
-                <td>
+      <table className="tbl">
+        <thead>
+          <tr>
+            <th style={{ width: "52px" }}>Code</th>
+            <th>Competentie</th>
+            <th style={{ width: "72px", textAlign: "center" }}>Student</th>
+            <th style={{ width: "72px", textAlign: "center" }}>Mentor</th>
+            <th style={{ width: kanInvullen ? "200px" : "72px", textAlign: "center" }}>Docent</th>
+          </tr>
+        </thead>
+        <tbody>
+          {competenties.map((c) => (
+            <tr key={c.id}>
+              <td><span className="status s_info">{c.code}</span></td>
+              <td>{c.naam}</td>
+              <td style={{ textAlign: "center" }}>
+                <ScoreDisplay waarde={studentScoresMap[c.id]} />
+              </td>
+              <td style={{ textAlign: "center" }}>
+                <ScoreDisplay waarde={mentorScoresMap[c.id]} />
+              </td>
+              <td style={{ textAlign: kanInvullen ? "left" : "center" }}>
+                {kanInvullen ? (
                   <ScoreKnoppen
                     waarde={docentScores[c.id] || null}
-                    leesOnly={!kanInvullen}
                     onChange={(val) =>
                       setDocentScores((prev) => ({ ...prev, [c.id]: val }))
                     }
                   />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                ) : (
+                  <ScoreDisplay waarde={docentScores[c.id]} />
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
-        {melding.tekst && (
+      {/* Legende */}
+      <div style={{
+        fontSize: "11.5px", color: "var(--sub)", marginTop: "10px",
+        borderTop: "0.5px solid var(--border)", paddingTop: "8px",
+        display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center"
+      }}>
+        <strong style={{ fontSize: "11px", textTransform: "uppercase", letterSpacing: "0.4px" }}>Legende</strong>
+        <span>1 Onvoldoende · 2 Matig · 3 Voldoende · 4 Goed · 5 Uitstekend</span>
+      </div>
+
+      {melding.tekst && (
+        <div style={{ marginTop: "10px" }}>
+          <span className={`status ${melding.type}`}>{melding.tekst}</span>
+        </div>
+      )}
+
+      {kanInvullen && (
+        <div className="actions" style={{ marginTop: "14px" }}>
+          <button className="btn primary" disabled={bezig} onClick={handleRegistreren}>
+            {bezig ? "Bezig..." : "Registreren"}
+          </button>
+          <button className="btn" disabled={bezig} onClick={handleOpslaan}>
+            Opslaan
+          </button>
+        </div>
+      )}
+
+      {!kanInvullen && (
+        <p className="muted" style={{ marginTop: "10px", fontSize: "13px" }}>
+          {["geregistreerd", "klaar_voor_vrijgave", "vrijgegeven"].includes(evaluatie.status)
+            ? "Evaluatie is geregistreerd."
+            : `Evaluatie is ${getEvalStatusLabel(evaluatie.status).toLowerCase()}.`}
+        </p>
+      )}
+    </div>
+
+    {/* Story 43 — Eindresultaatkaart na finale registratie */}
+    {activeType === "finaal" && ["klaar_voor_vrijgave", "vrijgegeven"].includes(evaluatie.status) && (
+      <div className="card" style={{ border: "1.5px solid var(--dark)", boxShadow: "0 4px 14px rgba(0,0,0,.08)" }}>
+        <div className="card_title">
+          Eindresultaat{" "}
+          <span className={`status ${getEvalStatusClass(evaluatie.status)}`}>
+            {getEvalStatusLabel(evaluatie.status)}
+          </span>
+        </div>
+
+        <div className="grid_2" style={{ marginBottom: "12px" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: "11.5px", color: "var(--sub)", marginBottom: "6px" }}>
+              Competentiescore
+            </div>
+            <div style={{ fontSize: "26px", fontWeight: 600, color: "var(--red)" }}>
+              {evaluatie.competentie_score ?? "—"}
+              {evaluatie.competentie_score && (
+                <span style={{ fontSize: "12px", fontWeight: 400, color: "var(--faint)" }}>/5</span>
+              )}
+            </div>
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: "11.5px", color: "var(--sub)", marginBottom: "6px" }}>
+              Eindcijfer
+            </div>
+            <div style={{ fontSize: "26px", fontWeight: 600, color: "var(--red)" }}>
+              {evaluatie.eindcijfer ?? "—"}
+              {evaluatie.eindcijfer && (
+                <span style={{ fontSize: "12px", fontWeight: 400, color: "var(--faint)" }}>/20</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {vrijgaveMelding.tekst && (
           <div style={{ marginTop: "10px" }}>
-            <span className={`status ${melding.type}`}>{melding.tekst}</span>
+            <span className={`status ${vrijgaveMelding.type}`}>{vrijgaveMelding.tekst}</span>
           </div>
         )}
 
-        {kanInvullen && (
-          <div className="actions" style={{ marginTop: "14px" }}>
-            <button className="btn primary" disabled={bezig} onClick={handleRegistreren}>
-              {bezig ? "Bezig..." : "Registreren"}
-            </button>
-            <button className="btn" disabled={bezig} onClick={handleOpslaan}>
-              Opslaan
-            </button>
-          </div>
+        {/* Story 44 — Vrijgeven knop */}
+        {evaluatie.status === "klaar_voor_vrijgave" && (
+          <>
+            <div style={{ fontSize: "12px", color: "var(--sub)", marginBottom: "12px", display: "flex", gap: "7px", alignItems: "flex-start" }}>
+              <span style={{ color: "var(--amber)" }}>⚠</span>
+              <span>Na vrijgave kan de student het resultaat bekijken. Dit kan niet meer ongedaan gemaakt worden.</span>
+            </div>
+            <div className="actions">
+              <button className="btn primary" disabled={bezig} onClick={handleVrijgeven}>
+                {bezig ? "Bezig..." : "Eindresultaat vrijgeven"}
+              </button>
+            </div>
+          </>
         )}
 
-        {!kanInvullen && (
-          <p className="muted" style={{ marginTop: "10px", fontSize: "13px" }}>
-            Evaluatie is {getEvalStatusLabel(evaluatie.status).toLowerCase()}.
+        {evaluatie.status === "vrijgegeven" && (
+          <p className="muted" style={{ fontSize: "13px", display: "flex", gap: "6px", alignItems: "center" }}>
+            <span style={{ color: "var(--green)" }}>✓</span>
+            Eindresultaat is vrijgegeven — de student kan het resultaat bekijken.
           </p>
         )}
       </div>
-    </div>
+    )}
+    </>
   );
 }
 
