@@ -3,7 +3,9 @@ const {
   getAdminDossiers,
   getAdminDossierById,
   updateAdminDossierStatus,
-  assignDossier
+  assignDossier,
+  registerDossierStartklaar,
+  generateEindoverzicht
 } = require("../controllers/internshipController");
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
 
@@ -15,5 +17,7 @@ router.get("/dossiers", getAdminDossiers);
 router.get("/dossiers/:id", getAdminDossierById);
 router.patch("/dossiers/:id/status", updateAdminDossierStatus);
 router.patch("/dossiers/:id/assign", assignDossier);
+router.patch("/dossiers/:id/startklaar", registerDossierStartklaar);
+router.post("/dossiers/:id/eindoverzicht", generateEindoverzicht);
 
 module.exports = router;

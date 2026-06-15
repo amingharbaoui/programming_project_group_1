@@ -987,6 +987,86 @@ async function assignDossier(req, res) {
   }
 }
 
+// Dossier registreren als startklaar: contract volledig ondertekend + verplichte docs goedgekeurd.
+async function registerDossierStartklaar(req, res) {
+  const dossierId = Number(req.params.id);
+  if (!dossierId) return fail(res, 400, "Ongeldig dossier-id");
+
+  try {
+    const [d] = await db.query(
+      "SELECT id, student_id, mentor_id, stagebegeleider_id, status FROM stagedossiers WHERE id = ? LIMIT 1",
+      [dossierId]
+    );
+    if (d.length === 0) return fail(res, 404, "Dossier niet gevonden");
+
+    const [ov] = await db.query("SELECT status FROM stageovereenkomsten WHERE stagedossier_id = ? LIMIT 1", [dossierId]);
+    const contractOk = ov.length > 0 && ["volledig_ondertekend", "geregistreerd"].includes(ov[0].status);
+
+    const [docs] = await db.query(
+      `SELECT COUNT(*) AS openstaand
+       FROM documenten doc
+       JOIN document_soorten ds ON ds.id = doc.document_soort_id
+       WHERE doc.stagedossier_id = ? AND ds.is_verplicht = 1 AND doc.status NOT IN ('goedgekeurd', 'geregistreerd')`,
+      [dossierId]
+    );
+    const docsOk = docs[0].openstaand === 0;
+
+    if (!contractOk || !docsOk) {
+      const ontbrekend = [];
+      if (!contractOk) ontbrekend.push("overeenkomst nog niet volledig ondertekend");
+      if (!docsOk) ontbrekend.push(`${docs[0].openstaand} verplichte document(en) nog niet goedgekeurd`);
+      return fail(res, 400, `Dossier nog niet startklaar: ${ontbrekend.join("; ")}`);
+    }
+
+    await db.query("UPDATE stagedossiers SET status = 'active', aangepast_op = NOW() WHERE id = ?", [dossierId]);
+
+    try {
+      const door = Number(req.user?.id);
+      for (const uid of [d[0].student_id, d[0].mentor_id, d[0].stagebegeleider_id].filter(Boolean)) {
+        await meld(uid, { titel: "Stage startklaar", bericht: "Het stagedossier is geregistreerd als startklaar; de stage kan starten.", aangemaaktDoorId: door, stagedossierId: dossierId });
+      }
+    } catch (notifyError) {
+      console.error("Melding startklaar mislukt:", notifyError.message);
+    }
+
+    return ok(res, { id: dossierId, status: "active" }, "Dossier geregistreerd als startklaar");
+  } catch (error) {
+    return fail(res, 500, "Registreren mislukt", error.message);
+  }
+}
+
+// Eindoverzicht genereren: enkel nadat het eindresultaat is vrijgegeven.
+async function generateEindoverzicht(req, res) {
+  const dossierId = Number(req.params.id);
+  if (!dossierId) return fail(res, 400, "Ongeldig dossier-id");
+
+  try {
+    const [d] = await db.query(
+      `SELECT d.id, d.dossiernummer, d.eindresultaat, d.eindresultaat_vrijgegeven_op,
+              d.startdatum, d.einddatum, d.opleiding, d.academiejaar,
+              sg.voornaam AS student_voornaam, sg.achternaam AS student_achternaam, s.studentennummer,
+              b.naam AS bedrijf_naam
+       FROM stagedossiers d
+       JOIN studenten s ON s.gebruiker_id = d.student_id
+       JOIN gebruikers sg ON sg.id = s.gebruiker_id
+       JOIN bedrijven b ON b.id = d.bedrijf_id
+       WHERE d.id = ? LIMIT 1`,
+      [dossierId]
+    );
+    if (d.length === 0) return fail(res, 404, "Dossier niet gevonden");
+    if (d[0].eindresultaat_vrijgegeven_op == null) return fail(res, 400, "Eindresultaat is nog niet vrijgegeven");
+
+    await db.query(
+      "UPDATE stagedossiers SET eindoverzicht_gegenereerd_op = NOW(), status = 'afgerond', aangepast_op = NOW() WHERE id = ?",
+      [dossierId]
+    );
+
+    return ok(res, { dossier: d[0], gegenereerd: true }, "Eindoverzicht gegenereerd");
+  } catch (error) {
+    return fail(res, 500, "Eindoverzicht genereren mislukt", error.message);
+  }
+}
+
 module.exports = {
   createInternship,
   getMyInternship,
@@ -995,5 +1075,7 @@ module.exports = {
   getAdminDossiers,
   getAdminDossierById,
   updateAdminDossierStatus,
-  assignDossier
+  assignDossier,
+  registerDossierStartklaar,
+  generateEindoverzicht
 };
