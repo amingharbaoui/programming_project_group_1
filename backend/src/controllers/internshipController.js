@@ -440,8 +440,12 @@ async function getMyInternship(req, res) {
 
         v.id AS versie_id,
         v.bedrijf_naam,
+        v.bedrijfsafdeling,
+        v.bedrijfsadres,
         v.mentor_naam,
         v.mentor_email,
+        v.mentor_telefoon,
+        v.mentor_functie,
         v.stagefunctie,
         v.opdrachtomschrijving,
         v.startdatum,
