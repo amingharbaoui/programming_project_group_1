@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 
@@ -67,8 +68,63 @@ async function reactivateUser(req, res) {
   }
 }
 
+// Mentor uitnodigen: maakt een mentor-account (status uitgenodigd) + mentoren-rij + activatielink (demo, geen e-mail).
+async function inviteMentor(req, res) {
+  const { voornaam, achternaam, email, functie } = req.body;
+  let bedrijfId = req.body.bedrijfId ?? req.body.bedrijf_id ?? null;
+  const bedrijfNaam = req.body.bedrijfNaam ?? req.body.bedrijf_naam ?? null;
+
+  if (!voornaam || !achternaam || !email) {
+    return fail(res, 400, "Voornaam, achternaam en e-mail zijn verplicht");
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [dup] = await conn.query("SELECT id FROM gebruikers WHERE email = ? LIMIT 1", [email]);
+    if (dup.length > 0) {
+      await conn.rollback();
+      return fail(res, 409, "Er bestaat al een gebruiker met dit e-mailadres");
+    }
+
+    if (!bedrijfId) {
+      if (!bedrijfNaam) {
+        await conn.rollback();
+        return fail(res, 400, "bedrijfId of bedrijfNaam is verplicht");
+      }
+      const [b] = await conn.query("INSERT INTO bedrijven (naam, aangemaakt_op, aangepast_op) VALUES (?, NOW(), NOW())", [bedrijfNaam]);
+      bedrijfId = b.insertId;
+    }
+
+    const [u] = await conn.query(
+      `INSERT INTO gebruikers (voornaam, achternaam, email, auth_provider, hoofdrol, status, aangemaakt_op, aangepast_op)
+       VALUES (?, ?, ?, 'local', 'mentor', 'uitgenodigd', NOW(), NOW())`,
+      [voornaam, achternaam, email]
+    );
+    const mentorId = u.insertId;
+
+    const token = crypto.randomBytes(24).toString("hex");
+    await conn.query(
+      `INSERT INTO mentoren (gebruiker_id, bedrijf_id, functie, mag_stageovereenkomst_tekenen, uitnodiging_status, uitnodiging_token, uitnodiging_vervalt_op)
+       VALUES (?, ?, ?, 1, 'verstuurd', ?, DATE_ADD(NOW(), INTERVAL 14 DAY))`,
+      [mentorId, bedrijfId, functie || "Mentor", token]
+    );
+
+    await conn.commit();
+    return ok(res, { mentorId, bedrijfId, activatielink: `/activeren?token=${token}` }, "Mentor uitgenodigd");
+  } catch (error) {
+    await conn.rollback();
+    if (error.code === "ER_DUP_ENTRY") return fail(res, 409, "Dubbele invoer");
+    return fail(res, 500, "Mentor uitnodigen mislukt", error.message);
+  } finally {
+    conn.release();
+  }
+}
+
 module.exports = {
   getUsers,
   deactivateUser,
-  reactivateUser
+  reactivateUser,
+  inviteMentor
 };

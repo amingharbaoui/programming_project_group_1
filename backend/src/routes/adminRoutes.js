@@ -7,6 +7,8 @@ const {
   registerDossierStartklaar,
   generateEindoverzicht
 } = require("../controllers/internshipController");
+const { getSettings, updateStageRule, updateDocumentType } = require("../controllers/settingsController");
+const { inviteMentor } = require("../controllers/userController");
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
 
 const router = express.Router();
@@ -19,5 +21,11 @@ router.patch("/dossiers/:id/status", updateAdminDossierStatus);
 router.patch("/dossiers/:id/assign", assignDossier);
 router.patch("/dossiers/:id/startklaar", registerDossierStartklaar);
 router.post("/dossiers/:id/eindoverzicht", generateEindoverzicht);
+
+router.get("/settings", getSettings);
+router.patch("/stage-rules/:id", updateStageRule);
+router.patch("/document-types/:id", updateDocumentType);
+
+router.post("/invitations", inviteMentor);
 
 module.exports = router;
