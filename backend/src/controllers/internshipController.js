@@ -384,6 +384,112 @@ async function saveDraft(req, res) {
   }
 }
 
+async function resubmitInternship(req, res) {
+  const studentId = getUserId(req);
+  const {
+    bedrijfNaam, bedrijfsnaam, bedrijfsafdeling, bedrijfsadres,
+    mentorNaam, mentorEmail, mentorTelefoon, mentorFunctie,
+    stagefunctie, opdrachtomschrijving, startdatum, einddatum, urenPerWeek
+  } = req.body;
+
+  const finalBedrijfNaam = bedrijfNaam || bedrijfsnaam;
+  const finalUrenPerWeek = Number(urenPerWeek || 38);
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Haal huidig voorstel op met status aanpassingen_gevraagd
+    const [voorstellen] = await conn.query(
+      `SELECT sp.*, v.id AS versie_id,
+              v.bedrijf_naam, v.bedrijfsafdeling, v.bedrijfsadres,
+              v.mentor_naam, v.mentor_email, v.mentor_telefoon, v.mentor_functie,
+              v.stagefunctie, v.opdrachtomschrijving,
+              v.startdatum, v.einddatum, v.aantal_weken, v.uren_per_week, v.totaal_uren
+       FROM stagevoorstellen sp
+       JOIN stagevoorstel_versies v
+         ON v.stagevoorstel_id = sp.id AND v.versie_nummer = sp.huidige_versie_nummer
+       WHERE sp.student_id = ? AND sp.status = 'aanpassingen_gevraagd'
+       ORDER BY sp.aangemaakt_op DESC LIMIT 1`,
+      [studentId]
+    );
+
+    if (voorstellen.length === 0) {
+      await conn.rollback();
+      return fail(res, 400, "Geen voorstel gevonden met status 'aanpassingen_gevraagd'");
+    }
+
+    const voorstel = voorstellen[0];
+    const nieuweVersieNummer = voorstel.huidige_versie_nummer + 1;
+
+    const nieuwStartdatum = startdatum || voorstel.startdatum;
+    const nieuwEinddatum = einddatum || voorstel.einddatum;
+    const aantalWeken = (nieuwStartdatum && nieuwEinddatum) ? calculateWeeks(nieuwStartdatum, nieuwEinddatum) : voorstel.aantal_weken;
+    const totaalUren = aantalWeken * finalUrenPerWeek;
+
+    // Nieuwe versie aanmaken
+    await conn.query(
+      `INSERT INTO stagevoorstel_versies
+        (stagevoorstel_id, versie_nummer, bedrijf_id,
+         bedrijf_naam, bedrijfsafdeling, bedrijfsadres,
+         mentor_naam, mentor_email, mentor_telefoon, mentor_functie,
+         stagefunctie, opdrachtomschrijving,
+         startdatum, einddatum, aantal_weken, uren_per_week, totaal_uren,
+         ingediend_door_id, ingediend_op, aangemaakt_op)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      [
+        voorstel.id, nieuweVersieNummer, voorstel.bedrijf_id,
+        finalBedrijfNaam || voorstel.bedrijf_naam,
+        bedrijfsafdeling ?? voorstel.bedrijfsafdeling,
+        bedrijfsadres ?? voorstel.bedrijfsadres,
+        mentorNaam || voorstel.mentor_naam,
+        mentorEmail || voorstel.mentor_email,
+        mentorTelefoon ?? voorstel.mentor_telefoon,
+        mentorFunctie ?? voorstel.mentor_functie,
+        stagefunctie || voorstel.stagefunctie,
+        opdrachtomschrijving || voorstel.opdrachtomschrijving,
+        nieuwStartdatum, nieuwEinddatum, aantalWeken, finalUrenPerWeek, totaalUren,
+        studentId
+      ]
+    );
+
+    // Voorstel updaten: versienummer ophogen + status heringediend
+    await conn.query(
+      `UPDATE stagevoorstellen
+       SET huidige_versie_nummer = ?, status = 'heringediend', heringediend_op = NOW(), aangepast_op = NOW()
+       WHERE id = ?`,
+      [nieuweVersieNummer, voorstel.id]
+    );
+
+    await conn.commit();
+
+    // Stagecommissie notificeren
+    try {
+      const student = await getStudentData(db, studentId);
+      const [commissie] = await db.query(
+        "SELECT id FROM gebruikers WHERE hoofdrol = 'stagecommissie' AND status = 'actief'"
+      );
+      for (const lid of commissie) {
+        await meld(lid.id, {
+          titel: "Heringediend stagevoorstel",
+          bericht: `${student?.voornaam} ${student?.achternaam} heeft een aangepast stagevoorstel ingediend (versie ${nieuweVersieNummer}).`,
+          aangemaaktDoorId: studentId,
+          stagevoorstelId: voorstel.id
+        });
+      }
+    } catch (notifyError) {
+      console.error("Melding herindienen mislukt:", notifyError.message);
+    }
+
+    return ok(res, { stagevoorstelId: voorstel.id, versieNummer: nieuweVersieNummer, status: "heringediend" }, "Voorstel heringediend");
+  } catch (err) {
+    await conn.rollback();
+    return fail(res, 500, "Herindienen mislukt", err.message);
+  } finally {
+    conn.release();
+  }
+}
+
 async function withdrawInternship(req, res) {
   const studentId = getUserId(req);
 
@@ -1275,6 +1381,7 @@ module.exports = {
   createInternship,
   saveDraft,
   withdrawInternship,
+  resubmitInternship,
   getMyInternship,
   getCommitteeApplications,
   decideApplication,
