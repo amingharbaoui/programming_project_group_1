@@ -493,14 +493,14 @@ export default function CompetenciesPage() {
               daarna de nieuwe versie.
             </p>
             {totaalOk ? (
-              <div className="validation_ok">Totaal correct: {localTotaal}%</div>
+              <div className="validation_ok">Totaal: {localTotaal}%</div>
             ) : (
               <div style={{
                 padding: "10px 12px", borderRadius: 10,
                 background: "var(--red-light)", color: "var(--red)",
                 fontSize: "12.5px", fontWeight: 600,
               }}>
-                Totaal: {localTotaal}% — moet 100% zijn
+                Totaal: {localTotaal}%
               </div>
             )}
           </div>
