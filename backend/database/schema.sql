@@ -106,7 +106,7 @@ DROP TABLE IF EXISTS `documenten`;
 CREATE TABLE `documenten` (
   `id` int NOT NULL AUTO_INCREMENT,
   `stagedossier_id` int NOT NULL,
-  `document_soort_id` int NOT NULL,
+  `document_soort_id` int DEFAULT NULL,
   `status` varchar(255) NOT NULL COMMENT 'ontbreekt, ingediend, in_controle, afgekeurd, goedgekeurd, geregistreerd',
   `versie_nummer` int DEFAULT '1',
   `bestand_url` text,
