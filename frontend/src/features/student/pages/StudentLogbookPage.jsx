@@ -752,6 +752,14 @@ export default function StudentLogbookPage() {
     );
   }
 
+  const totaalUrenIngediend = weken.reduce(
+    (sum, w) => sum + (Number(w.totaal_uren) || 0),
+    0
+  );
+  const MIN_UREN = 456;
+  const urenPct = Math.min(100, Math.round((totaalUrenIngediend / MIN_UREN) * 100));
+  const urenResterend = Math.max(0, MIN_UREN - totaalUrenIngediend);
+
   return (
     <div className="page-inner">
       <div className="page-header">
@@ -763,6 +771,29 @@ export default function StudentLogbookPage() {
             ? "Week ingediend — je mentor krijgt een melding."
             : "Vul wekelijks je activiteiten in"}
         </p>
+      </div>
+
+      {/* Uren voortgangsbalk */}
+      <div style={{ marginBottom: 16, padding: "10px 2px", borderBottom: "1px solid var(--border)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <div style={{ fontSize: 12, color: "var(--sub)" }}>
+              Gepresteerde uren — bevestigd door je mentor
+            </div>
+            <div className="prog-wrap" style={{ marginTop: 7 }}>
+              <div className="prog-fill" style={{ width: `${urenPct}%` }} />
+            </div>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <span style={{ fontSize: 20, fontWeight: 700, color: "var(--red)" }}>
+              {totaalUrenIngediend}
+            </span>
+            <span style={{ fontSize: 12, color: "var(--sub)" }}> / min. {MIN_UREN}u</span>
+            <div style={{ fontSize: 11, color: "var(--sub)" }}>
+              {urenResterend > 0 ? `nog ${urenResterend}u te gaan` : "minimum behaald ✓"}
+            </div>
+          </div>
+        </div>
       </div>
 
       {error && (

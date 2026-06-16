@@ -7,7 +7,7 @@ import {
   IconInfoCircle, IconUsers, IconFileDescription, IconChevronUp,
   IconChevronDown, IconBuilding, IconCalendar, IconUserCheck,
   IconClipboardText, IconArrowBackUp, IconNotebook, IconArrowRight,
-  IconHourglass, IconPencil, IconAlertCircle, IconDeviceFloppy,
+  IconHourglass, IconPencil, IconAlertCircle, IconDeviceFloppy, IconTrophy,
 } from "@tabler/icons-react";
 
 const STATUS_CONFIG = {
@@ -15,38 +15,69 @@ const STATUS_CONFIG = {
   ingediend:             { cls: "s_grijs",  icon: <IconHourglass size={14} />,      label: "In behandeling" },
   heringediend:          { cls: "s_grijs",  icon: <IconHourglass size={14} />,      label: "Heringediend — in behandeling" },
   aanpassingen_gevraagd: { cls: "s_amber",  icon: <IconPencil size={14} />,         label: "Aanpassingen gevraagd" },
-  goedgekeurd:           { cls: "s_ok",     icon: <IconCheck size={14} />,           label: "Goedgekeurd" },
-  afgekeurd:             { cls: "s_rood",   icon: <IconX size={14} />,               label: "Afgekeurd" },
-  ingetrokken:           { cls: "s_grijs",  icon: <IconArrowBackUp size={14} />,     label: "Ingetrokken" },
+  goedgekeurd:              { cls: "s_ok",    icon: <IconCheck size={14} />,    label: "Goedgekeurd" },
+  afgekeurd:                { cls: "s_rood",  icon: <IconX size={14} />,        label: "Afgekeurd" },
+  ingetrokken:              { cls: "s_grijs", icon: <IconArrowBackUp size={14} />, label: "Ingetrokken" },
+  resultaat_vrijgegeven:    { cls: "s_ok",    icon: <IconTrophy size={14} />,   label: "Eindresultaat vrijgegeven" },
+  afgerond:                 { cls: "s_ok",    icon: <IconTrophy size={14} />,   label: "Stage afgerond" },
 };
 
-// Progressstap op basis van status (0=concept/geen, 1=ingediend, 2=goedgekeurd)
-function getProgressStep(status) {
-  if (!status || status === "concept") return 0;
-  if (["ingediend", "heringediend", "aanpassingen_gevraagd"].includes(status)) return 1;
-  if (status === "goedgekeurd") return 2;
-  return 1;
+const FASES = ["Voorstel", "Beoordeling", "Contract", "Stage", "Evaluatie"];
+
+const FASE_IDX = {
+  concept: 0, ingetrokken: 0,
+  ingediend: 1, aanpassingen_gevraagd: 1, heringediend: 1, afgekeurd: 1,
+  goedgekeurd: 2,
+  resultaat_vrijgegeven: 4, afgerond: 4,
+};
+
+function getFaseIdx(status, contractGetekend) {
+  if (status === "goedgekeurd" && contractGetekend) return 3;
+  return FASE_IDX[status] ?? 0;
 }
 
-function ProgressBar({ status }) {
-  const stap = getProgressStep(status);
-  const stappen = ["Voorstel", "Beoordeling", "Contract", "Stage", "Evaluatie"];
+function getSubs(status, contractGetekend) {
+  if (status === "goedgekeurd" && contractGetekend)
+    return ["Ingediend", "Goedgekeurd", "Getekend", "Stage loopt", "—"];
+  const map = {
+    concept:               ["Concept opgeslagen", "—", "—", "—", "—"],
+    ingediend:             ["Ingediend", "Wacht op beslissing", "—", "—", "—"],
+    aanpassingen_gevraagd: ["Ingediend", "Aanpassing nodig", "—", "—", "—"],
+    heringediend:          ["Heringediend", "Wacht op beslissing", "—", "—", "—"],
+    afgekeurd:             ["Ingediend", "Afgekeurd", "—", "—", "—"],
+    goedgekeurd:           ["Ingediend", "Goedgekeurd", "Te ondertekenen", "—", "—"],
+    resultaat_vrijgegeven: ["Ingediend", "Goedgekeurd", "Geregistreerd", "Afgerond", "Vrijgegeven"],
+    afgerond:              ["Ingediend", "Goedgekeurd", "Geregistreerd", "Afgerond", "Afgesloten"],
+  };
+  return map[status] ?? ["Nog niet gestart", "—", "—", "—", "—"];
+}
+
+function ProgressBar({ status, contractGetekend }) {
+  const idx  = getFaseIdx(status, contractGetekend);
+  const subs = getSubs(status, contractGetekend);
 
   return (
-    <div className="progress-steps">
-      {stappen.map((label, i) => {
-        const done   = stap > i;
-        const active = stap === i;
+    <div className="steps">
+      {FASES.map((fase, i) => {
+        const cls = i < idx ? "done" : i === idx ? "active" : "";
+        let vul = 0;
+        if (i + 1 < idx) vul = 100;
+        else if (i + 1 === idx) vul = 50;
         return (
-          <div key={label} style={{ display: "contents" }}>
-            <div className={`progress-step${done ? " done" : active ? " active" : ""}`}>
-              <div className="progress-circle">
-                {done ? <IconCheck size={16} /> : i + 1}
+          <div key={fase} className={`step${cls ? ` ${cls}` : ""}`}>
+            <div className="step-block">
+              <div className="step-circle">
+                {i < idx ? <IconCheck size={17} /> : i + 1}
               </div>
-              <div className="progress-label">{label}</div>
+              <div className="step-col">
+                <span className="step-label">{fase}</span>
+                <span className="step-sub">{subs[i] || "—"}</span>
+              </div>
             </div>
-            {i < stappen.length - 1 && (
-              <div className={`progress-line${done || (active && i === 0) ? " active" : ""}`} />
+            {i < FASES.length - 1 && (
+              <div className="step-line">
+                <span className="fill" style={{ width: `${vul}%` }} />
+              </div>
             )}
           </div>
         );
@@ -59,16 +90,17 @@ export default function MyInternshipPage() {
   const navigate  = useNavigate();
   const location  = useLocation();
 
-  const [showPopup,    setShowPopup]    = useState(location.state?.ingediend || false);
-  const [voorstelOpen, setVoorstelOpen] = useState(false);
-  const [internship,   setInternship]   = useState(null);
-  const [loading,      setLoading]      = useState(true);
-  const [intrekModal,  setIntrekModal]  = useState(false);
-  const [intrekken,    setIntrekken]    = useState(false);
-  const [intrekFout,   setIntrekFout]   = useState(null);
+  const [showPopup,        setShowPopup]        = useState(location.state?.ingediend || false);
+  const [voorstelOpen,     setVoorstelOpen]     = useState(false);
+  const [internship,       setInternship]       = useState(null);
+  const [loading,          setLoading]          = useState(true);
+  const [intrekModal,      setIntrekModal]      = useState(false);
+  const [intrekken,        setIntrekken]        = useState(false);
+  const [intrekFout,       setIntrekFout]       = useState(null);
+  const [contractGetekend, setContractGetekend] = useState(false);
 
   useEffect(() => {
-    async function fetchInternship() {
+    async function fetchData() {
       try {
         const res = await apiRequest("GET", "/internships/my");
         if (res.data) setInternship(res.data);
@@ -77,8 +109,19 @@ export default function MyInternshipPage() {
       } finally {
         setLoading(false);
       }
+      // Contract ophalen (los van voorstel — fout is ok)
+      try {
+        const res = await apiRequest("GET", "/contracts/my");
+        const c = res.data;
+        // Pas "getekend" als alle drie partijen getekend hebben
+        if (c?.student_getekend_op && c?.bedrijf_getekend_op && c?.opleiding_getekend_op) {
+          setContractGetekend(true);
+        }
+      } catch {
+        // geen contract — ok
+      }
     }
-    fetchInternship();
+    fetchData();
   }, []);
 
   function formatDatum(datum) {
@@ -290,7 +333,7 @@ export default function MyInternshipPage() {
         <>
           {/* Progressbar */}
           <div className="card">
-            <ProgressBar status={currentStatus} />
+            <ProgressBar status={currentStatus} contractGetekend={contractGetekend} />
           </div>
 
           {/* Status */}

@@ -40,8 +40,8 @@ export default function StageApplicationPage() {
         const laadbaar = ["concept", "aanpassingen_gevraagd"];
         if (!laadbaar.includes(data.status)) return;
 
-        if (data.status === "concept") setHeeftConcept(true);
         setHuidigStatus(data.status);
+        if (data.status === "concept") setHeeftConcept(true);
 
         setForm({
           bedrijfNaam:           data.bedrijf_naam        || "",
@@ -96,24 +96,21 @@ export default function StageApplicationPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
-    const payload = {
-      bedrijfNaam:          form.bedrijfNaam,
-      bedrijfsadres:        form.bedrijfAdres,
-      mentorNaam:           form.mentorNaam,
-      mentorEmail:          form.mentorEmail,
-      mentorFunctie:        form.mentorFunctie,
-      stagefunctie:         form.opdrachtTitel,
-      opdrachtomschrijving: form.opdrachtOmschrijving,
-      startdatum:           form.startDatum,
-      einddatum:            form.eindDatum,
-      urenPerWeek:          38,
-    };
-    // Bij aanpassingen_gevraagd → nieuwe versie aanmaken via herindienen
-    const endpoint = huidigStatus === "aanpassingen_gevraagd"
-      ? "/internships/my/herindienen"
-      : "/internships";
+    const isHerindienen = huidigStatus === "aanpassingen_gevraagd";
+    const endpoint = isHerindienen ? "/internships/my/herindienen" : "/internships";
     try {
-      await apiRequest("POST", endpoint, payload);
+      await apiRequest("POST", endpoint, {
+        bedrijfNaam:          form.bedrijfNaam,
+        bedrijfsadres:        form.bedrijfAdres,
+        mentorNaam:           form.mentorNaam,
+        mentorEmail:          form.mentorEmail,
+        mentorFunctie:        form.mentorFunctie,
+        stagefunctie:         form.opdrachtTitel,
+        opdrachtomschrijving: form.opdrachtOmschrijving,
+        startdatum:           form.startDatum,
+        einddatum:            form.eindDatum,
+        urenPerWeek:          38,
+      });
       setSubmitted(true);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Stagevoorstel indienen mislukt");
