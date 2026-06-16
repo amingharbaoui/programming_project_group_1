@@ -1,31 +1,41 @@
 const express = require("express");
-const { ok } = require("../utils/response");
+const db = require("../config/db");
+const { ok, fail } = require("../utils/response");
 
 const router = express.Router();
 
-const demoUsers = {
-  "student@ehb.be": { id: 1, voornaam: "Demo", achternaam: "Student", email: "student@ehb.be", hoofdrol: "student" },
-  "student2@ehb.be": { id: 6, voornaam: "Demo", achternaam: "Student 2", email: "student2@ehb.be", hoofdrol: "student" },
-  "student3@ehb.be": { id: 7, voornaam: "Demo", achternaam: "Student 3", email: "student3@ehb.be", hoofdrol: "student" },
-  "student4@ehb.be": { id: 8, voornaam: "Demo", achternaam: "Student 4", email: "student4@ehb.be", hoofdrol: "student" },
-  "commissie@ehb.be": { id: 2, voornaam: "Demo", achternaam: "Commissie", email: "commissie@ehb.be", hoofdrol: "stagecommissie" },
-  "docent@ehb.be": { id: 3, voornaam: "Demo", achternaam: "Docent", email: "docent@ehb.be", hoofdrol: "docent" },
-  "admin@ehb.be": { id: 4, voornaam: "Demo", achternaam: "Admin", email: "admin@ehb.be", hoofdrol: "administratie" },
-  "mentor@bedrijf.be": { id: 5, voornaam: "Demo", achternaam: "Mentor", email: "mentor@bedrijf.be", hoofdrol: "mentor" }
-};
+router.post("/login", async (req, res) => {
+  const email = String(req.body.email || "").trim().toLowerCase();
 
-router.post("/login", (req, res) => {
-  const { email } = req.body;
-  const user = demoUsers[email];
-
-  if (!user) {
-    return res.status(401).json({
-      success: false,
-      message: "Demo gebruiker niet gevonden"
-    });
+  if (!email) {
+    return fail(res, 400, "E-mailadres is verplicht");
   }
 
-  return ok(res, user, "Login gelukt");
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT id, voornaam, achternaam, email, hoofdrol, status
+      FROM gebruikers
+      WHERE LOWER(email) = ?
+      LIMIT 1
+      `,
+      [email]
+    );
+
+    const user = rows[0];
+
+    if (!user) {
+      return fail(res, 401, "Gebruiker niet gevonden");
+    }
+
+    if (user.status !== "actief") {
+      return fail(res, 403, "Gebruiker is niet actief");
+    }
+
+    return ok(res, user, "Login gelukt");
+  } catch (error) {
+    return fail(res, 500, "Login mislukt", error.message);
+  }
 });
 
 router.get("/me", (req, res) => {

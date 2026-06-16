@@ -17,6 +17,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { loginUser } = useAuth();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [fout, setFout] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -27,6 +28,7 @@ export default function LoginPage() {
     try {
       const response = await apiRequest("POST", "/auth/login", {
         email: emailWaarde.toLowerCase().trim(),
+        password,
       });
       const apiUser = response.data;
 
@@ -92,6 +94,8 @@ export default function LoginPage() {
               type="password"
               className="form_input login_input"
               placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               required
             />
           </div>
