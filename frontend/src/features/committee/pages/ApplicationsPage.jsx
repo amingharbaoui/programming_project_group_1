@@ -11,15 +11,6 @@ const CRITERIA = [
   { id: "geldige_periode",  label: "Geldige stageperiode (start vóór einde)" },
 ];
 
-const ONDERDELEN = [
-  "Bedrijfsgegevens",
-  "Mentorgegevens",
-  "Stageperiode",
-  "Opdrachtomschrijving",
-  "Uren / weken",
-  "Andere",
-];
-
 function formatDate(v) {
   if (!v) return "–";
   return new Date(v).toLocaleDateString("nl-BE");
@@ -146,7 +137,6 @@ function VergelijkModal({ aanvraagId, feedbackVorige, onSluit }) {
 function BeoordelingModal({ aanvraag, onSluit, onBeslissing }) {
   const [criteria, setCriteria]         = useState({});
   const [beslissing, setBeslissing]     = useState(null); // "goedgekeurd"|"aanpassingen_gevraagd"|"afgekeurd"
-  const [onderdeel, setOnderdeel]       = useState("");
   const [feedback, setFeedback]         = useState("");
   const [motivering, setMotivering]     = useState("");
   const [uitzondering, setUitzondering] = useState(false);
@@ -159,10 +149,6 @@ function BeoordelingModal({ aanvraag, onSluit, onBeslissing }) {
 
   async function verstuur() {
     // Validaties
-    if (beslissing === "aanpassingen_gevraagd" && !onderdeel) {
-      setFout("Kies een onderdeel bij aanpassingen vragen.");
-      return;
-    }
     if (beslissing === "aanpassingen_gevraagd" && !feedback.trim()) {
       setFout("Feedback is verplicht bij aanpassingen vragen.");
       return;
@@ -182,7 +168,6 @@ function BeoordelingModal({ aanvraag, onSluit, onBeslissing }) {
       await api.patch(`/committee/applications/${aanvraag.id}/decision`, {
         beslissing,
         feedback:               feedback || null,
-        feedbackOnderdeel:      onderdeel || null,
         motivering:             motivering || null,
         uitzonderingMotivering: uitzondering ? uitzMot : null,
       });
@@ -272,36 +257,15 @@ function BeoordelingModal({ aanvraag, onSluit, onBeslissing }) {
 
           {/* Feedback / motivering velden afhankelijk van keuze */}
           {beslissing === "aanpassingen_gevraagd" && (
-            <>
-              <div className="form_group">
-                <label className="form_label">Onderdeel <span style={{ color: "var(--red)" }}>*</span></label>
-                <select
-                  className="form_input"
-                  value={onderdeel}
-                  onChange={(e) => setOnderdeel(e.target.value)}
-                >
-                  <option value="">— Kies een onderdeel —</option>
-                  {ONDERDELEN.map((o) => (
-                    <option key={o} value={o}>{o}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="form_group">
-                <label className="form_label">Feedback aan student <span style={{ color: "var(--red)" }}>*</span></label>
-                <textarea
-                  className="form_textarea"
-                  rows={3}
-                  placeholder="Welke aanpassingen zijn nodig?"
-                  value={feedback}
-                  onChange={(e) => setFeedback(e.target.value)}
-                />
-              </div>
-            </>
-          )}
-
-          {beslissing === "afgekeurd" && (
-            <div style={{ padding: "10px 14px", background: "var(--red-light)", border: "1px solid var(--red-mid)", borderRadius: 8, fontSize: 12.5, color: "var(--red)" }}>
-              ⚠ <strong>Afkeuring is definitief.</strong> De student krijgt een melding en kan een nieuw voorstel indienen.
+            <div className="form_group">
+              <label className="form_label">Feedback aan student <span style={{ color: "var(--red)" }}>*</span></label>
+              <textarea
+                className="form_textarea"
+                rows={3}
+                placeholder="Welke aanpassingen zijn nodig?"
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+              />
             </div>
           )}
 
