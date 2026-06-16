@@ -1085,6 +1085,7 @@ async function getAdminDossierById(req, res) {
         doc.id,
         doc.status,
         doc.versie_nummer,
+        doc.bestand_url,
         doc.bestand_naam,
         doc.opgeladen_op,
         doc.gecontroleerd_op,
@@ -1093,7 +1094,7 @@ async function getAdminDossierById(req, res) {
         ds.type,
         ds.is_verplicht
       FROM documenten doc
-      JOIN document_soorten ds ON ds.id = doc.document_soort_id
+      LEFT JOIN document_soorten ds ON ds.id = doc.document_soort_id
       WHERE doc.stagedossier_id = ?
       ORDER BY ds.is_verplicht DESC, ds.id ASC
       `,
