@@ -5,9 +5,7 @@ import {
   IconFileCheck,
   IconUser,
   IconBuilding,
-  IconSchool,
   IconCalendar,
-  IconShieldCheck,
   IconWriting,
   IconCircleCheck,
   IconClock,
@@ -34,47 +32,35 @@ function formatDatumTijd(d) {
   });
 }
 
+const STATUS_MAP = {
+  klaar_voor_student:            ["s_blauw", "Klaar voor ondertekening"],
+  getekend_door_student:         ["s_ok",    "Getekend door jou"],
+  wacht_op_bedrijf:              ["s_amber", "Wacht op bedrijf"],
+  volledig_ondertekend:          ["s_ok",    "Volledig ondertekend"],
+  in_controle_bij_administratie: ["s_blauw", "Bij administratie"],
+  afgekeurd:                     ["s_rood",  "Afgekeurd"],
+  geregistreerd:                 ["s_ok",    "Geregistreerd"],
+};
+
+function ContractBadge({ status }) {
+  const [cls, label] = STATUS_MAP[status] ?? ["s_grijs", status ?? "Onbekend"];
+  return <span className={`status ${cls}`}>{label}</span>;
+}
+
 function HandtekeningBadge({ getekendOp }) {
   if (getekendOp) {
     return (
-      <span className="handtekening-badge getekend">
-        <IconCircleCheck size={14} />
-        Ondertekend op {formatDatumTijd(getekendOp)}
+      <span className="hb-getekend">
+        <IconCircleCheck size={13} />
+        {formatDatumTijd(getekendOp)}
       </span>
     );
   }
   return (
-    <span className="handtekening-badge wacht">
-      <IconClock size={14} />
+    <span className="hb-wacht">
+      <IconClock size={13} />
       Wacht op ondertekening
     </span>
-  );
-}
-
-const STATUS_MAP = {
-  klaar_voor_student:            ["badge-blauw", "Klaar voor ondertekening"],
-  getekend_door_student:         ["badge-groen", "Getekend door jou"],
-  wacht_op_bedrijf:              ["badge-geel",  "Wacht op bedrijf"],
-  volledig_ondertekend:          ["badge-groen", "Volledig ondertekend"],
-  in_controle_bij_administratie: ["badge-blauw", "Bij administratie"],
-  afgekeurd:                     ["badge-rood",  "Afgekeurd"],
-  geregistreerd:                 ["badge-groen", "Geregistreerd"],
-};
-
-function ContractBadge({ status }) {
-  const [cls, label] = STATUS_MAP[status] ?? ["badge-grijs", status ?? "Onbekend"];
-  return <span className={`contract-badge ${cls}`}>{label}</span>;
-}
-
-function Rij({ icon: Icon, label, waarde }) {
-  return (
-    <div className="gegevens-rij">
-      <span className="gegevens-label">
-        <Icon size={15} className="gegevens-icon" />
-        {label}
-      </span>
-      <span className="gegevens-waarde">{waarde || "–"}</span>
-    </div>
   );
 }
 
@@ -128,92 +114,118 @@ export default function StudentContractPage() {
   }
 
   if (loading) {
-    return <div className="contract-page"><div className="laadbericht">Stageovereenkomst laden…</div></div>;
+    return (
+      <div className="page-inner">
+        <div className="page-header"><h1>Stageovereenkomst</h1></div>
+        <div className="card"><p>Laden…</p></div>
+      </div>
+    );
   }
 
   if (!contract) {
     return (
-      <div className="contract-page">
-        <div className="geen-contract">
-          <IconFileCheck size={40} />
-          <p>Er is nog geen stageovereenkomst beschikbaar.</p>
+      <div className="page-inner">
+        <div className="page-header"><h1>Stageovereenkomst</h1></div>
+        <div className="card" style={{ textAlign: "center", padding: "40px 24px" }}>
+          <IconFileCheck size={36} style={{ color: "var(--sub)", marginBottom: 12 }} />
+          <p style={{ color: "var(--sub)" }}>Er is nog geen stageovereenkomst beschikbaar.</p>
         </div>
       </div>
     );
   }
 
-  const alGetekend   = !!contract.student_getekend_op;
+  const alGetekend      = !!contract.student_getekend_op;
   const kanOndertekenen = !alGetekend && (contract.status === "klaar_voor_student" || !contract.status);
 
   return (
-    <div className="contract-page">
+    <div className="page-inner">
+
+      <div className="page-header">
+        <h1>Stageovereenkomst</h1>
+        <p>Dossier {contract.dossiernummer}</p>
+      </div>
 
       {fout && (
-        <div className="melding melding-fout">
-          <IconAlertCircle size={16} /> {fout}
+        <div className="card">
+          <span className="status s_rood"><IconAlertCircle size={14} /> {fout}</span>
         </div>
       )}
 
       {succesmelding && (
-        <div className="melding melding-ok">
-          <IconCircleCheck size={16} /> {succesmelding}
+        <div className="card">
+          <span className="status s_ok"><IconCircleCheck size={14} /> {succesmelding}</span>
         </div>
       )}
 
-      <div className="contract-header">
-        <div>
-          <h2 className="contract-dossiernr">Dossier {contract.dossiernummer}</h2>
-          <p className="contract-subtitel">Stageovereenkomst</p>
+      {/* Status */}
+      <div className="card">
+        <div className="card_title">
+          <IconFileCheck size={16} />
+          Status
         </div>
         <ContractBadge status={contract.status} />
       </div>
 
-      <div className="kaart">
-        <h3 className="kaart-titel">Stagegegevens</h3>
-        <div className="gegevens-lijst">
-          <Rij icon={IconUser}        label="Student"    waarde={contract.student_naam} />
-          <Rij icon={IconBuilding}    label="Bedrijf"    waarde={contract.bedrijf_naam} />
-          <Rij icon={IconUser}        label="Mentor"     waarde={contract.mentor_naam} />
-          <Rij icon={IconSchool}      label="Docent"     waarde={contract.docent_naam} />
-          <Rij icon={IconCalendar}    label="Startdatum" waarde={formatDatum(contract.startdatum)} />
-          <Rij icon={IconCalendar}    label="Einddatum"  waarde={formatDatum(contract.einddatum)} />
-          <Rij icon={IconShieldCheck} label="Verzekering" waarde={contract.verzekering ?? "Op te laden"} />
+      {/* Stagegegevens */}
+      <div className="card">
+        <div className="card_title">
+          <IconBuilding size={16} />
+          Stagegegevens
         </div>
+        <div className="kv"><span className="k">Student</span><span className="v">{contract.student_naam || "–"}</span></div>
+        <div className="kv"><span className="k">Bedrijf</span><span className="v">{contract.bedrijf_naam || "–"}</span></div>
+        <div className="kv"><span className="k">Mentor</span><span className="v">{contract.mentor_naam || "–"}</span></div>
+        <div className="kv"><span className="k">Docent</span><span className="v">{contract.docent_naam || "–"}</span></div>
+        <div className="kv"><span className="k">Startdatum</span><span className="v">{formatDatum(contract.startdatum)}</span></div>
+        <div className="kv"><span className="k">Einddatum</span><span className="v">{formatDatum(contract.einddatum)}</span></div>
       </div>
 
-      <div className="kaart">
-        <h3 className="kaart-titel">Handtekeningen</h3>
+      {/* Handtekeningen */}
+      <div className="card">
+        <div className="card_title">
+          <IconWriting size={16} />
+          Handtekeningen
+        </div>
         <div className="partijen">
-          <Partij titel="Student"          naam={contract.student_naam} getekendOp={contract.student_getekend_op} />
-          <Partij titel="Bedrijf / Mentor" naam={contract.mentor_naam} getekendOp={contract.bedrijf_getekend_op} />
-          <Partij titel="Opleiding"        naam={contract.docent_naam} getekendOp={contract.opleiding_getekend_op} />
+          <Partij titel="Student"          naam={contract.student_naam}  getekendOp={contract.student_getekend_op} />
+          <Partij titel="Bedrijf / Mentor" naam={contract.mentor_naam}   getekendOp={contract.bedrijf_getekend_op} />
+          <Partij titel="Opleiding"        naam={contract.docent_naam}   getekendOp={contract.opleiding_getekend_op} />
         </div>
       </div>
 
+      {/* Ondertekenen */}
       {kanOndertekenen && (
-        <div className="kaart kaart-ondertekenen">
-          <h3 className="kaart-titel">
-            <IconWriting size={17} /> Ondertekenen
-          </h3>
-          <p className="ondertekenen-tekst">
+        <div className="card">
+          <div className="card_title">
+            <IconWriting size={16} />
+            Ondertekenen
+          </div>
+          <p style={{ fontSize: 13, color: "var(--sub)", marginBottom: 14, lineHeight: 1.6 }}>
             Door te ondertekenen bevestig je dat je de stageovereenkomst hebt gelezen en akkoord gaat met de inhoud ervan.
           </p>
           <label className="akkoord-label">
             <input type="checkbox" checked={akkoord} onChange={(e) => setAkkoord(e.target.checked)} />
             Ik ga akkoord met de stageovereenkomst
           </label>
-          <button className="btn-ondertekenen" disabled={!akkoord || bezig} onClick={handleOndertekenen}>
-            {bezig ? "Bezig…" : "Digitaal ondertekenen"}
-          </button>
+          <div className="actions">
+            <button className="btn primary" disabled={!akkoord || bezig} onClick={handleOndertekenen}>
+              <IconWriting size={15} />
+              {bezig ? "Bezig…" : "Digitaal ondertekenen"}
+            </button>
+          </div>
         </div>
       )}
 
+      {/* Al getekend */}
       {alGetekend && (
-        <div className="kaart kaart-getekend">
-          <IconCircleCheck size={20} className="getekend-icon" />
-          <span>
-            Je hebt de stageovereenkomst ondertekend op{" "}
-            <strong>{formatDatumTijd(contract.student_getekend_op)}</strong>.
+        <div className="card">
+          <div className="card_title">
+            <IconCircleCheck size={16} />
+            Ondertekend
+          </div>
+          <span className="status s_ok">
+            <IconCircleCheck size={13} />
+            Je hebt ondertekend op <strong>{formatDatumTijd(contract.student_getekend_op)}</strong>
           </span>
         </div>
       )}
