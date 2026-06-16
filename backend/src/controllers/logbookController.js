@@ -396,6 +396,7 @@ async function getLogbooksByStudent(req, res) {
         lw.docent_nagekeken_op,
         lw.herindiening_nodig,
         lw.blokkade,
+        lw.student_antwoord,
 
         d.dossiernummer,
         d.student_id,
@@ -598,9 +599,40 @@ async function docentReviewLogbookWeek(req, res) {
 }
 
 
+async function studentAntwoordFeedback(req, res) {
+  const weekId   = Number(req.params.weekId);
+  const studentId = Number(req.headers["x-user-id"] || 1);
+  const { antwoord } = req.body;
+
+  if (!antwoord || !antwoord.trim()) {
+    return fail(res, 400, "Antwoord mag niet leeg zijn");
+  }
+
+  try {
+    // Controleer of deze week bij de student hoort
+    const [rows] = await db.query(
+      `SELECT lw.id FROM logboek_weken lw
+       JOIN stagedossiers d ON d.id = lw.stagedossier_id
+       WHERE lw.id = ? AND d.student_id = ? LIMIT 1`,
+      [weekId, studentId]
+    );
+    if (rows.length === 0) return fail(res, 403, "Geen toegang tot deze week");
+
+    await db.query(
+      "UPDATE logboek_weken SET student_antwoord = ?, aangepast_op = NOW() WHERE id = ?",
+      [antwoord.trim(), weekId]
+    );
+
+    return ok(res, { weekId }, "Antwoord opgeslagen");
+  } catch (err) {
+    return fail(res, 500, "Antwoord opslaan mislukt", err.message);
+  }
+}
+
 module.exports = {
   createLogbook,
   getLogbooksByStudent,
   mentorCheckLogbookWeek,
-  docentReviewLogbookWeek
+  docentReviewLogbookWeek,
+  studentAntwoordFeedback
 };

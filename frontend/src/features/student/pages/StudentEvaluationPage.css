@@ -2,7 +2,7 @@
   max-width: 760px;
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 14px;
 }
 
 /* ── Meldingen ── */
@@ -17,224 +17,149 @@
 .melding-fout { background: var(--red-light); color: var(--red); }
 .melding-ok   { background: #edfaf3; color: #16a34a; }
 
-/* ── Badges ── */
-.ev-badge {
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.badge-groen { background: #edfaf3; color: #16a34a; }
-.badge-blauw { background: #eff6ff; color: #2563eb; }
-.badge-geel  { background: #fffbeb; color: #d97706; }
-.badge-rood  { background: var(--red-light); color: var(--red); }
-.badge-grijs { background: var(--muted); color: var(--sub); }
-
-/* ── Sectie ── */
-.ev-sectie {
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.ev-sectie-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 18px 22px;
-  border-bottom: 1px solid var(--border);
-  gap: 12px;
-}
-.ev-type  { font-size: 16px; font-weight: 700; margin: 0; }
-.ev-datum { font-size: 12px; color: var(--sub); margin: 3px 0 0; }
-
-/* ── Formulier ── */
-.ev-formulier { padding: 20px 22px; display: flex; flex-direction: column; gap: 16px; }
-
-/* ── Competentie kaart ── */
-.ev-competentie-kaart {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.ev-competentie-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.ev-code    { font-size: 11px; font-weight: 700; background: var(--muted); padding: 2px 7px; border-radius: 4px; color: var(--sub); }
-.ev-naam    { font-size: 14px; font-weight: 600; color: var(--dark); flex: 1; }
-.ev-gewicht { font-size: 12px; color: var(--sub); margin-left: auto; }
-.ev-beschrijving { font-size: 13px; color: var(--gray); margin: 0; line-height: 1.5; }
-
-/* ── Invulrij ── */
-.ev-invul-rij {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
-.ev-invul-veld { display: flex; flex-direction: column; gap: 5px; }
-.ev-invul-motivering { flex: 1; min-width: 200px; }
-.ev-label { font-size: 12px; color: var(--sub); font-weight: 500; }
-
-/* ── Score input ── */
-.score-input-wrap { display: flex; align-items: center; gap: 5px; }
-.score-input {
-  width: 72px;
-  padding: 7px 10px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  font-size: 14px;
-  font-family: var(--font);
-  color: var(--dark);
-  outline: none;
-  transition: border .12s;
-}
-.score-input:focus { border-color: var(--red); }
-.score-input:disabled { background: var(--muted); color: var(--sub); }
-.score-max { font-size: 13px; color: var(--sub); }
-
-/* ── Textarea ── */
-.ev-textarea {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  font-size: 13.5px;
-  font-family: var(--font);
-  color: var(--dark);
-  resize: vertical;
-  outline: none;
-  transition: border .12s;
-  box-sizing: border-box;
-}
-.ev-textarea:focus { border-color: var(--red); }
-.ev-textarea:disabled { background: var(--muted); color: var(--sub); }
-
-/* ── Acties ── */
-.ev-acties {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  padding-top: 4px;
-}
-.btn-opslaan, .btn-indienen {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 9px 18px;
-  border-radius: 8px;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  transition: opacity .12s;
-}
-.btn-opslaan:disabled, .btn-indienen:disabled { opacity: .45; cursor: not-allowed; }
-.btn-opslaan  { background: var(--muted); color: var(--dark); border: 1px solid var(--border); }
-.btn-opslaan:hover:not(:disabled) { background: var(--border); }
-.btn-indienen { background: var(--red); color: #fff; }
-.btn-indienen:hover:not(:disabled) { opacity: .87; }
-
-/* ── Ingediend melding ── */
-.ev-ingediend-melding {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  background: #edfaf3;
-  color: #16a34a;
-  border-radius: 8px;
-  font-size: 13.5px;
-}
-
-/* ── Readonly lijst ── */
-.ev-readonly-lijst { display: flex; flex-direction: column; gap: 10px; }
-.ev-readonly-rij {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px 14px;
-}
-.ev-readonly-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.ev-score-pill {
-  margin-left: auto;
-  background: var(--muted);
-  padding: 2px 9px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--dark);
-}
-.ev-readonly-motivering { font-size: 13px; color: var(--gray); margin: 6px 0 0; line-height: 1.5; }
-
-/* ── Nog niet open ── */
-.ev-nog-niet {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--sub);
-  font-size: 13.5px;
-  padding: 10px 0;
-}
-
-/* ── Eindresultaat ── */
-.ev-resultaat-header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px 18px;
-  background: #fffbeb;
-  border-radius: 8px;
-  margin-bottom: 4px;
-}
-.trophy-icon { color: #d97706; flex-shrink: 0; }
-.ev-resultaat-titel  { font-size: 15px; font-weight: 700; color: var(--dark); }
-.ev-resultaat-datum  { font-size: 12px; color: var(--sub); margin-top: 2px; }
-.ev-eindcijfer {
-  margin-left: auto;
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--dark);
-}
-.ev-eindcijfer span { font-size: 14px; color: var(--sub); font-weight: 400; }
-
-.ev-scores-overzicht { display: flex; flex-direction: column; gap: 10px; }
-.ev-score-rij {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px 14px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.ev-score-competentie { display: flex; align-items: center; gap: 8px; flex: 1; }
-.ev-score-kolommen    { display: flex; gap: 16px; }
-.ev-score-kolom       { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 55px; }
-.ev-kolom-label { font-size: 11px; color: var(--sub); }
-.ev-kolom-waarde { font-size: 15px; font-weight: 700; color: var(--dark); }
-.ev-kolom-waarde.highlight { color: var(--red); }
-
-/* ── Leeg/laden ── */
-.laadbericht { padding: 40px; text-align: center; color: var(--sub); font-size: 14px; }
+/* ── Lege staat ── */
 .geen-data {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  padding: 60px 20px;
+  padding: 32px 0;
   color: var(--sub);
-  font-size: 14px;
+  text-align: center;
+  font-size: 13.5px;
+}
+.laadbericht { padding: 20px; font-size: 13.5px; color: var(--sub); }
+
+/* ── Banners ── */
+.banner {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.banner.blauw  { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+.banner.groen  { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+.banner.amber  { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+.b-title { font-weight: 600; margin-bottom: 3px; }
+.b-text  { line-height: 1.6; }
+
+/* ── Eval-track ── */
+.eval-track {
+  display: flex;
+  align-items: flex-start;
+  padding: 6px 0;
+}
+.ev-stap {
+  flex: 1;
+  text-align: center;
+  padding: 0 8px;
+}
+.ev-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #e9e9ec;
+  color: var(--sub);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 7px;
+}
+.ev-stap.actief .ev-circle { background: var(--red); color: #fff; box-shadow: 0 0 0 4px rgba(226,0,26,.12); }
+.ev-stap.done   .ev-circle { background: var(--green, #16a34a); color: #fff; }
+.ev-label { font-size: 12.5px; font-weight: 600; color: var(--dark); }
+.ev-stap.actief .ev-label  { color: var(--red); }
+.ev-sub   { font-size: 11px; color: var(--sub); margin-top: 3px; line-height: 1.4; }
+.ev-lijn  { flex: 0 0 36px; border-top: 2.5px dotted #c9c9d2; margin-top: 17px; }
+
+/* ── Schaallegenda ── */
+.scale-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--sub);
+  background: var(--muted, #f7f7f5);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+.scale-legend strong { color: var(--dark); }
+
+/* ── Score-knoppen in modal ── */
+.scale { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.scale-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: 0.5px solid var(--border);
+  background: var(--white);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gray);
+  font-family: var(--font);
+  transition: all .12s;
+}
+.scale-btn:hover   { border-color: var(--red); color: var(--red); }
+.scale-btn.selected{ background: var(--red); border-color: var(--red); color: #fff; }
+.scale-lbl { font-size: 12px; color: var(--sub); margin-left: 4px; }
+
+/* ── Scorematrix ── */
+.mtx {
+  background: var(--white);
+  border: 0.5px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.mtx-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0,1fr) 58px 58px 58px 26px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px;
+  min-height: 44px;
+  border-bottom: 0.5px solid var(--border);
+}
+.mtx-row:last-child { border-bottom: none; }
+.mtx-row.klik { cursor: pointer; transition: background .12s; }
+.mtx-row.klik:hover { background: var(--muted); }
+.mtx-head { min-height: 34px; background: #fafaf8; }
+.mtx-head span { font-size: 10.5px; color: var(--sub); letter-spacing: .3px; }
+.m-code { font-size: 10.5px; font-weight: 700; color: var(--faint, #bbb); }
+.m-naam { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-sc   { text-align: center; font-size: 12.5px; font-weight: 600; }
+.m-sc.leeg { color: #d8d8d4; font-weight: 400; }
+.pil {
+  display: inline-block;
+  min-width: 34px;
+  padding: 2px 7px;
+  border-radius: 11px;
+  background: var(--muted);
+  text-align: center;
+}
+.pil.jij  { background: var(--red-light); color: var(--red); }
+.pil.eind { background: var(--red); color: #fff; }
+.m-chev { color: var(--faint); font-size: 15px; text-align: right; }
+
+/* ── Competentie-modal (popup-comp) ── */
+.popup-comp { max-width: 480px; }
+
+/* ── Kleine knop ── */
+.btn.primary.sm, .btn.sm {
+  font-size: 12.5px;
+  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+/* ── Print ── */
+@media print {
+  .topbar, .sidebar, .banner, .scale-legend, .btn, button { display: none !important; }
 }

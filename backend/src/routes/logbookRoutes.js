@@ -1,7 +1,8 @@
 const express = require("express");
 const {
   createLogbook,
-  getLogbooksByStudent
+  getLogbooksByStudent,
+  studentAntwoordFeedback
 } = require("../controllers/logbookController");
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
 
@@ -11,5 +12,6 @@ router.use(authenticateDemoUser, requireRole("student"));
 
 router.post("/", createLogbook);
 router.get("/:studentId", getLogbooksByStudent);
+router.patch("/weeks/:weekId/antwoord", studentAntwoordFeedback);
 
 module.exports = router;

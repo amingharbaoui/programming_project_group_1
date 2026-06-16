@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import "./UsersPage.css";
 import "../../../index.css";
-import { IconUser, IconUserPlus, IconEye } from "@tabler/icons-react";
+import { IconUserPlus } from "@tabler/icons-react";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 
@@ -27,6 +27,26 @@ export default function UsersPage() {
 
     loadUsers();
   }, [user.id]);
+
+  async function reload() {
+    try {
+      const response = await api.get("/users");
+      setUsers(response.data.data || []);
+    } catch (err) {
+      setError(err.response?.data?.message || "Gebruikers ophalen mislukt");
+    }
+  }
+
+  async function toggleStatus(rawUser) {
+    const actie = rawUser.status === "actief" ? "deactivate" : "reactivate";
+    setError("");
+    try {
+      await api.patch(`/users/${rawUser.id}/${actie}`);
+      reload();
+    } catch (err) {
+      setError(err.response?.data?.message || "Status wijzigen mislukt");
+    }
+  }
 
   function formatUser(user) {
     return {
@@ -105,9 +125,11 @@ export default function UsersPage() {
                     <td>{user.status}</td>
                     <td>{user.koppeling}</td>
                     <td>
-                      <button className="btn sm">
-                        <IconEye size={16} stroke={2} />
-                        Bekijken
+                      <button
+                        className="btn sm"
+                        onClick={() => toggleStatus(rawUser)}
+                      >
+                        {user.status === "actief" ? "Deactiveren" : "Heractiveren"}
                       </button>
                     </td>
                   </tr>

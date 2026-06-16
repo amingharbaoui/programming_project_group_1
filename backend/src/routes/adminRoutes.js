@@ -2,8 +2,15 @@ const express = require("express");
 const {
   getAdminDossiers,
   getAdminDossierById,
-  updateAdminDossierStatus
+  updateAdminDossierStatus,
+  assignDossier,
+  registerDossierStartklaar,
+  generateEindoverzicht,
+  sendContractReminder
 } = require("../controllers/internshipController");
+const { getSettings, updateStageRule, updateDocumentType } = require("../controllers/settingsController");
+const { inviteMentor } = require("../controllers/userController");
+const { approveDocument, rejectDocument } = require("../controllers/documentController");
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
 
 const router = express.Router();
@@ -13,5 +20,18 @@ router.use(authenticateDemoUser, requireRole("administratie"));
 router.get("/dossiers", getAdminDossiers);
 router.get("/dossiers/:id", getAdminDossierById);
 router.patch("/dossiers/:id/status", updateAdminDossierStatus);
+router.patch("/dossiers/:id/assign", assignDossier);
+router.patch("/dossiers/:id/startklaar", registerDossierStartklaar);
+router.post("/dossiers/:id/eindoverzicht", generateEindoverzicht);
+router.post("/dossiers/:id/reminder", sendContractReminder);
+
+router.get("/settings", getSettings);
+router.patch("/stage-rules/:id", updateStageRule);
+router.patch("/document-types/:id", updateDocumentType);
+
+router.post("/invitations", inviteMentor);
+
+router.patch("/documents/:id/approve", approveDocument);
+router.patch("/documents/:id/reject", rejectDocument);
 
 module.exports = router;
