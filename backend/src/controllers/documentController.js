@@ -73,7 +73,7 @@ async function getDocuments(req, res) {
         doc.opgeladen_op,
         doc.afkeurreden
       FROM documenten doc
-      JOIN document_soorten ds ON ds.id = doc.document_soort_id
+      LEFT JOIN document_soorten ds ON ds.id = doc.document_soort_id
       JOIN stagedossiers d ON d.id = doc.stagedossier_id
       WHERE d.student_id = ?
       ORDER BY ds.naam ASC, doc.versie_nummer DESC
@@ -93,7 +93,7 @@ async function uploadDocument(req, res) {
   const { document_soort_id } = req.body;
 
   if (!document_soort_id) {
-    return fail(res, 400, "document_soort_id is verplicht");
+    return fail(res, 400, "document_soort_id is verplicht voor verplichte documenten");
   }
 
   if (!req.file) {
@@ -169,6 +169,62 @@ async function uploadDocument(req, res) {
   }
 }
 
+/* POST /api/documents/upload-eigen */
+async function uploadEigenDocument(req, res) {
+  const studentId = getUserId(req);
+
+  if (!req.file) {
+    return fail(res, 400, "Geen bestand ontvangen");
+  }
+
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [dossiers] = await connection.query(
+      `SELECT id FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1`,
+      [studentId]
+    );
+
+    if (dossiers.length === 0) {
+      await connection.rollback();
+      return fail(res, 404, "Geen stagedossier gevonden");
+    }
+
+    const dossier_id = dossiers[0].id;
+    const bestandUrl = `/uploads/${req.file.filename}`;
+
+    const [result] = await connection.query(
+      `
+      INSERT INTO documenten
+        (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam, opgeladen_door_id, aangemaakt_op, aangepast_op)
+      VALUES (?, NULL, 'ingediend', 1, ?, ?, ?, NOW(), NOW())
+      `,
+      [dossier_id, bestandUrl, req.file.originalname, studentId]
+    );
+
+    await connection.commit();
+
+    return ok(
+      res,
+      {
+        id: result.insertId,
+        bestand_url: bestandUrl,
+        bestand_naam: req.file.originalname,
+        versie_nummer: 1,
+        status: "ingediend",
+      },
+      "Eigen document succesvol geüpload"
+    );
+  } catch (error) {
+    await connection.rollback();
+    return fail(res, 500, "Upload mislukt", error.message);
+  } finally {
+    connection.release();
+  }
+}
+
 // Administratie keurt een document goed.
 async function approveDocument(req, res) {
   const id = Number(req.params.id);
@@ -221,4 +277,4 @@ async function rejectDocument(req, res) {
   }
 }
 
-module.exports = { getDocuments, uploadDocument, uploadMiddleware, getSoorten, approveDocument, rejectDocument };
+module.exports = { getDocuments, uploadDocument, uploadEigenDocument, uploadMiddleware, getSoorten, approveDocument, rejectDocument };

@@ -8,20 +8,22 @@ import {
   IconAlertCircle,
   IconEye,
   IconHistory,
+  IconPlus,
+  IconFolderOpen,
 } from "@tabler/icons-react";
 
 const STATUS_MAP = {
-  ontbreekt:    ["badge-rood",  "Ontbreekt"],
-  ingediend:    ["badge-blauw", "Ingediend · in controle"],
-  in_controle:  ["badge-geel",  "In controle"],
-  afgekeurd:    ["badge-rood",  "Afgekeurd"],
-  goedgekeurd:  ["badge-groen", "Goedgekeurd"],
-  geregistreerd:["badge-groen", "Geregistreerd"],
+  ontbreekt:     ["s_rood",  "Ontbreekt"],
+  ingediend:     ["s_blauw", "Ingediend"],
+  in_controle:   ["s_amber", "In controle"],
+  afgekeurd:     ["s_rood",  "Afgekeurd"],
+  goedgekeurd:   ["s_ok",    "Goedgekeurd"],
+  geregistreerd: ["s_ok",    "Geregistreerd"],
 };
 
 function StatusBadge({ status }) {
-  const [cls, label] = STATUS_MAP[status] ?? ["badge-grijs", status ?? "–"];
-  return <span className={`doc-badge ${cls}`}>{label}</span>;
+  const [cls, label] = STATUS_MAP[status] ?? ["s_grijs", status ?? "–"];
+  return <span className={`status ${cls}`}>{label}</span>;
 }
 
 function formatDatum(d) {
@@ -29,8 +31,9 @@ function formatDatum(d) {
   return new Date(d).toLocaleDateString("nl-BE", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+/* ── Verplicht document kaart ── */
 function DocumentKaart({ soort, documenten, onUpload }) {
-  const [bezig, setBezig]           = useState(false);
+  const [bezig, setBezig]               = useState(false);
   const [historiekOpen, setHistoriekOpen] = useState(false);
   const inputRef = useRef(null);
 
@@ -58,47 +61,45 @@ function DocumentKaart({ soort, documenten, onUpload }) {
   }
 
   return (
-    <div className="doc-kaart">
-      <div className="doc-kaart-header">
-        <div className="doc-kaart-info">
-          <IconFile size={18} className="doc-file-icon" />
-          <div>
-            <div className="doc-soort-naam">{soort.naam}</div>
-            {actief && (
-              <div className="doc-versie">
-                Versie {actief.versie_nummer} · {formatDatum(actief.opgeladen_op)}
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="doc-kaart-rechts">
-          <StatusBadge status={actief?.status ?? "ontbreekt"} />
-
-          {actief?.bestand_url && (
-            <a href={actief.bestand_url} target="_blank" rel="noreferrer" className="doc-btn doc-btn-bekijken">
-              <IconEye size={15} /> Bekijken
-            </a>
+    <div className="doc-rij">
+      <div className="doc-rij-links">
+        <IconFile size={16} className="doc-file-icon" />
+        <div>
+          <div className="doc-naam">{soort.naam}</div>
+          {actief && (
+            <div className="doc-meta">
+              Versie {actief.versie_nummer} · {formatDatum(actief.opgeladen_op)}
+            </div>
           )}
-
-          <button className="doc-btn doc-btn-upload" disabled={bezig} onClick={() => inputRef.current?.click()}>
-            <IconUpload size={15} />
-            {bezig ? "Bezig…" : actief ? "Nieuwe versie" : "Uploaden"}
-          </button>
-          <input
-            ref={inputRef}
-            type="file"
-            accept=".pdf,.png,.jpg,.jpeg"
-            className="doc-file-input"
-            onChange={handleBestandKiezen}
-          />
+          {actief?.afkeurreden && (
+            <div className="doc-reden">
+              <IconAlertCircle size={13} /> {actief.afkeurreden}
+            </div>
+          )}
         </div>
       </div>
 
-      {actief?.afkeurreden && (
-        <div className="doc-reden">
-          <IconAlertCircle size={14} /> {actief.afkeurreden}
-        </div>
-      )}
+      <div className="doc-rij-rechts">
+        <StatusBadge status={actief?.status ?? "ontbreekt"} />
+
+        {actief?.bestand_url && (
+          <a href={actief.bestand_url} target="_blank" rel="noreferrer" className="btn sm">
+            <IconEye size={14} /> Bekijken
+          </a>
+        )}
+
+        <button className="btn sm primary" disabled={bezig} onClick={() => inputRef.current?.click()}>
+          <IconUpload size={14} />
+          {bezig ? "Bezig…" : actief ? "Nieuwe versie" : "Uploaden"}
+        </button>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".pdf,.png,.jpg,.jpeg"
+          style={{ display: "none" }}
+          onChange={handleBestandKiezen}
+        />
+      </div>
 
       {historiek.length > 0 && (
         <div className="doc-historiek">
@@ -113,7 +114,7 @@ function DocumentKaart({ soort, documenten, onUpload }) {
                   <span>v{d.versie_nummer} · {formatDatum(d.opgeladen_op)}</span>
                   <StatusBadge status={d.status} />
                   {d.bestand_url && (
-                    <a href={d.bestand_url} target="_blank" rel="noreferrer" className="doc-link">Bekijken</a>
+                    <a href={d.bestand_url} target="_blank" rel="noreferrer" className="btn sm">Bekijken</a>
                   )}
                 </div>
               ))}
@@ -125,11 +126,37 @@ function DocumentKaart({ soort, documenten, onUpload }) {
   );
 }
 
+/* ── Eigen document rij ── */
+function EigenDocRij({ doc, onDelete }) {
+  return (
+    <div className="doc-rij">
+      <div className="doc-rij-links">
+        <IconFile size={16} className="doc-file-icon" />
+        <div>
+          <div className="doc-naam">{doc.bestand_naam}</div>
+          <div className="doc-meta">{formatDatum(doc.opgeladen_op)}</div>
+        </div>
+      </div>
+      <div className="doc-rij-rechts">
+        <StatusBadge status={doc.status} />
+        {doc.bestand_url && (
+          <a href={doc.bestand_url} target="_blank" rel="noreferrer" className="btn sm">
+            <IconEye size={14} /> Bekijken
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Hoofd component ── */
 export default function StudentDocumentsPage() {
   const [documenten, setDocumenten] = useState([]);
   const [soorten, setSoorten]       = useState([]);
   const [loading, setLoading]       = useState(true);
   const [fout, setFout]             = useState(null);
+  const [eigenBezig, setEigenBezig] = useState(false);
+  const eigenInputRef = useRef(null);
 
   useEffect(() => { laadData(); }, []);
 
@@ -156,53 +183,108 @@ export default function StudentDocumentsPage() {
       .sort((a, b) => b.versie_nummer - a.versie_nummer);
   }
 
+  // Eigen documenten: geen document_soort_id
+  const eigenDocs = documenten.filter((d) => !d.document_soort_id);
+
+  async function handleEigenUpload(e) {
+    const bestand = e.target.files?.[0];
+    if (!bestand) return;
+    e.target.value = "";
+    setEigenBezig(true);
+    try {
+      const formData = new FormData();
+      formData.append("bestand", bestand);
+      await api.post("/documents/upload-eigen", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      await laadData();
+    } catch (err) {
+      alert(err.response?.data?.message || "Upload mislukt.");
+    } finally {
+      setEigenBezig(false);
+    }
+  }
+
   if (loading) {
-    return <div className="docs-page"><div className="laadbericht">Documenten laden…</div></div>;
+    return (
+      <div className="page-inner">
+        <div className="page-header"><h1>Mijn documenten</h1></div>
+        <div className="card"><p>Laden…</p></div>
+      </div>
+    );
   }
 
   return (
-    <div className="docs-page">
+    <div className="page-inner">
+
+      <div className="page-header">
+        <h1>Mijn documenten</h1>
+        <p>Upload hier de verplichte documenten voor je stage.</p>
+      </div>
 
       {fout && (
-        <div className="melding melding-fout">
-          <IconAlertCircle size={16} /> {fout}
+        <div className="card">
+          <span className="status s_rood"><IconAlertCircle size={14} /> {fout}</span>
         </div>
       )}
 
-      <div className="docs-header">
-        <h2 className="docs-titel">Mijn documenten</h2>
-        <p className="docs-subtitel">Upload hier de verplichte documenten voor je stage.</p>
+      {/* Verplichte documenten */}
+      <div className="card">
+        <div className="card_title">
+          <IconFile size={16} />
+          Verplichte documenten
+        </div>
+
+        {soorten.length === 0 ? (
+          <p style={{ fontSize: 13, color: "var(--sub)" }}>Geen verplichte documenten gevonden.</p>
+        ) : (
+          <div className="doc-lijst">
+            {soorten.map((soort) => (
+              <DocumentKaart
+                key={soort.id}
+                soort={soort}
+                documenten={groeperPerSoort(soort.id)}
+                onUpload={laadData}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      <div className="docs-lijst">
-        {soorten.length === 0 && documenten.length === 0 && (
-          <div className="laadbericht">Geen documenten gevonden.</div>
+      {/* Eigen documenten */}
+      <div className="card">
+        <div className="card_title">
+          <IconFolderOpen size={16} />
+          Eigen documenten
+        </div>
+        <p style={{ fontSize: 12.5, color: "var(--sub)", marginBottom: 14, lineHeight: 1.55 }}>
+          Komt er iets tussen — een attest, een aangepaste planning, een extra verslag — voeg het hier toe.
+          Je docent en de administratie kunnen het inkijken.
+        </p>
+
+        {eigenDocs.length > 0 && (
+          <div className="doc-lijst" style={{ marginBottom: 14 }}>
+            {eigenDocs.map((doc) => (
+              <EigenDocRij key={doc.id} doc={doc} onDelete={laadData} />
+            ))}
+          </div>
         )}
-        {soorten.map((soort) => (
-          <DocumentKaart
-            key={soort.id}
-            soort={soort}
-            documenten={groeperPerSoort(soort.id)}
-            onUpload={laadData}
-          />
-        ))}
-        {/* Toon documenten van soorten die niet in de lijst staan */}
-        {documenten
-          .filter((d) => !soorten.find((s) => s.id === d.document_soort_id))
-          .reduce((acc, d) => {
-            if (!acc.find((s) => s.id === d.document_soort_id)) {
-              acc.push({ id: d.document_soort_id, naam: d.soort_naam, type: d.soort_type });
-            }
-            return acc;
-          }, [])
-          .map((soort) => (
-            <DocumentKaart
-              key={soort.id}
-              soort={soort}
-              documenten={groeperPerSoort(soort.id)}
-              onUpload={laadData}
-            />
-          ))}
+
+        <div
+          className="dropzone"
+          onClick={() => !eigenBezig && eigenInputRef.current?.click()}
+          style={{ cursor: eigenBezig ? "not-allowed" : "pointer", opacity: eigenBezig ? .6 : 1 }}
+        >
+          <IconPlus size={16} style={{ color: "var(--sub)" }} />
+          <span className="dz-t">{eigenBezig ? "Bezig met uploaden…" : "Document toevoegen"}</span>
+        </div>
+        <input
+          ref={eigenInputRef}
+          type="file"
+          accept=".pdf,.png,.jpg,.jpeg"
+          style={{ display: "none" }}
+          onChange={handleEigenUpload}
+        />
       </div>
 
     </div>
