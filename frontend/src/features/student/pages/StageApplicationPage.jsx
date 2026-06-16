@@ -15,6 +15,7 @@ export default function StageApplicationPage() {
   const [conceptOpgeslagen, setConceptOpgeslagen] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [heeftConcept, setHeeftConcept] = useState(false);
+  const [huidigStatus, setHuidigStatus] = useState(null);
 
   const [form, setForm] = useState({
     bedrijfNaam: "",
@@ -39,6 +40,7 @@ export default function StageApplicationPage() {
         const laadbaar = ["concept", "aanpassingen_gevraagd"];
         if (!laadbaar.includes(data.status)) return;
 
+        setHuidigStatus(data.status);
         if (data.status === "concept") setHeeftConcept(true);
 
         setForm({
@@ -94,8 +96,10 @@ export default function StageApplicationPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
+    const isHerindienen = huidigStatus === "aanpassingen_gevraagd";
+    const endpoint = isHerindienen ? "/internships/my/herindienen" : "/internships";
     try {
-      await apiRequest("POST", "/internships", {
+      await apiRequest("POST", endpoint, {
         bedrijfNaam:          form.bedrijfNaam,
         bedrijfsadres:        form.bedrijfAdres,
         mentorNaam:           form.mentorNaam,
