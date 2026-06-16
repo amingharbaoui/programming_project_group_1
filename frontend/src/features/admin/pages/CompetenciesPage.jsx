@@ -366,15 +366,6 @@ export default function CompetenciesPage() {
                 <span className="v">{profiel.opleiding} {profiel.academiejaar}</span>
               </div>
               <div className="kv">
-                <span className="k">Versie</span>
-                <span className="v">
-                  {profiel.versie}
-                  {profiel.status !== "actief" && (
-                    <span className="concept_note"> conceptwijzigingen niet gepubliceerd</span>
-                  )}
-                </span>
-              </div>
-              <div className="kv">
                 <span className="k">Status</span>
                 <span className="v">
                   <span className={`status ${profiel.status === "actief" ? "s_ok" : ""}`}>
@@ -459,11 +450,6 @@ export default function CompetenciesPage() {
                   </div>
                 ))
               )}
-            </div>
-
-            <div className="competencies_footer">
-              Het totaalgewicht moet exact 100 zijn voordat je dit
-              competentieprofiel kan publiceren.
             </div>
           </div>
         </div>
