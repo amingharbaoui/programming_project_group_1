@@ -1,4 +1,5 @@
 import React from "react";
+import { IconLogin2 } from "@tabler/icons-react";
 import "./LoginPage.css";
 import { useNavigate } from "react-router-dom";
 import logoWide from "../../assets/stageify-logo/stageify_logo_wide.png";
@@ -65,6 +66,7 @@ export default function LoginPage() {
 
           {/* Aanmelden knop */}
           <button type="submit" className="btn primary login_btn">
+            <IconLogin2 size={16} stroke={2} style={{ marginRight: 6 }} />
             Aanmelden
           </button>
 
