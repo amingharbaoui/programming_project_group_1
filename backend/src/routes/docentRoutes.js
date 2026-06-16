@@ -3,6 +3,7 @@ const { getDocentStudents } = require("../controllers/docentController");
 const {
   getLogbooksByStudent,
   docentReviewLogbookWeek,
+  remindStudentLogbook,
 } = require("../controllers/logbookController");
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
 
@@ -16,5 +17,6 @@ router.get("/students", getDocentStudents);
 // Logboeken
 router.get("/logbooks/:studentId", getLogbooksByStudent);
 router.patch("/logbooks/:weekId/review", docentReviewLogbookWeek);
+router.post("/logbooks/:studentId/remind", remindStudentLogbook);
 
 module.exports = router;

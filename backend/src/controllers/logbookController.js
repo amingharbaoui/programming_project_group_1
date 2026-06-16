@@ -597,10 +597,39 @@ async function docentReviewLogbookWeek(req, res) {
   }
 }
 
+async function remindStudentLogbook(req, res) {
+  const studentId = Number(req.params.studentId);
+  const docentId = getUserId(req, 5);
+
+  if (!studentId) return fail(res, 400, "studentId is verplicht");
+
+  try {
+    const [linked] = await db.query(
+      "SELECT id FROM stagedossiers WHERE student_id = ? AND stagebegeleider_id = ? LIMIT 1",
+      [studentId, docentId]
+    );
+    if (linked.length === 0) {
+      return fail(res, 403, "Docent is niet gekoppeld aan deze student");
+    }
+
+    await meld(studentId, {
+      titel: "Herinnering: logboek indienen",
+      bericht: "Je docent herinnert je eraan een of meerdere logboekweken in te dienen.",
+      type: "herinnering",
+      ernst: "gemiddeld",
+      aangemaaktDoorId: docentId
+    });
+
+    return ok(res, null, "Herinnering verstuurd naar student");
+  } catch (error) {
+    return fail(res, 500, "Herinnering versturen mislukt", error.message);
+  }
+}
 
 module.exports = {
   createLogbook,
   getLogbooksByStudent,
   mentorCheckLogbookWeek,
-  docentReviewLogbookWeek
+  docentReviewLogbookWeek,
+  remindStudentLogbook
 };
