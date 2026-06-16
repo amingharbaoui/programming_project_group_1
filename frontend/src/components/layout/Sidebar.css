@@ -63,6 +63,12 @@
 .sidebar.collapsed .nav-item { justify-content: center; padding: 11px 0; border-left: none; }
 .sidebar.collapsed .nav-item .label { display: none; }
 
+/* Vergrendelde nav items */
+.nav-item.locked { color: var(--faint); cursor: default; }
+.nav-item.locked:hover { background: transparent; color: var(--faint); }
+.nav-item.locked .lock { margin-left: auto; font-size: 13px; color: var(--faint); }
+.sidebar.collapsed .nav-item.locked .lock { display: none; }
+
 .sidebar-footer {
 	border-top: 1px solid var(--border);
 	display: flex;
