@@ -10,6 +10,7 @@ import {
   IconCircleCheck,
   IconClock,
   IconAlertCircle,
+  IconPrinter,
 } from "@tabler/icons-react";
 
 function formatDatum(d) {
@@ -141,8 +142,13 @@ export default function StudentContractPage() {
     <div className="page-inner">
 
       <div className="page-header">
-        <h1>Stageovereenkomst</h1>
-        <p>Dossier {contract.dossiernummer}</p>
+        <div>
+          <h1>Stageovereenkomst</h1>
+          <p>Dossier {contract.dossiernummer}</p>
+        </div>
+        <button className="btn sm" onClick={() => window.print()}>
+          <IconPrinter size={14} /> Afdrukken / PDF
+        </button>
       </div>
 
       {fout && (
