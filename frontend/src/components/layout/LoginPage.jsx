@@ -2,35 +2,41 @@ import React, { useState } from "react";
 import "./LoginPage.css";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { apiRequest } from "../../services/api";
 import logoWide from "../../assets/stageify-logo/stageify_logo_wide.png";
 
-// Accounts uit de database gekoppeld aan demo-gebruikers en routes
-const ACCOUNT_MAP = {
-  "student@ehb.be":    { userKey: "student",        route: "/student/internship" },
-  "student2@ehb.be":   { userKey: "student2",       route: "/student/internship" },
-  "student3@ehb.be":   { userKey: "student3",       route: "/student/internship" },
-  "student4@ehb.be":   { userKey: "student4",       route: "/student/internship" },
-  "commissie@ehb.be":  { userKey: "stagecommissie", route: "/committee/applications" },
-  "admin@ehb.be":      { userKey: "administratie",  route: "/admin/dossiers" },
-  "docent@ehb.be":     { userKey: "docent",         route: "/docent/students" },
-  "mentor@bedrijf.be": { userKey: "mentor",         route: "/mentor/students" },
+const ROLE_ROUTES = {
+  student: "/student/internship",
+  stagecommissie: "/committee/applications",
+  administratie: "/admin/dossiers",
+  docent: "/docent/students",
+  mentor: "/mentor/students",
 };
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { switchRole } = useAuth();
+  const { loginUser } = useAuth();
   const [email, setEmail] = useState("");
   const [fout, setFout] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  function login(emailWaarde) {
-    const account = ACCOUNT_MAP[emailWaarde.toLowerCase().trim()];
-    if (!account) {
-      setFout("Onbekend e-mailadres. Gebruik een geldig demo-account.");
-      return false;
+  async function login(emailWaarde) {
+    setFout(null);
+    setLoading(true);
+
+    try {
+      const response = await apiRequest("POST", "/auth/login", {
+        email: emailWaarde.toLowerCase().trim(),
+      });
+      const apiUser = response.data;
+
+      loginUser(apiUser);
+      navigate(ROLE_ROUTES[apiUser.hoofdrol] || "/student/internship");
+    } catch (error) {
+      setFout(error.response?.data?.message || "Aanmelden mislukt.");
+    } finally {
+      setLoading(false);
     }
-    switchRole(account.userKey);
-    navigate(account.route);
-    return true;
   }
 
   function handleLogin(e) {
@@ -96,8 +102,8 @@ export default function LoginPage() {
           )}
 
           {/* Aanmelden knop */}
-          <button type="submit" className="btn primary login_btn">
-            Aanmelden
+          <button type="submit" className="btn primary login_btn" disabled={loading}>
+            {loading ? "Aanmelden..." : "Aanmelden"}
           </button>
 
           <div className="login_divider">
@@ -105,13 +111,11 @@ export default function LoginPage() {
           </div>
 
           {/* EhB SSO knop */}
-          <button type="button" className="btn login_secondary_btn" onClick={handleEhbLogin}>
+          <button type="button" className="btn login_secondary_btn" onClick={handleEhbLogin} disabled={loading}>
             Aanmelden met je EhB-account
           </button>
 
         </form>
-
-        <p className="login_footer">Stagify · versie 1.0</p>
       </div>
     </div>
   );
