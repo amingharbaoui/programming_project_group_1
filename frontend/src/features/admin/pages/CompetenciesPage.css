@@ -258,7 +258,6 @@
 	background: var(--red-light);
 }
 
-/* ── Modal ─────────────────────────────────────────────────────────────────── */
 .modal_overlay {
   position: fixed;
   inset: 0;
@@ -361,4 +360,14 @@
 }
 .spin {
   animation: spin 0.7s linear infinite;
+}
+
+.s_concept {
+  background: var(--red-light);
+  color: var(--red);
+}
+
+.page_chip_actief {
+  background: var(--green-bg);
+  color: var(--green);
 }

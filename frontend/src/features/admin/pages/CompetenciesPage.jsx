@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import "./CompetenciesPage.css";
 import {
-  IconArchive,
   IconChecks,
   IconCopyPlus,
   IconEdit,
@@ -13,7 +12,7 @@ import {
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 
-function CompetentieModal({ initial, onClose, onSaved }) {
+function CompetentieModal({ initial, onClose, onSaved, maxVolgorde }) {
   const isEdit = Boolean(initial);
   const [form, setForm] = useState({
     code: initial?.code ?? "",
@@ -119,6 +118,7 @@ function CompetentieModal({ initial, onClose, onSaved }) {
                 type="number"
                 value={form.volgorde}
                 min="1"
+                max={maxVolgorde}
                 onChange={(e) => set("volgorde", e.target.value)}
                 placeholder="Optioneel"
               />
@@ -207,6 +207,50 @@ function VerwijderModal({ competentie, onClose, onDeleted }) {
   );
 }
 
+
+// ─── Modal: Nieuwe versie bevestigen ────────────────────────────────────────
+function NieuweVersieModal({ onClose, onConfirm, loading }) {
+  return (
+    <div className="modal_overlay" onClick={onClose}>
+      <div className="modal_box" onClick={(e) => e.stopPropagation()}>
+        <div className="modal_header">
+          <span className="modal_title">Nieuwe versie maken</span>
+          <button className="icon_btn" onClick={onClose} type="button">
+            <IconX size={16} stroke={1.8} />
+          </button>
+        </div>
+        <div className="modal_body">
+          <p style={{ margin: 0, fontSize: 13.5, color: "var(--dark)", lineHeight: 1.6 }}>
+            Het profiel wordt volledig gereset:
+          </p>
+          <ul style={{ margin: "10px 0 0", padding: "0 0 0 18px", fontSize: 13, color: "var(--sub)", lineHeight: 2 }}>
+            <li>De <strong>11 standaardcompetenties</strong> worden hersteld</li>
+            <li>Alle <strong>gewichten</strong> worden teruggezet naar de standaardwaarden</li>
+            <li>De status wordt teruggezet op <strong>concept</strong></li>
+          </ul>
+          <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--sub)", lineHeight: 1.6 }}>
+            Deze actie kan niet ongedaan worden gemaakt.
+          </p>
+        </div>
+        <div className="modal_footer">
+          <button className="btn" onClick={onClose} type="button" disabled={loading}>
+            Annuleren
+          </button>
+          <button
+            className="btn primary"
+            onClick={onConfirm}
+            disabled={loading}
+            type="button"
+          >
+            {loading ? <IconLoader2 size={16} stroke={1.8} className="spin" /> : <IconCopyPlus size={16} stroke={1.8} />}
+            Ja, reset alles
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function CompetenciesPage() {
   const { user } = useAuth();
 
@@ -214,11 +258,17 @@ export default function CompetenciesPage() {
   const [competenties, setCompetenties] = useState([]);
   const [localGewichten, setLocalGewichten] = useState({});
   const [loading, setLoading] = useState(true);
+  const [resetKey, setResetKey] = useState(0);
   const [error, setError] = useState("");
 
   const [publishLoading, setPublishLoading] = useState(false);
   const [publishError, setPublishError] = useState("");
   const [publishSuccess, setPublishSuccess] = useState("");
+
+  const [nieuweVersieLoading, setNieuweVersieLoading] = useState(false);
+  const [nieuweVersieError, setNieuweVersieError] = useState("");
+  const [nieuweVersieSuccess, setNieuweVersieSuccess] = useState("");
+  const [nieuweVersieModalOpen, setNieuweVersieModalOpen] = useState(false);
 
   // Modals
   const [toevoegenOpen, setToevoegenOpen] = useState(false);
@@ -229,7 +279,7 @@ export default function CompetenciesPage() {
     try {
       setLoading(true);
       setError("");
-      const res = await api.get("/competencies");
+      const res = await api.get("/competencies", { params: { _t: Date.now() } });
       const { profiel, competenties } = res.data.data;
       setProfiel(profiel);
       setCompetenties(competenties);
@@ -287,6 +337,34 @@ export default function CompetenciesPage() {
     }
   }
 
+  async function handleNieuweVersie() {
+    if (!profiel?.id) return;
+    setNieuweVersieModalOpen(false);
+    setNieuweVersieLoading(true);
+    setNieuweVersieError("");
+    setNieuweVersieSuccess("");
+    try {
+      // Reset gewichten naar standaardwaarden op de backend
+      await api.post(`/competencies/profiles/${profiel.id}/new-version`);
+      // Herlaad hetzelfde profiel — gewichten zijn nu gereset
+      const res = await api.get("/competencies", { params: { _t: Date.now() } });
+      const { profiel: nieuwProfiel, competenties: nieuweCompetenties } = res.data.data;
+      setProfiel(nieuwProfiel);
+      setCompetenties(nieuweCompetenties);
+      const weights = {};
+      nieuweCompetenties.forEach((c) => {
+        weights[c.id] = Number(c.gewicht_percentage);
+      });
+      setLocalGewichten(weights);
+      setResetKey((k) => k + 1);
+      setNieuweVersieSuccess("Gewichten gereset naar standaardwaarden.");
+    } catch (err) {
+      setNieuweVersieError(err.response?.data?.message || "Reset mislukt");
+    } finally {
+      setNieuweVersieLoading(false);
+    }
+  }
+
   const aantalActief = competenties.filter((c) => c.is_actief).length;
 
   return (
@@ -297,6 +375,7 @@ export default function CompetenciesPage() {
           initial={null}
           onClose={() => setToevoegenOpen(false)}
           onSaved={() => { setToevoegenOpen(false); fetchData(); }}
+          maxVolgorde={competenties.length + 1}
         />
       )}
       {bewerkTarget && (
@@ -304,6 +383,7 @@ export default function CompetenciesPage() {
           initial={bewerkTarget}
           onClose={() => setBewerkTarget(null)}
           onSaved={() => { setBewerkTarget(null); fetchData(); }}
+          maxVolgorde={competenties.length}
         />
       )}
       {verwijderTarget && (
@@ -314,12 +394,20 @@ export default function CompetenciesPage() {
         />
       )}
 
+      {nieuweVersieModalOpen && (
+        <NieuweVersieModal
+          onClose={() => setNieuweVersieModalOpen(false)}
+          onConfirm={handleNieuweVersie}
+          loading={nieuweVersieLoading}
+        />
+      )}
+
       <div className="competencies_page">
         <div className="competencies_main">
           {/* Hero */}
           <div className="card competencies_hero">
             <div className="competencies_hero_content">
-              <span className="page_chip">
+              <span className={profiel?.status === "actief" ? "page_chip page_chip_actief" : "page_chip"}>
                 {profiel?.status === "actief" ? "Actief profiel" : profiel?.status ?? "—"}
               </span>
               <h1>Competentieprofiel</h1>
@@ -333,13 +421,15 @@ export default function CompetenciesPage() {
             </div>
 
             <div className="competencies_hero_actions">
-              <button className="btn">
-                <IconCopyPlus size={18} stroke={1.8} />
+              <button
+                className="btn"
+                onClick={() => setNieuweVersieModalOpen(true)}
+                disabled={nieuweVersieLoading}
+              >
+                {nieuweVersieLoading
+                  ? <IconLoader2 size={18} stroke={1.8} className="spin" />
+                  : <IconCopyPlus size={18} stroke={1.8} />}
                 Nieuwe versie maken
-              </button>
-              <button className="btn">
-                <IconArchive size={18} stroke={1.8} />
-                Archiveren
               </button>
               <button
                 className="btn primary"
@@ -368,7 +458,7 @@ export default function CompetenciesPage() {
               <div className="kv">
                 <span className="k">Status</span>
                 <span className="v">
-                  <span className={`status ${profiel.status === "actief" ? "s_ok" : ""}`}>
+                  <span className={`status ${profiel.status === "actief" ? "s_ok" : profiel.status === "concept" ? "s_concept" : ""}`}>
                     {profiel.status.charAt(0).toUpperCase() + profiel.status.slice(1)}
                   </span>
                 </span>
@@ -398,7 +488,7 @@ export default function CompetenciesPage() {
               </button>
             </div>
 
-            <div className="competency_table">
+            <div className="competency_table" key={resetKey}>
               <div className="competency_table_head">
                 <span>#</span>
                 <span>Competentie</span>
@@ -493,17 +583,25 @@ export default function CompetenciesPage() {
 
           <div className="card actions_card">
             <div className="card_title">Snelle acties</div>
-            <button className="btn full_width">
-              <IconCopyPlus size={18} stroke={1.8} />
+            <button
+              className="btn full_width"
+              onClick={() => setNieuweVersieModalOpen(true)}
+              disabled={nieuweVersieLoading}
+            >
+              {nieuweVersieLoading
+                ? <IconLoader2 size={18} stroke={1.8} className="spin" />
+                : <IconCopyPlus size={18} stroke={1.8} />}
               Nieuwe versie maken
             </button>
-            <button className="btn full_width">
-              <IconArchive size={18} stroke={1.8} />
-              Dupliceren
-            </button>
-            <button className="btn full_width danger_outline">
-              <IconTrash size={18} stroke={1.8} />
-              Profiel archiveren
+            <button
+              className="btn primary full_width"
+              onClick={handlePublish}
+              disabled={publishLoading || !totaalOk}
+            >
+              {publishLoading
+                ? <IconLoader2 size={18} stroke={1.8} className="spin" />
+                : <IconChecks size={18} stroke={1.8} />}
+              Publiceren
             </button>
           </div>
         </aside>
