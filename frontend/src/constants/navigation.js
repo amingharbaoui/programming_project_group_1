@@ -26,6 +26,7 @@ export const NAVIGATION = {
     { label: "Evaluatie",  path: "/mentor/evaluation", icon: "ti-clipboard-check" },
     { label: "Contract",   path: "/mentor/contract",   icon: "ti-writing" },
     { label: "Afspraken",  path: "/mentor/afspraken",  icon: "ti-calendar" },
+    { label: "Planning",   path: "/mentor/planning",   icon: "ti-calendar-event" },
   ],
 
   [ROLES.DOCENT]: [
@@ -34,4 +35,3 @@ export const NAVIGATION = {
     { label: "Evaluaties", path: "/docent/evaluations", icon: "ti-clipboard-check" },
   ],
 };
-
