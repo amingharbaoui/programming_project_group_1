@@ -1,33 +1,58 @@
-import React from "react";
+import React, { useState } from "react";
 import "./LoginPage.css";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import logoWide from "../../assets/stageify-logo/stageify_logo_wide.png";
+
+// Accounts uit de database gekoppeld aan demo-gebruikers en routes
+const ACCOUNT_MAP = {
+  "student@ehb.be":    { userKey: "student",        route: "/student/internship" },
+  "student2@ehb.be":   { userKey: "student2",       route: "/student/internship" },
+  "student3@ehb.be":   { userKey: "student3",       route: "/student/internship" },
+  "student4@ehb.be":   { userKey: "student4",       route: "/student/internship" },
+  "commissie@ehb.be":  { userKey: "stagecommissie", route: "/committee/applications" },
+  "admin@ehb.be":      { userKey: "administratie",  route: "/admin/dossiers" },
+  "docent@ehb.be":     { userKey: "docent",         route: "/docent/students" },
+  "mentor@bedrijf.be": { userKey: "mentor",         route: "/mentor/students" },
+};
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { switchRole } = useAuth();
+  const [email, setEmail] = useState("");
+  const [fout, setFout] = useState(null);
 
-  // Na inloggen gaat de student naar zijn stage pagina
-  function handleLogin(e) {
-    e.preventDefault();
-    navigate("/student/internship");
+  function login(emailWaarde) {
+    const account = ACCOUNT_MAP[emailWaarde.toLowerCase().trim()];
+    if (!account) {
+      setFout("Onbekend e-mailadres. Gebruik een geldig demo-account.");
+      return false;
+    }
+    switchRole(account.userKey);
+    navigate(account.route);
+    return true;
   }
 
-  // EhB SSO knop doet hetzelfde voor nu
+  function handleLogin(e) {
+    e.preventDefault();
+    login(email);
+  }
+
   function handleEhbLogin() {
-    navigate("/student/internship");
+    login(email);
   }
 
   return (
     <div className="login_page">
       <div className="login_card">
 
-        {/* Logo en ondertitel */}
+        {/* Logo */}
         <div className="login_header">
           <div className="login_wrapper">
             <img
-                className="login_logo"
-                src={logoWide}
-                alt="Stageify logo"
+              className="login_logo"
+              src={logoWide}
+              alt="Stageify logo"
             />
           </div>
         </div>
@@ -45,6 +70,8 @@ export default function LoginPage() {
               type="email"
               className="form_input login_input"
               placeholder="voornaam.naam@student.ehb.be"
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setFout(null); }}
               required
             />
           </div>
@@ -63,6 +90,11 @@ export default function LoginPage() {
             />
           </div>
 
+          {/* Foutmelding */}
+          {fout && (
+            <p style={{ fontSize: 12.5, color: "var(--red)", margin: "0 0 8px" }}>{fout}</p>
+          )}
+
           {/* Aanmelden knop */}
           <button type="submit" className="btn primary login_btn">
             Aanmelden
@@ -72,7 +104,7 @@ export default function LoginPage() {
             <span>of</span>
           </div>
 
-          {/* EhB SSO knop - wordt later gekoppeld aan de echte SSO */}
+          {/* EhB SSO knop */}
           <button type="button" className="btn login_secondary_btn" onClick={handleEhbLogin}>
             Aanmelden met je EhB-account
           </button>
