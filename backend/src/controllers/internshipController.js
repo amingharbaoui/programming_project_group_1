@@ -779,173 +779,29 @@ async function getAdminDossierById(req, res) {
 
   try {
     const [rows] = await db.query(
-      `
-      SELECT
-        d.id,
-        d.dossiernummer,
-        d.status,
-        d.opleiding,
-        d.academiejaar,
-        d.startdatum,
-        d.einddatum,
-        d.aantal_weken,
-        d.uren_per_week,
-        d.totaal_uren,
-        d.verzekering_in_orde,
-        d.praktische_afspraken,
-        d.praktische_afspraken_gedeeld_op,
-        d.eindresultaat,
-
-        sp.id AS stagevoorstel_id,
-        sp.status AS stagevoorstel_status,
-
-        sg.voornaam AS student_voornaam,
-        sg.achternaam AS student_achternaam,
-        sg.email AS student_email,
-        s.studentennummer,
-
-        b.naam AS bedrijf_naam,
-        b.afdeling AS bedrijf_afdeling,
-        b.adres AS bedrijf_adres,
-        b.postcode AS bedrijf_postcode,
-        b.stad AS bedrijf_stad,
-        b.email AS bedrijf_email,
-        b.telefoon AS bedrijf_telefoon,
-
-        mg.voornaam AS mentor_voornaam,
-        mg.achternaam AS mentor_achternaam,
-        mg.email AS mentor_email,
-
-        dg.voornaam AS docent_voornaam,
-        dg.achternaam AS docent_achternaam,
-        dg.email AS docent_email
-      FROM stagedossiers d
-      JOIN stagevoorstellen sp ON sp.id = d.stagevoorstel_id
-      JOIN studenten s ON s.gebruiker_id = d.student_id
-      JOIN gebruikers sg ON sg.id = s.gebruiker_id
-      JOIN bedrijven b ON b.id = d.bedrijf_id
-      LEFT JOIN gebruikers mg ON mg.id = d.mentor_id
-      JOIN gebruikers dg ON dg.id = d.stagebegeleider_id
-      WHERE d.id = ?
-      LIMIT 1
-      `,
+      `SELECT * FROM stagedossiers WHERE id = ? LIMIT 1`,
       [dossierId]
     );
-
-    if (rows.length === 0) {
-      return fail(res, 404, "Dossier niet gevonden");
-    }
-
-    const [documents] = await db.query(
-      `
-      SELECT
-        doc.id,
-        doc.status,
-        doc.versie_nummer,
-        doc.bestand_naam,
-        doc.opgeladen_op,
-        doc.gecontroleerd_op,
-        doc.afkeurreden,
-        ds.naam,
-        ds.type,
-        ds.is_verplicht
-      FROM documenten doc
-      JOIN document_soorten ds ON ds.id = doc.document_soort_id
-      WHERE doc.stagedossier_id = ?
-      ORDER BY ds.is_verplicht DESC, ds.id ASC
-      `,
-      [dossierId]
-    );
-
-    const [agreements] = await db.query(
-      `
-      SELECT
-        id,
-        status,
-        versie_nummer,
-        student_getekend_op,
-        bedrijf_getekend_op,
-        opleiding_getekend_op,
-        gecontroleerd_op,
-        geregistreerd_op,
-        afkeurreden
-      FROM stageovereenkomsten
-      WHERE stagedossier_id = ?
-      LIMIT 1
-      `,
-      [dossierId]
-    );
-
-    return ok(
-      res,
-      {
-        ...rows[0],
-        stageovereenkomst: agreements[0] || null,
-        documenten: documents
-      },
-      "Admin dossier detail opgehaald"
-    );
+    return ok(res, rows[0] || null, "Dossier opgehaald");
   } catch (error) {
-    return fail(res, 500, "Dossier detail ophalen mislukt", error.message);
+    return fail(res, 500, "Dossier ophalen mislukt", error.message);
   }
 }
 
+
+
 async function updateAdminDossierStatus(req, res) {
   const dossierId = Number(req.params.id);
-  const { status, verzekeringInOrde, praktischeAfspraken } = req.body;
-
-  const allowedStatuses = [
-    "contract_pending",
-    "documents_pending",
-    "active",
-    "completed"
-  ];
-
-  if (!allowedStatuses.includes(status)) {
-    return fail(res, 400, "Ongeldige dossierstatus");
-  }
-
+  const { status } = req.body;
+  if (!status) return fail(res, 400, "Status is verplicht");
   try {
-    const [existing] = await db.query(
-      "SELECT id FROM stagedossiers WHERE id = ? LIMIT 1",
-      [dossierId]
-    );
-
-    if (existing.length === 0) {
-      return fail(res, 404, "Dossier niet gevonden");
-    }
-
     await db.query(
-      `
-      UPDATE stagedossiers
-      SET status = ?,
-          verzekering_in_orde = COALESCE(?, verzekering_in_orde),
-          praktische_afspraken = COALESCE(?, praktische_afspraken),
-          praktische_afspraken_gedeeld_op =
-            CASE 
-              WHEN ? IS NOT NULL THEN NOW()
-              ELSE praktische_afspraken_gedeeld_op
-            END,
-          aangepast_op = NOW()
-      WHERE id = ?
-      `,
-      [
-        status,
-        typeof verzekeringInOrde === "boolean" ? verzekeringInOrde : null,
-        praktischeAfspraken || null,
-        praktischeAfspraken || null,
-        dossierId
-      ]
+      "UPDATE stagedossiers SET status = ?, aangepast_op = NOW() WHERE id = ?",
+      [status, dossierId]
     );
-
-    const [rows] = await db.query(
-      "SELECT id, dossiernummer, status, verzekering_in_orde, praktische_afspraken FROM stagedossiers WHERE id = ?",
-      [dossierId]
-    );
-
-    return ok(res, rows[0], "Dossierstatus aangepast");
+    return ok(res, null, "Status bijgewerkt");
   } catch (error) {
-    return fail(res, 500, "Dossierstatus aanpassen mislukt", error.message);
+    return fail(res, 500, "Status bijwerken mislukt", error.message);
   }
 }
 
@@ -956,5 +812,5 @@ module.exports = {
   decideApplication,
   getAdminDossiers,
   getAdminDossierById,
-  updateAdminDossierStatus
+  updateAdminDossierStatus,
 };

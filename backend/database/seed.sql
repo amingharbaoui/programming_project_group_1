@@ -62,3 +62,21 @@ VALUES
 (2, 'Verzekeringsbewijs', 'verzekeringsbewijs', true, true, 'Toegepaste Informatica', '2025-2026', 'actief', 3, NOW(), NOW()),
 (3, 'Stageplan', 'stageplan', true, true, 'Toegepaste Informatica', '2025-2026', 'actief', 3, NOW(), NOW()),
 (4, 'Eindoverzicht', 'eindoverzicht', false, true, 'Toegepaste Informatica', '2025-2026', 'actief', 3, NOW(), NOW());
+
+-- Demo stagevoorstel + stagedossier (student 1, mentor 5, docent 3, bedrijf 1)
+INSERT INTO stagevoorstellen
+(id, student_id, bedrijf_id, stage_regel_id, voorlopige_stagebegeleider_id, status, huidige_versie_nummer, ingediend_op, goedgekeurd_op, aangemaakt_op, aangepast_op)
+VALUES
+(1, 1, 1, 1, 3, 'goedgekeurd', 1, NOW(), NOW(), NOW(), NOW());
+
+INSERT INTO stagedossiers
+(id, dossiernummer, stagevoorstel_id, student_id, bedrijf_id, stagebegeleider_id, mentor_id, status, opleiding, academiejaar, startdatum, einddatum, aantal_weken, uren_per_week, totaal_uren, aangemaakt_op, aangepast_op)
+VALUES
+(1, 'D-2026-0001', 1, 1, 1, 3, 5, 'stage_loopt', 'Toegepaste Informatica', '2025-2026', '2026-02-09', '2026-06-27', 13, 38, 494, NOW(), NOW());
+
+-- Demo planning_momenten: bedrijfsbezoek te bevestigen door mentor
+INSERT INTO planning_momenten
+(stagedossier_id, type, status, gepland_op, locatie, voorgesteld_door_id, aangemaakt_op, aangepast_op)
+VALUES
+(1, 'bedrijfsbezoek', 'voorgesteld', '2026-06-25 10:00:00', 'CodeLab Brussels — Nijverheidsstraat 10, 1000 Brussel', 3, NOW(), NOW()),
+(1, 'tussentijdse_bespreking', 'bevestigd', '2026-05-14 14:00:00', 'Online (Teams)', 3, NOW(), NOW());

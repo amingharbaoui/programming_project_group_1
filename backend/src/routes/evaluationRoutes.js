@@ -8,14 +8,10 @@ router.use(authenticateDemoUser);
 // Admin/docent opent een evaluatiemoment voor een dossier.
 router.post("/open", requireRole("administratie", "docent"), openEvaluation);
 
-// Scores + motivatie per competentie opslaan/indienen (eigen rol).
-router.post("/:evaluationId/scores", requireRole("student", "mentor", "docent"), saveScores);
-
-// Docent berekent/registreert het resultaat en geeft het vrij.
-router.post("/:evaluationId/calculate", requireRole("docent", "administratie"), calculateResult);
-router.post("/:evaluationId/release", requireRole("docent", "administratie"), releaseResult);
-
-// Lezen door de betrokken rollen.
-router.get("/:studentId", requireRole("student", "mentor", "docent", "administratie"), getEvaluationsForStudent);
+// Scores + motivaties opslaan (mentor of docent)
+router.get("/student/:studentId", getEvaluationsForStudent);
+router.patch("/:id/scores", saveScores);
+router.patch("/:id/calculate", requireRole("administratie", "docent"), calculateResult);
+router.patch("/:id/release", requireRole("administratie", "docent"), releaseResult);
 
 module.exports = router;
