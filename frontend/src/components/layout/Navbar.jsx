@@ -84,6 +84,8 @@ export default function Navbar({ onToggle }) {
               </div>
             </div>
             <div className="profiel-divider" />
+            <div className="profiel-versie">Stagify · versie 1.0</div>
+            <div className="profiel-divider" />
             <button className="profiel-logout" onClick={handleLogout}>
               <i className="ti ti-logout"></i>
               Uitloggen
