@@ -2,9 +2,10 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../../../services/api";
 import "./StageApplicationPage.css";
+import Modal from "../../../components/ui/Modal";
 import {
   IconBuilding, IconUserCheck, IconClipboardText, IconCalendar,
-  IconCircleCheck, IconArrowRight, IconDeviceFloppy, IconSend,
+  IconCircleCheck, IconDeviceFloppy, IconSend,
   IconChecklist, IconInfoCircle,
 } from "@tabler/icons-react";
 
@@ -12,10 +13,11 @@ export default function StageApplicationPage() {
   const navigate = useNavigate();
   const [error, setError]       = useState(null);
   const [submitted, setSubmitted] = useState(false);
-  const [conceptOpgeslagen, setConceptOpgeslagen] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
   const [heeftConcept, setHeeftConcept] = useState(false);
   const [huidigStatus, setHuidigStatus] = useState(null);
+  // Modal state: null = gesloten, object = { icon, titel, sub, body, onSluit }
+  const [modal, setModal] = useState(null);
 
   const [form, setForm] = useState({
     bedrijfNaam: "",
@@ -63,14 +65,12 @@ export default function StageApplicationPage() {
 
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
-    setConceptOpgeslagen(false);
   }
 
   async function handleSaveDraft(e) {
     e.preventDefault();
     setSavingDraft(true);
     setError(null);
-    setConceptOpgeslagen(false);
     try {
       await apiRequest("POST", "/internships/draft", {
         bedrijfNaam:          form.bedrijfNaam,
@@ -84,8 +84,13 @@ export default function StageApplicationPage() {
         einddatum:            form.eindDatum,
         urenPerWeek:          38,
       });
-      setConceptOpgeslagen(true);
       setHeeftConcept(true);
+      setModal({
+        icon:  "ti-device-floppy",
+        titel: "Concept opgeslagen",
+        sub:   "Je kan later verder werken.",
+        body:  "Je gegevens zijn veilig bewaard. Kom terug wanneer je klaar bent om in te dienen.",
+      });
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Concept opslaan mislukt");
     } finally {
@@ -112,35 +117,20 @@ export default function StageApplicationPage() {
         urenPerWeek:          38,
       });
       setSubmitted(true);
+      setModal({
+        icon:  "ti-send",
+        titel: isHerindienen ? "Aangepast voorstel heringediend" : "Stagevoorstel ingediend",
+        sub:   "Je krijgt een melding na de beoordeling.",
+        body:  "Je stagevoorstel is klaar voor verwerking. De commissie bekijkt het voorstel en contacteert je zodra er een beslissing is.",
+        navigeerNa: true,
+      });
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Stagevoorstel indienen mislukt");
     }
   }
 
-  if (submitted) {
-    return (
-      <div className="page-inner">
-        <div className="page-header">
-          <h1>Stagevoorstel</h1>
-        </div>
-        <div className="card succes-card">
-          <div className="card_title">
-            <IconCircleCheck size={16} />
-            Stagevoorstel ingediend
-          </div>
-          <p>Je stagevoorstel is klaar voor verwerking. Je krijgt een melding na de beoordeling.</p>
-          <div className="actions">
-            <button className="btn primary" onClick={() => navigate("/student/internship", { state: { ingediend: true } })}>
-              <IconArrowRight size={16} />
-              Naar mijn stage
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
+    <>
     <div className="page-inner">
 
       <div className="page-header">
@@ -148,7 +138,7 @@ export default function StageApplicationPage() {
         <p>Vul alles in — je kan tussentijds opslaan als concept</p>
       </div>
 
-      {heeftConcept && !conceptOpgeslagen && (
+      {heeftConcept && (
         <div className="card" style={{ marginBottom: 0 }}>
           <div className="card_title" style={{ color: "var(--blue)" }}>
             <IconInfoCircle size={16} style={{ color: "var(--blue)" }} />
@@ -156,18 +146,6 @@ export default function StageApplicationPage() {
           </div>
           <p style={{ fontSize: 13, color: "var(--sub)" }}>
             Je eerder opgeslagen concept is ingevuld. Pas aan en dien in wanneer klaar.
-          </p>
-        </div>
-      )}
-
-      {conceptOpgeslagen && (
-        <div className="card" style={{ marginBottom: 0 }}>
-          <div className="card_title" style={{ color: "var(--green)" }}>
-            <IconCircleCheck size={16} style={{ color: "var(--green)" }} />
-            Concept opgeslagen
-          </div>
-          <p style={{ fontSize: 13, color: "var(--sub)" }}>
-            Je gegevens zijn bewaard. Je kan later verder werken.
           </p>
         </div>
       )}
@@ -299,5 +277,33 @@ export default function StageApplicationPage() {
       </div>
 
     </div>
+
+    {/* Modal: concept opgeslagen / ingediend / heringediend */}
+    {modal && (
+      <Modal
+        open={true}
+        onClose={() => {
+          if (modal.navigeerNa) navigate("/student/internship", { state: { ingediend: true } });
+          setModal(null);
+        }}
+        icon={modal.icon}
+        titel={modal.titel}
+        sub={modal.sub}
+        footer={
+          <button
+            className="btn primary"
+            onClick={() => {
+              if (modal.navigeerNa) navigate("/student/internship", { state: { ingediend: true } });
+              setModal(null);
+            }}
+          >
+            <i className="ti ti-check"></i> Begrepen
+          </button>
+        }
+      >
+        <p>{modal.body}</p>
+      </Modal>
+    )}
+    </>
   );
 }
