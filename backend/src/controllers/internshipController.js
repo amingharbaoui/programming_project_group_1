@@ -595,6 +595,7 @@ async function getMyInternship(req, res) {
         sp.heringediend_op,
         sp.goedgekeurd_op,
         sp.afgekeurd_op,
+        d.status AS dossier_status,
 
         v.id AS versie_id,
         v.bedrijf_naam,
@@ -628,6 +629,7 @@ async function getMyInternship(req, res) {
           ORDER BY vb.beslist_op DESC
           LIMIT 1
         )
+      LEFT JOIN stagedossiers d ON d.stagevoorstel_id = sp.id
       WHERE sp.student_id = ?
       ORDER BY sp.aangemaakt_op DESC
       LIMIT 1

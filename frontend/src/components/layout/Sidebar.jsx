@@ -8,37 +8,14 @@ import ehbLogoSmall from "../../assets/ehb-logo/erasmus_logo_black.png";
 import { NAVIGATION } from "../../constants/navigation";
 import { useAuth } from "../../context/AuthContext";
 import { apiRequest } from "../../services/api";
+import { fetchStudentAccess, STUDENT_PATH_KEYS } from "../../features/student/studentAccess";
 
-// Statuses waarbij stageovereenkomst + documenten ontgrendeld zijn
-const UNLOCK_CONTRACT_DOCS = ["goedgekeurd"];
-
-// Fase-info per voorstel status
-const FASE_MAP = {
-  geen:          { idx: 1, naam: "Voorstel",      actie: "Dien je stagevoorstel in om te starten." },
-  concept:       { idx: 1, naam: "Voorstel",      actie: "Je concept staat klaar — werk het af en dien in." },
-  ingediend:     { idx: 2, naam: "Beoordeling",   actie: "Beslissing volgt op de commissievergadering." },
-  aanpassingen:  { idx: 2, naam: "Beoordeling",   actie: "De commissie vraagt aanpassingen. Dien opnieuw in." },
-  heringediend:  { idx: 2, naam: "Beoordeling",   actie: "Je aangepast voorstel is heringediend." },
-  afgekeurd:     { idx: 2, naam: "Beoordeling",   actie: "Je stagevoorstel werd afgekeurd." },
-  ingetrokken:   { idx: 1, naam: "Voorstel",      actie: "Je stagevoorstel werd ingetrokken." },
-  goedgekeurd:   { idx: 3, naam: "Overeenkomst",  actie: "Onderteken je stageovereenkomst digitaal." },
-  teruggestuurd: { idx: 3, naam: "Overeenkomst",  actie: "Het stagebedrijf werd uitgenodigd om te tekenen." },
-  validatie:     { idx: 3, naam: "Overeenkomst",  actie: "De overeenkomst is in controle bij de administratie." },
-  startklaar:    { idx: 4, naam: "Stage",          actie: "Je stage start binnenkort — logboek opent dan." },
-  gestart:       { idx: 4, naam: "Stage loopt",   actie: "Vul je logboek van vandaag in." },
-  lopend:        { idx: 4, naam: "Stage loopt",   actie: "Logboek van vandaag nog niet ingevuld." },
-  presentatie:   { idx: 4, naam: "Evaluatie",     actie: "Bereid je eindpresentatie voor." },
-  afgerond:      { idx: 5, naam: "Afgerond",      actie: "Je eindresultaat staat klaar bij Evaluatie." },
-};
-
-// Statuses waarbij het nav-item een warn-cirkel krijgt
-const WARN_STATUS = {
-  aanpassingen:  ["/student/application"],
-  afgekeurd:     ["/student/application"],
-  ingetrokken:   ["/student/application"],
-  goedgekeurd:   ["/student/contract", "/student/documents"],
-  teruggestuurd: ["/student/documents"],
-  validatie:     ["/student/documents"],
+const STUDENT_KEY_PATHS = {
+  stage: "/student/internship",
+  overeenkomst: "/student/contract",
+  documenten: "/student/documents",
+  logboek: "/student/logbook",
+  evaluatie: "/student/evaluation",
 };
 
 // Wanneer de stage loopt, zakken overeenkomst + documenten naar "Afgehandeld"
@@ -46,66 +23,90 @@ const AFGEHANDELD_STATUS = new Set([
   "startklaar", "gestart", "lopend", "presentatie", "afgerond",
 ]);
 const AFGEHANDELD_PATHS = new Set(["/student/contract", "/student/documents"]);
+const VERBORGEN_DOCUMENT_TYPES = new Set(["reflectiebijlage", "eindoverzicht"]);
+const DOCUMENT_ACTIE_STATUSSEN = new Set(["ontbreekt", "afgekeurd"]);
+
+function normaliseerDocumentType(waarde) {
+  return String(waarde ?? "").toLowerCase();
+}
+
+function heeftDocumentActieNodig(soorten = [], documenten = []) {
+  const verplichteUploadSoorten = soorten.filter((soort) => {
+    const type = normaliseerDocumentType(soort.type);
+    const naam = normaliseerDocumentType(soort.naam);
+    return type !== "stageovereenkomst" &&
+      !VERBORGEN_DOCUMENT_TYPES.has(type) &&
+      !VERBORGEN_DOCUMENT_TYPES.has(naam);
+  });
+
+  return verplichteUploadSoorten.some((soort) => {
+    const actief = documenten
+      .filter((doc) => doc.document_soort_id === soort.id)
+      .sort((a, b) => (b.versie_nummer ?? 0) - (a.versie_nummer ?? 0))[0];
+
+    return !actief || DOCUMENT_ACTIE_STATUSSEN.has(actief.status);
+  });
+}
 
 export default function Sidebar({ collapsed }) {
   const { user } = useAuth();
   const items = NAVIGATION[user.role] || [];
 
-  const [lockedGroups, setLockedGroups]   = useState(new Set());
+  const [lockedGroups, setLockedGroups]   = useState(new Set(["contract_docs", "logboek_eval"]));
   const [faseInfo, setFaseInfo]           = useState(null);
+  const [openPaths, setOpenPaths]         = useState(null);
   const [warnPaths, setWarnPaths]         = useState(new Set());
-  const [voorstelStatus, setVoorstelStatus] = useState(null);
+  const [dotPaths, setDotPaths]           = useState(new Set());
+  const [faseStatus, setFaseStatus]       = useState(null);
 
   useEffect(() => {
     if (user.role !== "student") return;
 
     async function fetchLockState() {
-      const locked = new Set([]);
+      const locked = new Set(["contract_docs", "logboek_eval"]);
+      const access = await fetchStudentAccess();
+      const nextOpenPaths = new Set(
+        Object.entries(STUDENT_PATH_KEYS)
+          .filter(([, key]) => access.open.includes(key))
+          .map(([path]) => path)
+      );
+      const warn = new Set(
+        (access.warn ?? [])
+          .filter((key) => key !== "documenten")
+          .map((key) => STUDENT_KEY_PATHS[key])
+          .filter(Boolean)
+      );
 
-      const [internshipRes, contractRes] = await Promise.allSettled([
-        apiRequest("GET", "/internships/my"),
-        apiRequest("GET", "/contracts/my"),
-      ]);
-
-      if (internshipRes.status === "fulfilled") {
-        const voorstel = internshipRes.value?.data;
-        const status = voorstel?.status ?? "geen";
-
-        setVoorstelStatus(status);
-
-        if (voorstel && UNLOCK_CONTRACT_DOCS.includes(status)) {
-          locked.delete("contract_docs");
-        }
-
-        // Fase-info voor side-status blok
-        setFaseInfo(FASE_MAP[status] ?? FASE_MAP.geen);
-
-        // Warn-cirkels op basis van internship-status
-        const warn = new Set(WARN_STATUS[status] ?? []);
-
-        // Contract-warn alleen tonen als student nog niet getekend heeft
-        if (contractRes.status === "fulfilled") {
-          const contract = contractRes.value?.data;
-          if (!contract || contract.status !== "klaar_voor_student") {
-            warn.delete("/student/contract");
-          }
-          // Unlock logboek + evaluatie als alle 3 partijen getekend hebben
-          if (
-            contract &&
-            contract.student_getekend_op &&
-            contract.bedrijf_getekend_op &&
-            contract.opleiding_getekend_op
-          ) {
-            locked.delete("contract_docs");
-            locked.delete("logboek_eval");
-          }
-        }
-        setWarnPaths(warn);
-      } else {
-        setFaseInfo(FASE_MAP.geen);
-        setVoorstelStatus("geen");
+      if (access.open.includes("overeenkomst") && access.open.includes("documenten")) {
+        locked.delete("contract_docs");
+      }
+      if (access.open.includes("logboek") && access.open.includes("evaluatie")) {
+        locked.delete("logboek_eval");
+      }
+      if (access.dot && STUDENT_KEY_PATHS[access.dot]) {
+        warn.delete(STUDENT_KEY_PATHS[access.dot]);
       }
 
+      if (access.open.includes("documenten")) {
+        const [docsRes, soortenRes] = await Promise.allSettled([
+          apiRequest("GET", "/documents/my"),
+          apiRequest("GET", "/documents/soorten"),
+        ]);
+
+        if (
+          docsRes.status === "fulfilled" &&
+          soortenRes.status === "fulfilled" &&
+          heeftDocumentActieNodig(soortenRes.value?.data ?? [], docsRes.value?.data ?? [])
+        ) {
+          warn.add("/student/documents");
+        }
+      }
+
+      setFaseStatus(access.key);
+      setFaseInfo({ idx: access.faseIdx, naam: access.fase, actie: access.actie });
+      setOpenPaths(nextOpenPaths);
+      setWarnPaths(warn);
+      setDotPaths(access.dot && STUDENT_KEY_PATHS[access.dot] ? new Set([STUDENT_KEY_PATHS[access.dot]]) : new Set());
       setLockedGroups(locked);
     }
 
@@ -115,8 +116,8 @@ export default function Sidebar({ collapsed }) {
   // Bepaal welke items naar "Afgehandeld" zakken
   const isAfgehandeld =
     user.role === "student" &&
-    !!voorstelStatus &&
-    AFGEHANDELD_STATUS.has(voorstelStatus);
+    !!faseStatus &&
+    AFGEHANDELD_STATUS.has(faseStatus);
 
   const hoofdItems = items.filter(
     (item) => !isAfgehandeld || !AFGEHANDELD_PATHS.has(item.path)
@@ -127,8 +128,12 @@ export default function Sidebar({ collapsed }) {
 
   // Helper: render één nav-item (link of locked)
   function renderNavItem(item) {
-    const isLocked = item.lockGroup && lockedGroups.has(item.lockGroup);
+    const studentKey = STUDENT_PATH_KEYS[item.path];
+    const isLocked = user.role === "student" && studentKey && openPaths
+      ? !openPaths.has(item.path)
+      : item.lockGroup && lockedGroups.has(item.lockGroup);
     const hasWarn  = warnPaths.has(item.path);
+    const hasDot   = dotPaths.has(item.path);
 
     if (isLocked) {
       return (
@@ -157,6 +162,7 @@ export default function Sidebar({ collapsed }) {
         <i className={`ti ${item.icon}`}></i>
         <span className="label">{item.label}</span>
         {hasWarn && <span className="nav-warn">!</span>}
+        {!hasWarn && hasDot && <span className="nav-dot"></span>}
       </NavLink>
     );
   }

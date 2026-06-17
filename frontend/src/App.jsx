@@ -1,7 +1,13 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
+import { useEffect, useState } from "react";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import AppLayout from "./components/layout/AppLayout";
 import LoginPage from "./components/layout/LoginPage.jsx";
+import {
+  fetchStudentAccess,
+  getStudentRouteLock,
+  isStudentRouteOpen,
+} from "./features/student/studentAccess";
 
 import StageApplicationPage from "./features/student/pages/StageApplicationPage";
 import MyInternshipPage from "./features/student/pages/MyInternshipPage";
@@ -26,6 +32,67 @@ import DocentStudentsPage from "./features/docent/pages/DocentStudentsPage";
 import DocentLogbooksPage from "./features/docent/pages/DocentLogbooksPage";
 import DocentEvaluationsPage from "./features/docent/pages/DocentEvaluationsPage";
 
+function StudentFaseGuard({ path, children }) {
+  const { user } = useAuth();
+  const [state, setState] = useState({
+    loading: true,
+    toegestaan: false,
+    lock: {
+      titel: "Nog niet beschikbaar",
+      uitleg: "Dit onderdeel is nog niet beschikbaar in deze fase.",
+    },
+  });
+
+  useEffect(() => {
+    let actief = true;
+
+    async function controleerToegang() {
+      if (user.role !== "student") {
+        if (actief) setState((vorige) => ({ ...vorige, loading: false, toegestaan: true }));
+        return;
+      }
+
+      const access = await fetchStudentAccess();
+      if (!actief) return;
+      const toegestaan = isStudentRouteOpen(access, path);
+      setState({
+        loading: false,
+        toegestaan,
+        lock: getStudentRouteLock(access, path),
+      });
+    }
+
+    controleerToegang();
+    return () => { actief = false; };
+  }, [path, user.id, user.role]);
+
+  if (state.loading) {
+    return (
+      <div className="page-inner">
+        <div className="page-header"><h1>Laden...</h1></div>
+        <div className="card"><p style={{ fontSize: 13, color: "var(--sub)" }}>Toegang controleren...</p></div>
+      </div>
+    );
+  }
+
+  if (!state.toegestaan) {
+    return (
+      <div className="page-inner">
+        <div className="page-header"><h1>{state.lock.titel}</h1></div>
+        <div className="card">
+          <div className="card_title" style={{ color: "var(--red)" }}>
+            <i className="ti ti-lock"></i>
+            Nog niet beschikbaar
+          </div>
+          <p style={{ fontSize: 13, color: "var(--sub)" }}>{state.lock.uitleg}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return children;
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -35,13 +102,13 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/" element={<Navigate to="/login" replace />} />
           <Route element={<AppLayout />}>
-           <Route path="/student" element={<MyInternshipPage />} />
+            <Route path="/student" element={<MyInternshipPage />} />
             <Route path="/student/application" element={<StageApplicationPage />} />
             <Route path="/student/internship" element={<MyInternshipPage />} />
-            <Route path="/student/logbook" element={<StudentLogbookPage />} />
-            <Route path="/student/evaluation" element={<StudentEvaluationPage />} />
-            <Route path="/student/contract" element={<StudentContractPage />} />
-            <Route path="/student/documents" element={<StudentDocumentsPage />} />
+            <Route path="/student/logbook" element={<StudentFaseGuard path="/student/logbook"><StudentLogbookPage /></StudentFaseGuard>} />
+            <Route path="/student/evaluation" element={<StudentFaseGuard path="/student/evaluation"><StudentEvaluationPage /></StudentFaseGuard>} />
+            <Route path="/student/contract" element={<StudentFaseGuard path="/student/contract"><StudentContractPage /></StudentFaseGuard>} />
+            <Route path="/student/documents" element={<StudentFaseGuard path="/student/documents"><StudentDocumentsPage /></StudentFaseGuard>} />
 
             <Route path="/committee" element={<Navigate to="/committee/applications" replace />} />
             <Route path="/committee/applications" element={<ApplicationsPage />} />
