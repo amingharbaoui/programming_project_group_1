@@ -3,6 +3,7 @@ const {
   listCompetencies,
   createCompetency,
   updateCompetency,
+  deleteCompetency,
   publishProfile
 } = require("../controllers/competencyController");
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
@@ -11,12 +12,13 @@ const router = express.Router();
 
 router.use(authenticateDemoUser);
 
-// Lezen mag elke ingelogde rol
+// Lezen mag elke ingelogde rol (nodig voor de evaluatie-matrix van student/mentor/docent).
 router.get("/", listCompetencies);
 
-// Beheer — alleen admin/docent
-router.post("/", requireRole("administratie", "docent"), createCompetency);
-router.patch("/:id", requireRole("administratie", "docent"), updateCompetency);
-router.patch("/profile/:id/publish", requireRole("administratie", "docent"), publishProfile);
+// Beheer enkel voor administratie.
+router.post("/", requireRole("administratie"), createCompetency);
+router.patch("/profiles/:id/publish", requireRole("administratie"), publishProfile);
+router.patch("/:id", requireRole("administratie"), updateCompetency);
+router.delete("/:id", requireRole("administratie"), deleteCompetency);
 
 module.exports = router;

@@ -1,16 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../../../services/api";
 import "./StageApplicationPage.css";
 import {
   IconBuilding, IconUserCheck, IconClipboardText, IconCalendar,
-  IconCircleCheck, IconArrowRight, IconDeviceFloppy, IconSend, IconChecklist
+  IconCircleCheck, IconArrowRight, IconDeviceFloppy, IconSend,
+  IconChecklist, IconInfoCircle,
 } from "@tabler/icons-react";
 
 export default function StageApplicationPage() {
   const navigate = useNavigate();
-  const [error, setError] = useState(null);
+  const [error, setError]       = useState(null);
   const [submitted, setSubmitted] = useState(false);
+  const [conceptOpgeslagen, setConceptOpgeslagen] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
+  const [heeftConcept, setHeeftConcept] = useState(false);
+  const [huidigStatus, setHuidigStatus] = useState(null);
 
   const [form, setForm] = useState({
     bedrijfNaam: "",
@@ -24,42 +29,101 @@ export default function StageApplicationPage() {
     opdrachtOmschrijving: "",
   });
 
+  // Laad bestaand concept of aanpassingen-voorstel bij openen
+  useEffect(() => {
+    async function laadBestaand() {
+      try {
+        const res = await apiRequest("GET", "/internships/my");
+        const data = res.data;
+        if (!data) return;
+
+        const laadbaar = ["concept", "aanpassingen_gevraagd"];
+        if (!laadbaar.includes(data.status)) return;
+
+        setHuidigStatus(data.status);
+        if (data.status === "concept") setHeeftConcept(true);
+
+        setForm({
+          bedrijfNaam:           data.bedrijf_naam        || "",
+          bedrijfAdres:          data.bedrijfsadres       || "",
+          mentorNaam:            data.mentor_naam         || "",
+          mentorEmail:           data.mentor_email        || "",
+          mentorFunctie:         data.mentor_functie      || "",
+          startDatum:            data.startdatum ? data.startdatum.slice(0, 10) : "",
+          eindDatum:             data.einddatum  ? data.einddatum.slice(0, 10)  : "",
+          opdrachtTitel:         data.stagefunctie        || "",
+          opdrachtOmschrijving:  data.opdrachtomschrijving || "",
+        });
+      } catch {
+        // geen voorstel gevonden — lege form is ok
+      }
+    }
+    laadBestaand();
+  }, []);
+
   function handleChange(e) {
     setForm({ ...form, [e.target.name]: e.target.value });
+    setConceptOpgeslagen(false);
+  }
+
+  async function handleSaveDraft(e) {
+    e.preventDefault();
+    setSavingDraft(true);
+    setError(null);
+    setConceptOpgeslagen(false);
+    try {
+      await apiRequest("POST", "/internships/draft", {
+        bedrijfNaam:          form.bedrijfNaam,
+        bedrijfsadres:        form.bedrijfAdres,
+        mentorNaam:           form.mentorNaam,
+        mentorEmail:          form.mentorEmail,
+        mentorFunctie:        form.mentorFunctie,
+        stagefunctie:         form.opdrachtTitel,
+        opdrachtomschrijving: form.opdrachtOmschrijving,
+        startdatum:           form.startDatum,
+        einddatum:            form.eindDatum,
+        urenPerWeek:          38,
+      });
+      setConceptOpgeslagen(true);
+      setHeeftConcept(true);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || "Concept opslaan mislukt");
+    } finally {
+      setSavingDraft(false);
+    }
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
-
+    const isHerindienen = huidigStatus === "aanpassingen_gevraagd";
+    const endpoint = isHerindienen ? "/internships/my/herindienen" : "/internships";
     try {
-      await apiRequest("POST", "/internships", {
-        bedrijfNaam: form.bedrijfNaam,
-        bedrijfsadres: form.bedrijfAdres,
-        mentorNaam: form.mentorNaam,
-        mentorEmail: form.mentorEmail,
-        mentorFunctie: form.mentorFunctie,
-        stagefunctie: form.opdrachtTitel,
+      await apiRequest("POST", endpoint, {
+        bedrijfNaam:          form.bedrijfNaam,
+        bedrijfsadres:        form.bedrijfAdres,
+        mentorNaam:           form.mentorNaam,
+        mentorEmail:          form.mentorEmail,
+        mentorFunctie:        form.mentorFunctie,
+        stagefunctie:         form.opdrachtTitel,
         opdrachtomschrijving: form.opdrachtOmschrijving,
-        startdatum: form.startDatum,
-        einddatum: form.eindDatum,
-        urenPerWeek: 38,
+        startdatum:           form.startDatum,
+        einddatum:            form.eindDatum,
+        urenPerWeek:          38,
       });
-
       setSubmitted(true);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Stagevoorstel indienen mislukt");
     }
   }
 
-  // Toon successmelding na indienen
   if (submitted) {
     return (
       <div className="page-inner">
         <div className="page-header">
           <h1>Stagevoorstel</h1>
         </div>
-        <div className="card">
+        <div className="card succes-card">
           <div className="card_title">
             <IconCircleCheck size={16} />
             Stagevoorstel ingediend
@@ -81,8 +145,32 @@ export default function StageApplicationPage() {
 
       <div className="page-header">
         <h1>Stagevoorstel</h1>
-        <p>Vul alles in - je kan tussentijds opslaan als concept</p>
+        <p>Vul alles in — je kan tussentijds opslaan als concept</p>
       </div>
+
+      {heeftConcept && !conceptOpgeslagen && (
+        <div className="card" style={{ marginBottom: 0 }}>
+          <div className="card_title" style={{ color: "var(--blue)" }}>
+            <IconInfoCircle size={16} />
+            Concept geladen
+          </div>
+          <p style={{ fontSize: 13, color: "var(--sub)" }}>
+            Je eerder opgeslagen concept is ingevuld. Pas aan en dien in wanneer klaar.
+          </p>
+        </div>
+      )}
+
+      {conceptOpgeslagen && (
+        <div className="card" style={{ marginBottom: 0 }}>
+          <div className="card_title" style={{ color: "var(--green)" }}>
+            <IconCircleCheck size={16} />
+            Concept opgeslagen
+          </div>
+          <p style={{ fontSize: 13, color: "var(--sub)" }}>
+            Je gegevens zijn bewaard. Je kan later verder werken.
+          </p>
+        </div>
+      )}
 
       {error && (
         <div className="card">
@@ -164,13 +252,13 @@ export default function StageApplicationPage() {
                 <input className="form_input" type="date" name="eindDatum" value={form.eindDatum} onChange={handleChange} />
               </div>
             </div>
-            <p>Moet binnen het stagevenster van de opleiding vallen: 9 feb - 26 jun 2026.</p>
+            <p className="stagevenster-info">Moet binnen het stagevenster van de opleiding vallen: 9 feb - 26 jun 2026.</p>
           </div>
 
           <div className="actions">
-            <button type="button" className="btn">
+            <button type="button" className="btn" onClick={handleSaveDraft} disabled={savingDraft}>
               <IconDeviceFloppy size={16} />
-              Opslaan als concept
+              {savingDraft ? "Opslaan..." : "Opslaan als concept"}
             </button>
             <button type="submit" className="btn primary">
               <IconSend size={16} />
@@ -180,17 +268,32 @@ export default function StageApplicationPage() {
 
         </form>
 
-        {/* Checklist sticky — volgt mee bij scrollen */}
+        {/* Checklist sticky */}
         <div className="card checklist-sticky">
           <div className="card_title">
             <IconChecklist size={16} />
             Waar de commissie op let
           </div>
-          <p><IconCircleCheck size={14} /> Minstens 12 weken voltijds (456 uur) binnen het stagevenster</p>
-          <p><IconCircleCheck size={14} /> IT-gerelateerde opdracht met een ontwikkelcomponent</p>
-          <p><IconCircleCheck size={14} /> Mentor met een technische functie binnen het bedrijf</p>
-          <p><IconCircleCheck size={14} /> Concrete omschrijving: technologie, taken en team</p>
-          <p><IconCircleCheck size={14} /> Stage in een professionele bedrijfsomgeving</p>
+          <div className="checklist-item">
+            <IconCircleCheck size={14} />
+            Minstens 12 weken voltijds (456 uur) binnen het stagevenster
+          </div>
+          <div className="checklist-item">
+            <IconCircleCheck size={14} />
+            IT-gerelateerde opdracht met een ontwikkelcomponent
+          </div>
+          <div className="checklist-item">
+            <IconCircleCheck size={14} />
+            Mentor met een technische functie binnen het bedrijf
+          </div>
+          <div className="checklist-item">
+            <IconCircleCheck size={14} />
+            Concrete omschrijving: technologie, taken en team
+          </div>
+          <div className="checklist-item">
+            <IconCircleCheck size={14} />
+            Stage in een professionele bedrijfsomgeving
+          </div>
         </div>
 
       </div>

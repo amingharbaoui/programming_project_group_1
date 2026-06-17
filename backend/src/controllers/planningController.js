@@ -2,146 +2,350 @@ const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 const { meld } = require("../utils/notify");
 
-function getUserId(req, fallback = 1) {
-  return Number(req.user?.id || req.headers["x-user-id"] || fallback);
+function getUserId(req) {
+  return Number(req.user?.id);
 }
 
-// GET /mentor/planning/:dossierId
-async function getMentorPlanning(req, res) {
-  const dossierId = Number(req.params.dossierId);
-  const mentorId = getUserId(req, 5);
+function normalizeDateTime(value) {
+  if (!value) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(trimmed)) {
+      return trimmed.slice(0, 19).replace("T", " ");
+    }
+    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(trimmed)) {
+      return trimmed.slice(0, 19);
+    }
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 19).replace("T", " ");
+}
 
-  if (!dossierId) return fail(res, 400, "dossierId is verplicht");
+async function getDocentDossier(dossierId, docentId) {
+  const [rows] = await db.query(
+    `
+    SELECT id, student_id, mentor_id, stagebegeleider_id
+    FROM stagedossiers
+    WHERE id = ? AND stagebegeleider_id = ?
+    LIMIT 1
+    `,
+    [dossierId, docentId]
+  );
+  return rows[0] || null;
+}
+
+async function getMentorDossierByPlanning(planningId, mentorId) {
+  const [rows] = await db.query(
+    `
+    SELECT pm.id AS planning_id, pm.stagedossier_id, sd.student_id, sd.mentor_id, sd.stagebegeleider_id
+    FROM planning_momenten pm
+    JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
+    WHERE pm.id = ? AND sd.mentor_id = ?
+    LIMIT 1
+    `,
+    [planningId, mentorId]
+  );
+  return rows[0] || null;
+}
+
+async function listDocentPlanning(req, res) {
+  const docentId = getUserId(req);
 
   try {
-    // Controleer of mentor gekoppeld is aan dossier
-    const [linked] = await db.query(
-      "SELECT id FROM stagedossiers WHERE id = ? AND mentor_id = ? LIMIT 1",
-      [dossierId, mentorId]
+    const [rows] = await db.query(
+      `
+      SELECT
+        pm.*,
+        DATE_FORMAT(pm.gepland_op, '%Y-%m-%dT%H:%i:%s') AS gepland_op,
+        sd.dossiernummer,
+        sd.student_id,
+        sd.mentor_id,
+        CONCAT(gs.voornaam, ' ', gs.achternaam) AS student_naam,
+        CONCAT(gm.voornaam, ' ', gm.achternaam) AS mentor_naam,
+        b.naam AS bedrijf_naam
+      FROM planning_momenten pm
+      JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
+      JOIN gebruikers gs ON gs.id = sd.student_id
+      LEFT JOIN gebruikers gm ON gm.id = sd.mentor_id
+      JOIN bedrijven b ON b.id = sd.bedrijf_id
+      WHERE sd.stagebegeleider_id = ?
+      ORDER BY pm.gepland_op IS NULL, pm.gepland_op ASC, pm.id DESC
+      `,
+      [docentId]
     );
-    if (linked.length === 0) {
-      return fail(res, 403, "Mentor is niet gekoppeld aan dit dossier");
-    }
 
-    const [momenten] = await db.query(
-      `SELECT pm.*,
-        vb.voornaam AS voorgesteld_door_naam
-       FROM planning_momenten pm
-       LEFT JOIN gebruikers vb ON vb.id = pm.voorgesteld_door_id
-       WHERE pm.stagedossier_id = ?
-       ORDER BY pm.gepland_op ASC`,
-      [dossierId]
-    );
-
-    return ok(res, momenten, "Planning opgehaald");
+    return ok(res, rows, "Planning opgehaald");
   } catch (error) {
+    console.error("listDocentPlanning error:", error);
     return fail(res, 500, "Planning ophalen mislukt", error.message);
   }
 }
 
-// PATCH /mentor/planning/:id/bevestig
-async function bevestigBezoek(req, res) {
-  const momentId = Number(req.params.id);
-  const mentorId = getUserId(req, 5);
+async function createPlanningMoment(req, res, type) {
+  const docentId = getUserId(req);
+  const { dossierId, stagedossierId, geplandOp, datum, locatie, verslag } = req.body;
+  const dossierIdFinal = Number(dossierId || stagedossierId);
+  const geplandOpFinal = normalizeDateTime(geplandOp || datum);
+
+  if (!dossierIdFinal) return fail(res, 400, "Dossier is verplicht");
+  if (!geplandOpFinal) return fail(res, 400, "Geldig tijdstip is verplicht");
 
   try {
-    const [rows] = await db.query(
-      `SELECT pm.*, sd.mentor_id, sd.student_id, sd.stagebegeleider_id
-       FROM planning_momenten pm
-       JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
-       WHERE pm.id = ? LIMIT 1`,
-      [momentId]
+    const dossier = await getDocentDossier(dossierIdFinal, docentId);
+    if (!dossier) return fail(res, 403, "Geen toegang tot dit dossier");
+
+    const status = type === "bedrijfsbezoek" ? "voorgesteld" : "gepland";
+    const [result] = await db.query(
+      `
+      INSERT INTO planning_momenten
+        (stagedossier_id, type, status, gepland_op, locatie, voorgesteld_door_id, verslag, aangemaakt_op, aangepast_op)
+      VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+      `,
+      [dossierIdFinal, type, status, geplandOpFinal, locatie || null, docentId, verslag || null]
     );
 
-    if (rows.length === 0) return fail(res, 404, "Planning moment niet gevonden");
-    const moment = rows[0];
-
-    if (moment.mentor_id !== mentorId) {
-      return fail(res, 403, "Je bent niet de mentor van dit dossier");
-    }
-
-    await db.query(
-      `UPDATE planning_momenten
-       SET status = 'bevestigd', bevestigd_door_id = ?, aangepast_op = NOW()
-       WHERE id = ?`,
-      [mentorId, momentId]
-    );
-
-    // Notificeer docent + student
-    if (moment.stagebegeleider_id) {
-      await meld(moment.stagebegeleider_id, {
-        titel: "Bedrijfsbezoek bevestigd door mentor",
-        bericht: `De mentor heeft het bedrijfsbezoek bevestigd.`,
-        type: "notificatie",
-        aangemaaktDoorId: mentorId,
-      });
-    }
-    if (moment.student_id) {
-      await meld(moment.student_id, {
-        titel: "Bedrijfsbezoek bevestigd",
-        bericht: `De mentor heeft het geplande bedrijfsbezoek bevestigd.`,
-        type: "notificatie",
-        aangemaaktDoorId: mentorId,
+    const planningId = result.insertId;
+    await meld(dossier.student_id, {
+      titel: type === "bedrijfsbezoek" ? "Bedrijfsbezoek voorgesteld" : "Eindpresentatie gepland",
+      bericht: type === "bedrijfsbezoek" ? "Je docent heeft een bedrijfsbezoek voorgesteld." : "Je docent heeft je eindpresentatie gepland.",
+      aangemaaktDoorId: docentId,
+      stagedossierId: dossierIdFinal
+    });
+    if (dossier.mentor_id) {
+      await meld(dossier.mentor_id, {
+        titel: type === "bedrijfsbezoek" ? "Bedrijfsbezoek voorgesteld" : "Eindpresentatie gepland",
+        bericht: type === "bedrijfsbezoek" ? "Er is een bedrijfsbezoek voorgesteld." : "Er is een eindpresentatie gepland.",
+        aangemaaktDoorId: docentId,
+        stagedossierId: dossierIdFinal
       });
     }
 
-    return ok(res, null, "Bedrijfsbezoek bevestigd");
+    return ok(res, { id: planningId, status, type }, "Planningmoment aangemaakt");
   } catch (error) {
-    return fail(res, 500, "Bevestigen mislukt", error.message);
+    console.error("createPlanningMoment error:", error);
+    return fail(res, 500, "Planningmoment aanmaken mislukt", error.message);
   }
 }
 
-// PATCH /mentor/planning/:id/alternatief
-async function alternatiefsVoorstel(req, res) {
-  const momentId = Number(req.params.id);
-  const mentorId = getUserId(req, 5);
-  const { bericht } = req.body;
+async function createVisit(req, res) {
+  return createPlanningMoment(req, res, "bedrijfsbezoek");
+}
 
-  if (!bericht || !bericht.trim()) {
-    return fail(res, 400, "Een bericht is verplicht bij een alternatief voorstel");
+async function createPresentation(req, res) {
+  return createPlanningMoment(req, res, "eindpresentatie");
+}
+
+async function updateDocentPlanning(req, res) {
+  const docentId = getUserId(req);
+  const planningId = Number(req.params.id);
+  const { geplandOp, datum, locatie, status, verslag } = req.body;
+  const geplandOpFinal = normalizeDateTime(geplandOp || datum);
+
+  if (!planningId) return fail(res, 400, "Ongeldig planning-id");
+
+  const allowedStatuses = ["voorgesteld", "bevestigd", "alternatief_gevraagd", "gepland", "gegeven", "geannuleerd"];
+  if (status && !allowedStatuses.includes(status)) return fail(res, 400, "Ongeldige planningstatus");
+
+  const fields = [];
+  const values = [];
+  if (geplandOp || datum) {
+    if (!geplandOpFinal) return fail(res, 400, "Geldig tijdstip is verplicht");
+    fields.push("pm.gepland_op = ?");
+    values.push(geplandOpFinal);
   }
+  if (locatie !== undefined) {
+    fields.push("pm.locatie = ?");
+    values.push(locatie || null);
+  }
+  if (status) {
+    fields.push("pm.status = ?");
+    values.push(status);
+  }
+  if (verslag !== undefined) {
+    fields.push("pm.verslag = ?");
+    values.push(verslag || null);
+  }
+
+  if (fields.length === 0) return fail(res, 400, "Geen wijzigingen meegegeven");
+
+  try {
+    const [result] = await db.query(
+      `
+      UPDATE planning_momenten pm
+      JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
+      SET ${fields.join(", ")}, pm.aangepast_op = NOW()
+      WHERE pm.id = ? AND sd.stagebegeleider_id = ?
+      `,
+      [...values, planningId, docentId]
+    );
+
+    if (result.affectedRows === 0) return fail(res, 404, "Planningmoment niet gevonden");
+    return ok(res, { id: planningId }, "Planningmoment bijgewerkt");
+  } catch (error) {
+    console.error("updateDocentPlanning error:", error);
+    return fail(res, 500, "Planningmoment bijwerken mislukt", error.message);
+  }
+}
+
+async function confirmMentorPlanning(req, res) {
+  const mentorId = getUserId(req);
+  const planningId = Number(req.params.id);
+  if (!planningId) return fail(res, 400, "Ongeldig planning-id");
+
+  try {
+    const dossier = await getMentorDossierByPlanning(planningId, mentorId);
+    if (!dossier) return fail(res, 403, "Geen toegang tot dit planningmoment");
+
+    await db.query(
+      `
+      UPDATE planning_momenten
+      SET status = 'bevestigd', bevestigd_door_id = ?, alternatief_voorstel = NULL, aangepast_op = NOW()
+      WHERE id = ?
+      `,
+      [mentorId, planningId]
+    );
+
+    await meld(dossier.stagebegeleider_id, {
+      titel: "Bedrijfsbezoek bevestigd",
+      bericht: "De mentor heeft het voorgestelde bedrijfsbezoek bevestigd.",
+      aangemaaktDoorId: mentorId,
+      stagedossierId: dossier.stagedossier_id
+    });
+
+    return ok(res, { id: planningId, status: "bevestigd" }, "Planningmoment bevestigd");
+  } catch (error) {
+    console.error("confirmMentorPlanning error:", error);
+    return fail(res, 500, "Planningmoment bevestigen mislukt", error.message);
+  }
+}
+
+async function proposeAlternative(req, res) {
+  const mentorId = getUserId(req);
+  const planningId = Number(req.params.id);
+  const { alternatief, reden, geplandOp, datum } = req.body;
+  const tekst = alternatief || reden;
+  const geplandOpFinal = normalizeDateTime(geplandOp || datum);
+
+  if (!planningId) return fail(res, 400, "Ongeldig planning-id");
+  if (!tekst && !geplandOpFinal) return fail(res, 400, "Alternatief voorstel of tijdstip is verplicht");
+
+  try {
+    const dossier = await getMentorDossierByPlanning(planningId, mentorId);
+    if (!dossier) return fail(res, 403, "Geen toegang tot dit planningmoment");
+
+    await db.query(
+      `
+      UPDATE planning_momenten
+      SET status = 'alternatief_gevraagd',
+          alternatief_voorstel = ?,
+          gepland_op = COALESCE(?, gepland_op),
+          bevestigd_door_id = ?,
+          aangepast_op = NOW()
+      WHERE id = ?
+      `,
+      [tekst || null, geplandOpFinal, mentorId, planningId]
+    );
+
+    await meld(dossier.stagebegeleider_id, {
+      titel: "Alternatief bezoekmoment voorgesteld",
+      bericht: "De mentor heeft een alternatief voorgesteld voor het bedrijfsbezoek.",
+      aangemaaktDoorId: mentorId,
+      stagedossierId: dossier.stagedossier_id
+    });
+
+    return ok(res, { id: planningId, status: "alternatief_gevraagd" }, "Alternatief voorgesteld");
+  } catch (error) {
+    console.error("proposeAlternative error:", error);
+    return fail(res, 500, "Alternatief voorstellen mislukt", error.message);
+  }
+}
+
+async function listMentorPlanning(req, res) {
+  const mentorId = getUserId(req);
 
   try {
     const [rows] = await db.query(
-      `SELECT pm.*, sd.mentor_id, sd.stagebegeleider_id
-       FROM planning_momenten pm
-       JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
-       WHERE pm.id = ? LIMIT 1`,
-      [momentId]
+      `
+      SELECT
+        pm.*,
+        DATE_FORMAT(pm.gepland_op, '%Y-%m-%dT%H:%i:%s') AS gepland_op,
+        sd.dossiernummer,
+        sd.student_id,
+        CONCAT(gs.voornaam, ' ', gs.achternaam) AS student_naam,
+        CONCAT(gd.voornaam, ' ', gd.achternaam) AS docent_naam,
+        b.naam AS bedrijf_naam
+      FROM planning_momenten pm
+      JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
+      JOIN gebruikers gs ON gs.id = sd.student_id
+      JOIN gebruikers gd ON gd.id = sd.stagebegeleider_id
+      JOIN bedrijven b ON b.id = sd.bedrijf_id
+      WHERE sd.mentor_id = ?
+      ORDER BY pm.gepland_op IS NULL, pm.gepland_op ASC, pm.id DESC
+      `,
+      [mentorId]
     );
 
-    if (rows.length === 0) return fail(res, 404, "Planning moment niet gevonden");
-    const moment = rows[0];
-
-    if (moment.mentor_id !== mentorId) {
-      return fail(res, 403, "Je bent niet de mentor van dit dossier");
-    }
-
-    await db.query(
-      `UPDATE planning_momenten
-       SET status = 'alternatief_gevraagd', alternatief_voorstel = ?, aangepast_op = NOW()
-       WHERE id = ?`,
-      [bericht.trim(), momentId]
-    );
-
-    // Notificeer docent
-    if (moment.stagebegeleider_id) {
-      await meld(moment.stagebegeleider_id, {
-        titel: "Mentor stelt alternatief bezoekmoment voor",
-        bericht: `De mentor past het geplande bedrijfsbezoek niet: "${bericht.trim()}"`,
-        type: "notificatie",
-        aangemaaktDoorId: mentorId,
-      });
-    }
-
-    return ok(res, null, "Alternatief voorstel verstuurd");
+    return ok(res, rows, "Mentorplanning opgehaald");
   } catch (error) {
-    return fail(res, 500, "Alternatief voorstel mislukt", error.message);
+    console.error("listMentorPlanning error:", error);
+    return fail(res, 500, "Mentorplanning ophalen mislukt", error.message);
+  }
+}
+
+async function listMyPlanning(req, res) {
+  const userId = getUserId(req);
+  const role = req.user?.hoofdrol;
+
+  const roleWhere = {
+    student: "sd.student_id = ?",
+    mentor: "sd.mentor_id = ?",
+    docent: "sd.stagebegeleider_id = ?",
+    administratie: "1 = ?"
+  }[role];
+
+  if (!roleWhere) return fail(res, 403, "Geen planning voor deze rol");
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT
+        pm.*,
+        DATE_FORMAT(pm.gepland_op, '%Y-%m-%dT%H:%i:%s') AS gepland_op,
+        sd.dossiernummer,
+        sd.student_id,
+        sd.mentor_id,
+        sd.stagebegeleider_id,
+        CONCAT(gs.voornaam, ' ', gs.achternaam) AS student_naam,
+        CONCAT(gm.voornaam, ' ', gm.achternaam) AS mentor_naam,
+        CONCAT(gd.voornaam, ' ', gd.achternaam) AS docent_naam,
+        b.naam AS bedrijf_naam
+      FROM planning_momenten pm
+      JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
+      JOIN gebruikers gs ON gs.id = sd.student_id
+      LEFT JOIN gebruikers gm ON gm.id = sd.mentor_id
+      LEFT JOIN gebruikers gd ON gd.id = sd.stagebegeleider_id
+      JOIN bedrijven b ON b.id = sd.bedrijf_id
+      WHERE ${roleWhere}
+      ORDER BY pm.gepland_op IS NULL, pm.gepland_op ASC, pm.id DESC
+      `,
+      [role === "administratie" ? 1 : userId]
+    );
+
+    return ok(res, rows, "Mijn planning opgehaald");
+  } catch (error) {
+    console.error("listMyPlanning error:", error);
+    return fail(res, 500, "Mijn planning ophalen mislukt", error.message);
   }
 }
 
 module.exports = {
-  getMentorPlanning,
-  bevestigBezoek,
-  alternatiefsVoorstel,
+  listMyPlanning,
+  listDocentPlanning,
+  createVisit,
+  createPresentation,
+  updateDocentPlanning,
+  listMentorPlanning,
+  confirmMentorPlanning,
+  proposeAlternative
 };

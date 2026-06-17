@@ -1,85 +1,14 @@
-.contract-page {
-  max-width: 760px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.melding {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 13.5px;
-}
-.melding-fout { background: var(--red-light); color: var(--red); }
-.melding-ok   { background: #edfaf3; color: #16a34a; }
-
-.contract-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-.contract-dossiernr { font-size: 20px; font-weight: 700; margin: 0; }
-.contract-subtitel  { font-size: 13px; color: var(--sub); margin: 2px 0 0; }
-
-.contract-badge {
-  padding: 4px 10px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.badge-groen { background: #edfaf3; color: #16a34a; }
-.badge-blauw { background: #eff6ff; color: #2563eb; }
-.badge-geel  { background: #fffbeb; color: #d97706; }
-.badge-rood  { background: var(--red-light); color: var(--red); }
-.badge-grijs { background: var(--muted); color: var(--sub); }
-
-.kaart {
-  background: var(--white);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 20px 22px;
-}
-.kaart-titel {
-  font-size: 14.5px;
-  font-weight: 600;
-  margin: 0 0 14px;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--dark);
-}
-
-.gegevens-lijst { display: flex; flex-direction: column; gap: 10px; }
-.gegevens-rij {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 13.5px;
-  gap: 12px;
-}
-.gegevens-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--sub);
-  min-width: 130px;
-}
-.gegevens-icon { flex-shrink: 0; }
-.gegevens-waarde { font-weight: 500; color: var(--dark); text-align: right; }
-
+/* Partijen grid — 3 blokken naast elkaar */
 .partijen {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: 12px;
+  margin-top: 4px;
 }
 @media (max-width: 600px) {
   .partijen { grid-template-columns: 1fr; }
 }
+
 .partij {
   background: var(--muted);
   border-radius: 8px;
@@ -89,9 +18,11 @@
   gap: 4px;
 }
 .partij-titel { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--sub); }
-.partij-naam  { font-size: 14px; font-weight: 600; color: var(--dark); }
+.partij-naam  { font-size: 13.5px; font-weight: 600; color: var(--dark); }
 
-.handtekening-badge {
+/* Handtekening badges binnen een partij */
+.hb-getekend,
+.hb-wacht {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -99,12 +30,12 @@
   padding: 3px 8px;
   border-radius: 20px;
   margin-top: 6px;
+  width: fit-content;
 }
-.handtekening-badge.getekend { background: #edfaf3; color: #16a34a; }
-.handtekening-badge.wacht    { background: var(--white); color: var(--sub); border: 1px solid var(--border); }
+.hb-getekend { background: #edfaf3; color: #16a34a; }
+.hb-wacht    { background: var(--white); color: var(--sub); border: 1px solid var(--border); }
 
-.kaart-ondertekenen { border-color: #bfdbfe; }
-.ondertekenen-tekst { font-size: 13.5px; color: var(--gray); margin: 0 0 14px; line-height: 1.55; }
+/* Akkoord checkbox */
 .akkoord-label {
   display: flex;
   align-items: center;
@@ -112,45 +43,9 @@
   font-size: 13.5px;
   color: var(--dark);
   cursor: pointer;
-  margin-bottom: 16px;
+  margin-bottom: 4px;
 }
 .akkoord-label input { width: 16px; height: 16px; cursor: pointer; accent-color: var(--red); }
-.btn-ondertekenen {
-  padding: 10px 22px;
-  background: var(--red);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity .15s;
-}
-.btn-ondertekenen:hover:not(:disabled) { opacity: .87; }
-.btn-ondertekenen:disabled { opacity: .45; cursor: not-allowed; }
 
-.kaart-getekend {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 13.5px;
-  color: var(--dark);
-  border-color: #bbf7d0;
-}
-.getekend-icon { color: #16a34a; flex-shrink: 0; }
-
-.laadbericht {
-  padding: 40px;
-  text-align: center;
-  color: var(--sub);
-  font-size: 14px;
-}
-.geen-contract {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 60px 20px;
-  color: var(--sub);
-  font-size: 14px;
-}
+/* s_blauw status (niet in global) */
+.status.s_blauw { background: #eff6ff; color: #2563eb; }

@@ -171,7 +171,7 @@ export default function MentorEvaluationPage() {
       <div className="page_header">
         <div>
           <h1>Evaluatie invullen</h1>
-          <p>Beoordeel de competenties van een stagiair.</p>
+          <p>Beoordeel de competenties van je stagiair.</p>
         </div>
       </div>
 

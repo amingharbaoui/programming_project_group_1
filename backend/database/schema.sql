@@ -106,7 +106,7 @@ DROP TABLE IF EXISTS `documenten`;
 CREATE TABLE `documenten` (
   `id` int NOT NULL AUTO_INCREMENT,
   `stagedossier_id` int NOT NULL,
-  `document_soort_id` int NOT NULL,
+  `document_soort_id` int DEFAULT NULL,
   `status` varchar(255) NOT NULL COMMENT 'ontbreekt, ingediend, in_controle, afgekeurd, goedgekeurd, geregistreerd',
   `versie_nummer` int DEFAULT '1',
   `bestand_url` text,
@@ -217,6 +217,7 @@ CREATE TABLE `logboek_weken` (
   `docent_id` int DEFAULT NULL,
   `docent_feedback` text,
   `docent_nagekeken_op` timestamp NULL DEFAULT NULL,
+  `student_antwoord` text,
   `herindiening_nodig` tinyint(1) DEFAULT '0',
   `blokkade` text COMMENT 'Bijvoorbeeld week 11 ontbreekt',
   `aangemaakt_op` timestamp NULL DEFAULT NULL,

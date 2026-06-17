@@ -67,7 +67,7 @@
 ## documenten
 - id | int | null:NO | key:PRI | default:- | auto_increment
 - stagedossier_id | int | null:NO | key:MUL | default:- | -
-- document_soort_id | int | null:NO | key:MUL | default:- | -
+- document_soort_id | int | null:YES | key:MUL | default:- | -
 - status | varchar(255) | null:NO | key:- | default:- | -
 - versie_nummer | int | null:YES | key:- | default:1 | -
 - bestand_url | text | null:YES | key:- | default:- | -

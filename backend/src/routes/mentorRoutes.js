@@ -6,18 +6,23 @@ const {
   getAfspraken,
   updateAfspraken,
 } = require("../controllers/mentorController");
+const { getMentorInvitation, activateMentor } = require("../controllers/userController");
 const {
   getLogbooksByStudent,
   mentorCheckLogbookWeek,
 } = require("../controllers/logbookController");
 const {
-  getMentorPlanning,
-  bevestigBezoek,
-  alternatiefsVoorstel,
+  listMentorPlanning,
+  confirmMentorPlanning,
+  proposeAlternative
 } = require("../controllers/planningController");
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
 
 const router = express.Router();
+
+// Accountactivatie via uitnodiging (story 27)
+router.get("/invitations/:token", getMentorInvitation);
+router.post("/activate", activateMentor);
 
 router.use(authenticateDemoUser, requireRole("mentor"));
 
@@ -36,9 +41,9 @@ router.patch("/contract/:dossierId/teken", tekenContract);
 router.get("/dossier/:dossierId/afspraken", getAfspraken);
 router.patch("/dossier/:dossierId/afspraken", updateAfspraken);
 
-// Planning — bedrijfsbezoek (story 30)
-router.get("/planning/:dossierId", getMentorPlanning);
-router.patch("/planning/:id/bevestig", bevestigBezoek);
-router.patch("/planning/:id/alternatief", alternatiefsVoorstel);
+// Planning: bedrijfsbezoek bevestigen of alternatief voorstellen (story 30)
+router.get("/planning", listMentorPlanning);
+router.patch("/planning/:id/confirm", confirmMentorPlanning);
+router.patch("/planning/:id/alternative", proposeAlternative);
 
 module.exports = router;

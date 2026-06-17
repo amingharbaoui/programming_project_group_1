@@ -56,8 +56,19 @@ export function AuthProvider({ children }) {
     setUser(nextUser);
   }
 
+  function loginUser(apiUser) {
+    const nextUser = {
+      id: apiUser.id,
+      name: `${apiUser.voornaam} ${apiUser.achternaam}`.trim(),
+      role: apiUser.hoofdrol,
+    };
+
+    setApiUserId(nextUser.id);
+    setUser(nextUser);
+  }
+
   return (
-    <AuthContext.Provider value={{ user, switchRole }}>
+    <AuthContext.Provider value={{ user, switchRole, loginUser }}>
       {children}
     </AuthContext.Provider>
   );

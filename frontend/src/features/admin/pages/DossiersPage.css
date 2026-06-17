@@ -131,3 +131,167 @@
 .dossiers_tbl td:nth-child(7) {
 	min-width: 210px;
 }
+
+.modal-backdrop {
+	position: fixed;
+	inset: 0;
+	z-index: 50;
+	background: rgba(15, 23, 42, 0.28);
+	display: flex;
+	justify-content: flex-end;
+	padding: 18px;
+}
+
+.dossier-modal {
+	width: min(880px, 100%);
+	max-height: calc(100vh - 36px);
+	overflow: auto;
+	background: var(--white);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
+	padding: 18px;
+}
+
+.modal-head {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 16px;
+	padding-bottom: 14px;
+	border-bottom: 1px solid var(--border);
+}
+
+.modal-head h2 {
+	margin: 0;
+	font-size: 20px;
+	color: var(--dark);
+}
+
+.modal-head p,
+.modal-muted {
+	margin: 5px 0 0;
+	font-size: 13px;
+	color: var(--sub);
+}
+
+.detail-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 10px;
+	margin: 16px 0;
+}
+
+.detail-box {
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 12px;
+	background: var(--muted);
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+	min-width: 0;
+}
+
+.detail-box span,
+.doc-admin-meta {
+	font-size: 11.5px;
+	color: var(--faint);
+}
+
+.detail-box strong {
+	font-size: 13.5px;
+	color: var(--dark);
+}
+
+.detail-box small {
+	font-size: 12px;
+	color: var(--sub);
+	line-height: 1.45;
+}
+
+.modal-actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 12px 0;
+}
+
+.documents-panel {
+	margin-top: 18px;
+}
+
+.section-title {
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--dark);
+	margin-bottom: 10px;
+}
+
+.doc-admin-list {
+	display: flex;
+	flex-direction: column;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	overflow: hidden;
+}
+
+.doc-admin-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 12px;
+	align-items: center;
+	padding: 12px;
+	border-bottom: 1px solid var(--border);
+}
+
+.doc-admin-row:last-child {
+	border-bottom: 0;
+}
+
+.doc-admin-name {
+	font-size: 13.5px;
+	font-weight: 700;
+	color: var(--dark);
+}
+
+.doc-admin-actions {
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	flex-wrap: wrap;
+	gap: 8px;
+}
+
+.doc-reason {
+	margin-top: 6px;
+	font-size: 12px;
+	color: var(--red);
+	line-height: 1.45;
+}
+
+.btn.danger {
+	color: var(--red);
+	border-color: var(--red-mid);
+}
+
+@media (max-width: 760px) {
+	.modal-backdrop {
+		padding: 0;
+	}
+
+	.dossier-modal {
+		min-height: 100vh;
+		max-height: 100vh;
+		border-radius: 0;
+	}
+
+	.detail-grid,
+	.doc-admin-row {
+		grid-template-columns: 1fr;
+	}
+
+	.doc-admin-actions {
+		justify-content: flex-start;
+	}
+}

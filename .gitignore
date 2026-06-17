@@ -16,6 +16,7 @@ frontend/.env
 # build output
 dist/
 build/
+backend/uploads/
 
 # logs
 *.log
