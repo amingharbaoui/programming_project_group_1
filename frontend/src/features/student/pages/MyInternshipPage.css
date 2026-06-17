@@ -2,9 +2,11 @@
 .steps {
   display: flex;
   align-items: flex-start;
-  padding: 32px 20px 54px;
+  margin-bottom: 22px;
+  padding: 20px 20px 66px;
   background: var(--muted);
-  border-radius: 8px;
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
   overflow: hidden;
 }
 
@@ -14,6 +16,8 @@
   flex: 1;
   min-width: 0;
 }
+
+.step:last-child { flex: 0 0 auto; }
 
 .step-block {
   position: relative;
@@ -90,6 +94,131 @@
   border-top: 3px dotted var(--red);
 }
 
+/* Empty hero (geen voorstel) */
+.empty-hero {
+  text-align: center;
+  padding: 52px 20px 40px;
+}
+.empty-hero .eh-icon {
+  width: 68px;
+  height: 68px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--red) 0%, var(--red-dark) 100%);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  margin-bottom: 16px;
+  box-shadow: 0 8px 20px rgba(226, 0, 26, 0.22);
+}
+.empty-hero h2 { font-size: 19px; font-weight: 600; letter-spacing: -0.3px; margin: 0 0 7px; }
+.empty-hero p { font-size: 13.5px; color: var(--sub); margin: 0 auto 20px; max-width: 420px; line-height: 1.55; }
+
+/* Taak-kaart ("Wat moet je nu doen") */
+.taak-kaart {
+  background: var(--white);
+  border-radius: 10px;
+  border: 1.5px solid #0a0a0a;
+  box-shadow: 0 4px 14px rgba(0,0,0,.10);
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.taak-kaart .card_title { margin-bottom: 12px; }
+.taak-rij {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 8px 0;
+}
+.taak-rij + .taak-rij { border-top: 1px solid var(--border); }
+.taak-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.taak-icon.amber { background: var(--amber-bg); color: var(--amber); }
+.taak-icon.groen { background: var(--green-bg); color: var(--green); }
+.taak-info { flex: 1; font-size: 13.5px; font-weight: 500; color: var(--dark); }
+
+/* Dossier collapsible blok */
+.dossier { margin-bottom: 16px; }
+.dossier-kop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--gray);
+  font-family: var(--font);
+  width: 100%;
+  text-align: left;
+}
+.dossier-kop:hover { color: var(--dark); }
+.dossier-kop i { font-size: 16px; transition: transform .2s; }
+.dossier-kop.open i { transform: rotate(90deg); }
+.dossier-body { display: none; }
+.dossier-body.open { display: block; }
+
+/* Versie historiek */
+.versie {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 0.5px solid var(--border);
+  font-size: 13px;
+  color: var(--sub);
+}
+.versie:last-child { border-bottom: none; }
+.v-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border);
+  flex-shrink: 0;
+  margin-top: 5px;
+}
+.versie.actief .v-dot { background: var(--red); }
+.v-wat { flex: 1; line-height: 1.5; }
+.v-tijd { font-size: 11.5px; color: var(--faint); white-space: nowrap; }
+
+/* Profiel-kaart (begeleiding) */
+.prof {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 10px 0;
+  border-bottom: 0.5px solid var(--border);
+}
+.prof:last-child { border-bottom: none; }
+.prof-av {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--red);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.prof-av.grijs { background: var(--muted); color: var(--sub); font-size: 16px; }
+.p-naam { font-size: 13.5px; font-weight: 600; color: var(--dark); }
+.p-rol { font-size: 12px; color: var(--sub); margin-top: 1px; }
+.p-mail { font-size: 12px; color: var(--sub); margin-top: 1px; }
+
 /* Popup overlay */
 .popup-overlay {
   position: fixed;
@@ -124,15 +253,6 @@
   color: var(--gray);
   line-height: 1.6;
   margin-bottom: 16px;
-}
-
-/* Uitklapbare kaart — cursor pointer */
-.card-clickable {
-  cursor: pointer;
-}
-
-.card-clickable:hover {
-  border-color: var(--red);
 }
 
 /* Kv rij — sleutel links, waarde rechts */
