@@ -41,41 +41,48 @@ const WARN_STATUS = {
   validatie:     ["/student/documents"],
 };
 
+// Wanneer de stage loopt, zakken overeenkomst + documenten naar "Afgehandeld"
+const AFGEHANDELD_STATUS = new Set([
+  "startklaar", "gestart", "lopend", "presentatie", "afgerond",
+]);
+const AFGEHANDELD_PATHS = new Set(["/student/contract", "/student/documents"]);
+
 export default function Sidebar({ collapsed }) {
   const { user } = useAuth();
   const items = NAVIGATION[user.role] || [];
 
-  // Start volledig locked voor studenten, leeg (geen lock) voor andere rollen
-  const [lockedGroups, setLockedGroups] = useState(
-    user.role === "student"
-      ? new Set(["contract_docs", "logboek_eval"])
-      : new Set()
-  );
-  const [faseInfo, setFaseInfo] = useState(null);
-  const [warnPaths, setWarnPaths] = useState(new Set());
+  const [lockedGroups, setLockedGroups]   = useState(new Set());
+  const [faseInfo, setFaseInfo]           = useState(null);
+  const [warnPaths, setWarnPaths]         = useState(new Set());
+  const [voorstelStatus, setVoorstelStatus] = useState(null);
 
   useEffect(() => {
     if (user.role !== "student") return;
 
     async function fetchLockState() {
-      const locked = new Set(["contract_docs", "logboek_eval"]);
+      const locked = new Set([]);
 
       const [internshipRes, contractRes] = await Promise.allSettled([
         apiRequest("GET", "/internships/my"),
         apiRequest("GET", "/contracts/my"),
       ]);
 
-      // Unlock overeenkomst + documenten als voorstel goedgekeurd is
       if (internshipRes.status === "fulfilled") {
         const voorstel = internshipRes.value?.data;
         const status = voorstel?.status ?? "geen";
+
+        setVoorstelStatus(status);
+
         if (voorstel && UNLOCK_CONTRACT_DOCS.includes(status)) {
           locked.delete("contract_docs");
         }
+
         // Fase-info voor side-status blok
         setFaseInfo(FASE_MAP[status] ?? FASE_MAP.geen);
+
         // Warn-cirkels op basis van internship-status
         const warn = new Set(WARN_STATUS[status] ?? []);
+
         // Contract-warn alleen tonen als student nog niet getekend heeft
         if (contractRes.status === "fulfilled") {
           const contract = contractRes.value?.data;
@@ -96,6 +103,7 @@ export default function Sidebar({ collapsed }) {
         setWarnPaths(warn);
       } else {
         setFaseInfo(FASE_MAP.geen);
+        setVoorstelStatus("geen");
       }
 
       setLockedGroups(locked);
@@ -103,6 +111,55 @@ export default function Sidebar({ collapsed }) {
 
     fetchLockState();
   }, [user.role, user.id]);
+
+  // Bepaal welke items naar "Afgehandeld" zakken
+  const isAfgehandeld =
+    user.role === "student" &&
+    !!voorstelStatus &&
+    AFGEHANDELD_STATUS.has(voorstelStatus);
+
+  const hoofdItems = items.filter(
+    (item) => !isAfgehandeld || !AFGEHANDELD_PATHS.has(item.path)
+  );
+  const onderItems = isAfgehandeld
+    ? items.filter((item) => AFGEHANDELD_PATHS.has(item.path))
+    : [];
+
+  // Helper: render één nav-item (link of locked)
+  function renderNavItem(item) {
+    const isLocked = item.lockGroup && lockedGroups.has(item.lockGroup);
+    const hasWarn  = warnPaths.has(item.path);
+
+    if (isLocked) {
+      return (
+        <div
+          key={item.path}
+          className="nav-item locked"
+          title={
+            item.lockGroup === "contract_docs"
+              ? "Beschikbaar na goedkeuring stagevoorstel"
+              : "Beschikbaar zodra stage loopt"
+          }
+        >
+          <i className={`ti ${item.icon}`}></i>
+          <span className="label">{item.label}</span>
+          <i className="ti ti-lock lock"></i>
+        </div>
+      );
+    }
+
+    return (
+      <NavLink
+        key={item.path}
+        to={item.path}
+        className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
+      >
+        <i className={`ti ${item.icon}`}></i>
+        <span className="label">{item.label}</span>
+        {hasWarn && <span className="nav-warn">!</span>}
+      </NavLink>
+    );
+  }
 
   return (
     <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
@@ -118,40 +175,15 @@ export default function Sidebar({ collapsed }) {
 
       {/* Navigatie */}
       <nav className="sidebar-nav">
-        {items.map((item) => {
-          const isLocked = item.lockGroup && lockedGroups.has(item.lockGroup);
-          const hasWarn  = warnPaths.has(item.path);
+        {hoofdItems.map(renderNavItem)}
 
-          if (isLocked) {
-            return (
-              <div
-                key={item.path}
-                className="nav-item locked"
-                title={
-                  item.lockGroup === "contract_docs"
-                    ? "Beschikbaar na goedkeuring stagevoorstel"
-                    : "Beschikbaar zodra stage loopt"
-                }
-              >
-                <i className={`ti ${item.icon}`}></i>
-                <span className="label">{item.label}</span>
-                <i className="ti ti-lock lock"></i>
-              </div>
-            );
-          }
-
-          return (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
-            >
-              <i className={`ti ${item.icon}`}></i>
-              <span className="label">{item.label}</span>
-              {hasWarn && <span className="nav-warn">!</span>}
-            </NavLink>
-          );
-        })}
+        {/* Afgehandeld sectie — overeenkomst + documenten als stage loopt */}
+        {onderItems.length > 0 && (
+          <div className="nav-section">
+            <div className="nav-section-label">Afgehandeld</div>
+            {onderItems.map(renderNavItem)}
+          </div>
+        )}
       </nav>
 
       {/* Side-status blok (alleen voor student, boven EHB logo) */}

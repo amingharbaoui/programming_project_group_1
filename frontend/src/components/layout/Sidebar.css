@@ -87,6 +87,33 @@
 }
 .sidebar.collapsed .nav-warn { display: none; }
 
+/* Kleine rode stip (minder urgent dan nav-warn) */
+.nav-dot {
+	margin-left: auto;
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--red);
+	flex-shrink: 0;
+}
+.sidebar.collapsed .nav-dot { display: none; }
+
+/* "Afgehandeld" sectie onderaan de navigatie */
+.nav-section {
+	margin-top: auto;
+	padding-top: 6px;
+	border-top: 0.5px solid var(--border);
+}
+.nav-section-label {
+	font-size: 10.5px;
+	color: var(--faint);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	padding: 6px 16px 4px;
+	white-space: nowrap;
+}
+.sidebar.collapsed .nav-section-label { display: none; }
+
 /* Side-status fase-kaart */
 .side-status {
 	margin: 8px 12px;
