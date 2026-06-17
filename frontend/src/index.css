@@ -236,7 +236,7 @@ h1 {
 	resize: vertical;
 }
 
-/* ── Gedeelde utility klassen (underscores) ─────────────────────── */
+/* Gedeelde utility klassen (underscores)  */
 
 /* Pagina wrapper */
 .page-inner,
@@ -437,7 +437,7 @@ h1 {
 	color: var(--white);
 }
 
-/* ── Einde gedeelde utility klassen ─────────────────────────────── */
+/*  Einde gedeelde utility klassen */
 
 /* Grids */
 .grid_2 {
@@ -452,7 +452,7 @@ h1 {
 	gap: 12px;
 }
 
-/* ---------- Card title icons grijs (zoals prototype card-title i) ---------- */
+/* ---------- Card title icons grijs  ---------- */
 .card_title i,
 .card_title svg { color: var(--sub); }
 
