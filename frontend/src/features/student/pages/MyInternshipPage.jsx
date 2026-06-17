@@ -221,7 +221,8 @@ export default function MyInternshipPage() {
         const res = await apiRequest("GET", "/contracts/my");
         const c = res.data;
         setContractStudentGekend(!!c?.student_getekend_op);
-        setVolledigGetekend(!!(c?.student_getekend_op && c?.bedrijf_getekend_op && c?.opleiding_getekend_op));
+        // Volledig getekend = student + bedrijf (mentor) beide getekend; opleiding_getekend_op wordt niet gebruikt
+        setVolledigGetekend(!!(c?.student_getekend_op && c?.bedrijf_getekend_op));
       } catch {
         // geen contract — ok
       }
