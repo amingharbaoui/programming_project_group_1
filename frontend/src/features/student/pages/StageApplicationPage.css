@@ -1,3 +1,7 @@
+/* Formulier-sectie titels rood (= form-section-title in prototype) */
+.card_title i,
+.card_title svg { color: var(--red); }
+
 /* Checklist item met icoon */
 .checklist-item {
   display: flex;

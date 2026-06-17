@@ -151,7 +151,7 @@ export default function StageApplicationPage() {
       {heeftConcept && !conceptOpgeslagen && (
         <div className="card" style={{ marginBottom: 0 }}>
           <div className="card_title" style={{ color: "var(--blue)" }}>
-            <IconInfoCircle size={16} />
+            <IconInfoCircle size={16} style={{ color: "var(--blue)" }} />
             Concept geladen
           </div>
           <p style={{ fontSize: 13, color: "var(--sub)" }}>
@@ -163,7 +163,7 @@ export default function StageApplicationPage() {
       {conceptOpgeslagen && (
         <div className="card" style={{ marginBottom: 0 }}>
           <div className="card_title" style={{ color: "var(--green)" }}>
-            <IconCircleCheck size={16} />
+            <IconCircleCheck size={16} style={{ color: "var(--green)" }} />
             Concept opgeslagen
           </div>
           <p style={{ fontSize: 13, color: "var(--sub)" }}>
