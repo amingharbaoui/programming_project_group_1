@@ -266,6 +266,7 @@ async function calculateResult(req, res) {
   const role = req.user?.hoofdrol;
   const userId = getUserId(req);
   const eindpresentatieScore = req.body?.eindpresentatieScore ?? req.body?.eindpresentatie_score ?? null;
+  const verslag = req.body?.verslag ?? null;
 
   if (!evaluationId) return fail(res, 400, "Ongeldig evaluatie-id");
   if (eindpresentatieScore !== null) {
@@ -306,18 +307,47 @@ async function calculateResult(req, res) {
     const competentieScore = Math.round(gewogen * 100) / 100;
 
     const isFinaal = evaluatie.type === "finaal";
-    const eindcijfer = isFinaal ? Math.round(competentieScore * 4 * 100) / 100 : null;
+    // Competentiescore (1-5) omgezet naar /20.
+    const competentie20 = Math.round(competentieScore * 4 * 100) / 100;
+    // Finaal eindcijfer = 80% competenties + 20% eindpresentatie (als die gescoord is), anders enkel competenties.
+    let eindcijfer = null;
+    if (isFinaal) {
+      const presentatie = eindpresentatieScore != null
+        ? Number(eindpresentatieScore)
+        : (evaluatie.eindpresentatie_score != null ? Number(evaluatie.eindpresentatie_score) : null);
+      eindcijfer = presentatie != null
+        ? Math.round((competentie20 * 0.8 + presentatie * 0.2) * 100) / 100
+        : competentie20;
+    }
     const nieuweStatus = isFinaal ? "klaar_voor_vrijgave" : "geregistreerd";
 
     await conn.query(
       `UPDATE evaluaties
        SET competentie_score = ?, eindcijfer = ?, eindpresentatie_score = COALESCE(?, eindpresentatie_score),
+           verslag = COALESCE(?, verslag),
            status = ?, docent_geregistreerd_op = NOW(), aangepast_op = NOW()
        WHERE id = ?`,
-      [competentieScore, eindcijfer, eindpresentatieScore, nieuweStatus, evaluationId]
+      [competentieScore, eindcijfer, eindpresentatieScore, verslag, nieuweStatus, evaluationId]
     );
 
     await conn.commit();
+
+    // Tussentijds geregistreerd → student en mentor kunnen het verslag bekijken (mockup-belofte).
+    if (!isFinaal) {
+      await meld(evaluatie.student_id, {
+        titel: "Tussentijdse evaluatie geregistreerd",
+        bericht: "De docent registreerde de tussentijdse bespreking. Je kan het verslag en de feedback bekijken.",
+        aangemaaktDoorId: userId,
+        stagedossierId: evaluatie.stagedossier_id,
+      });
+      await meld(evaluatie.mentor_id, {
+        titel: "Tussentijdse evaluatie geregistreerd",
+        bericht: "De docent registreerde de tussentijdse bespreking van je stagiair.",
+        aangemaaktDoorId: userId,
+        stagedossierId: evaluatie.stagedossier_id,
+      });
+    }
+
     return ok(res, { evaluatieId: evaluationId, competentieScore, eindcijfer, status: nieuweStatus }, isFinaal ? "Eindresultaat berekend" : "Tussentijdse evaluatie geregistreerd");
   } catch (error) {
     await conn.rollback();
