@@ -130,6 +130,7 @@ async function getEvaluationsForStudent(req, res) {
 async function loadEvaluationWithDossier(conn, evaluationId) {
   const [rows] = await conn.query(
     `SELECT e.id, e.type, e.status, e.stagedossier_id, e.eindcijfer,
+            e.eindpresentatie_score, e.competentie_score, e.vrijgegeven_op,
             d.student_id, d.mentor_id, d.stagebegeleider_id
      FROM evaluaties e
      JOIN stagedossiers d ON d.id = e.stagedossier_id
@@ -196,16 +197,55 @@ async function saveScores(req, res) {
       );
     }
 
+    let nieuweStatus = evaluatie.status;
     if (ingediend) {
+      const andereRol = role === "student" ? "mentor" : role === "mentor" ? "student" : null;
+      const andereRolIngediend = andereRol
+        ? await conn.query(
+            `SELECT COUNT(*) AS aantal
+             FROM competentie_scores
+             WHERE evaluatie_id = ? AND rol = ? AND ingediend = 1`,
+            [evaluationId, andereRol]
+          )
+        : [[{ aantal: 0 }]];
+
       if (role === "student") {
-        await conn.query("UPDATE evaluaties SET status = 'student_ingediend', student_ingediend_op = NOW(), aangepast_op = NOW() WHERE id = ?", [evaluationId]);
+        nieuweStatus = Number(andereRolIngediend[0][0].aantal) > 0 ? "klaar_voor_docent" : "student_ingediend";
+        await conn.query("UPDATE evaluaties SET status = ?, student_ingediend_op = NOW(), aangepast_op = NOW() WHERE id = ?", [nieuweStatus, evaluationId]);
       } else if (role === "mentor") {
-        await conn.query("UPDATE evaluaties SET status = 'mentor_ingediend', mentor_ingediend_op = NOW(), aangepast_op = NOW() WHERE id = ?", [evaluationId]);
+        nieuweStatus = Number(andereRolIngediend[0][0].aantal) > 0 ? "klaar_voor_docent" : "mentor_ingediend";
+        await conn.query("UPDATE evaluaties SET status = ?, mentor_ingediend_op = NOW(), aangepast_op = NOW() WHERE id = ?", [nieuweStatus, evaluationId]);
       }
     }
 
     await conn.commit();
-    return ok(res, { evaluatieId: evaluationId, rol: role, ingediend }, ingediend ? "Scores ingediend" : "Scores opgeslagen");
+
+    if (ingediend) {
+      try {
+        if (role === "student" && evaluatie.mentor_id) {
+          await meld(evaluatie.mentor_id, {
+            titel: "Evaluatie ingevuld door student",
+            bericht: "De student heeft de evaluatie ingevuld.",
+            aangemaaktDoorId: userId,
+            stagedossierId: evaluatie.stagedossier_id
+          });
+        }
+        if (role === "mentor" && evaluatie.stagebegeleider_id) {
+          await meld(evaluatie.stagebegeleider_id, {
+            titel: "Evaluatie klaar voor docent",
+            bericht: nieuweStatus === "klaar_voor_docent"
+              ? "Student en mentor hebben de evaluatie ingevuld."
+              : "De mentor heeft de evaluatie ingevuld.",
+            aangemaaktDoorId: userId,
+            stagedossierId: evaluatie.stagedossier_id
+          });
+        }
+      } catch (notifyError) {
+        console.error("Melding evaluatie mislukt:", notifyError.message);
+      }
+    }
+
+    return ok(res, { evaluatieId: evaluationId, rol: role, ingediend, status: nieuweStatus }, ingediend ? "Scores ingediend" : "Scores opgeslagen");
   } catch (error) {
     await conn.rollback();
     return fail(res, 500, "Scores opslaan mislukt", error.message);
@@ -228,6 +268,12 @@ async function calculateResult(req, res) {
   const eindpresentatieScore = req.body.eindpresentatieScore ?? req.body.eindpresentatie_score ?? null;
 
   if (!evaluationId) return fail(res, 400, "Ongeldig evaluatie-id");
+  if (eindpresentatieScore !== null) {
+    const score = Number(eindpresentatieScore);
+    if (!Number.isFinite(score) || score < 0 || score > 20) {
+      return fail(res, 400, "eindpresentatieScore moet tussen 0 en 20 liggen");
+    }
+  }
 
   const conn = await db.getConnection();
   try {
@@ -260,7 +306,7 @@ async function calculateResult(req, res) {
     const competentieScore = Math.round(gewogen * 100) / 100;
 
     const isFinaal = evaluatie.type === "finaal";
-    const eindcijfer = isFinaal ? competentieScore : null;
+    const eindcijfer = isFinaal ? Math.round(competentieScore * 4 * 100) / 100 : null;
     const nieuweStatus = isFinaal ? "klaar_voor_vrijgave" : "geregistreerd";
 
     await conn.query(

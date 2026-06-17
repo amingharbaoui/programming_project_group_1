@@ -1,6 +1,6 @@
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
-const { meld } = require("../utils/notify");
+const { meld, emailMelding } = require("../utils/notify");
 
 async function notifyStudentOfWeek(connection, weekId, opts) {
   try {
@@ -629,10 +629,145 @@ async function studentAntwoordFeedback(req, res) {
   }
 }
 
+async function getMissingLogbooksForDocent(req, res) {
+  const docentId = getUserId(req);
+
+  try {
+    const [dossiers] = await db.query(
+      `
+      SELECT
+        d.id AS stagedossier_id,
+        d.dossiernummer,
+        d.student_id,
+        d.aantal_weken,
+        d.startdatum,
+        d.einddatum,
+        g.voornaam,
+        g.achternaam,
+        g.email,
+        s.studentennummer,
+        b.naam AS bedrijf_naam
+      FROM stagedossiers d
+      JOIN gebruikers g ON g.id = d.student_id
+      JOIN studenten s ON s.gebruiker_id = d.student_id
+      JOIN bedrijven b ON b.id = d.bedrijf_id
+      WHERE d.stagebegeleider_id = ?
+      ORDER BY g.achternaam, g.voornaam
+      `,
+      [docentId]
+    );
+
+    if (dossiers.length === 0) {
+      return ok(res, [], "Geen gekoppelde dossiers gevonden");
+    }
+
+    const dossierIds = dossiers.map((d) => d.stagedossier_id);
+    const [weeks] = await db.query(
+      `
+      SELECT id, stagedossier_id, week_nummer, status, week_start, week_einde, ingediend_op
+      FROM logboek_weken
+      WHERE stagedossier_id IN (?)
+      `,
+      [dossierIds]
+    );
+
+    const weeksByDossier = new Map();
+    for (const week of weeks) {
+      if (!weeksByDossier.has(week.stagedossier_id)) weeksByDossier.set(week.stagedossier_id, new Map());
+      weeksByDossier.get(week.stagedossier_id).set(Number(week.week_nummer), week);
+    }
+
+    const result = dossiers.map((dossier) => {
+      const totalWeeks = Math.max(0, Number(dossier.aantal_weken || 0));
+      const existing = weeksByDossier.get(dossier.stagedossier_id) || new Map();
+      const ontbrekendeWeken = [];
+
+      for (let weekNummer = 1; weekNummer <= totalWeeks; weekNummer += 1) {
+        const week = existing.get(weekNummer);
+        if (!week || week.status === "ontbreekt") {
+          ontbrekendeWeken.push({
+            weekNummer,
+            status: week?.status || "ontbreekt",
+            logboekWeekId: week?.id || null
+          });
+        }
+      }
+
+      return {
+        ...dossier,
+        totaalWeken: totalWeeks,
+        ingediendeWeken: totalWeeks - ontbrekendeWeken.length,
+        ontbrekendeWeken,
+        ontbrekendeAantal: ontbrekendeWeken.length
+      };
+    });
+
+    return ok(res, result, "Ontbrekende logboeken berekend");
+  } catch (error) {
+    return fail(res, 500, "Ontbrekende logboeken ophalen mislukt", error.message);
+  }
+}
+
+async function sendMissingLogbookReminder(req, res) {
+  const docentId = getUserId(req);
+  const studentId = Number(req.params.studentId || req.body.studentId || req.body.student_id);
+  const weken = Array.isArray(req.body.weken) ? req.body.weken.map(Number).filter(Boolean) : [];
+
+  if (!studentId) return fail(res, 400, "studentId is verplicht");
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT d.id AS stagedossier_id, d.student_id, g.voornaam, g.achternaam
+      FROM stagedossiers d
+      JOIN gebruikers g ON g.id = d.student_id
+      WHERE d.student_id = ? AND d.stagebegeleider_id = ?
+      ORDER BY d.aangemaakt_op DESC
+      LIMIT 1
+      `,
+      [studentId, docentId]
+    );
+
+    if (rows.length === 0) {
+      return fail(res, 403, "Docent is niet gekoppeld aan deze student");
+    }
+
+    const weekTekst = weken.length > 0 ? ` voor week ${weken.join(", ")}` : "";
+    const bericht = `Gelieve je ontbrekende logboek${weekTekst} in te dienen.`;
+
+    await meld(studentId, {
+      titel: "Ontbrekend logboek",
+      bericht,
+      type: "herinnering",
+      ernst: "medium",
+      aangemaaktDoorId: docentId,
+      stagedossierId: rows[0].stagedossier_id
+    });
+    await emailMelding(studentId, {
+      titel: "Ontbrekend logboek",
+      bericht,
+      type: "herinnering",
+      ernst: "medium",
+      aangemaaktDoorId: docentId,
+      stagedossierId: rows[0].stagedossier_id
+    });
+
+    return ok(
+      res,
+      { studentId, stagedossierId: rows[0].stagedossier_id, weken, emailStatus: "geregistreerd" },
+      "Logboekherinnering verstuurd"
+    );
+  } catch (error) {
+    return fail(res, 500, "Logboekherinnering sturen mislukt", error.message);
+  }
+}
+
 module.exports = {
   createLogbook,
   getLogbooksByStudent,
   mentorCheckLogbookWeek,
   docentReviewLogbookWeek,
-  studentAntwoordFeedback
+  studentAntwoordFeedback,
+  getMissingLogbooksForDocent,
+  sendMissingLogbookReminder
 };

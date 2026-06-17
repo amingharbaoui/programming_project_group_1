@@ -1,12 +1,13 @@
-/* ---------- Stappen progress bar (prototype-match) ---------- */
+/* ---------- Stappen progress bar ---------- */
 .steps {
   display: flex;
   align-items: flex-start;
-  margin-bottom: 22px;
-  padding: 20px 20px 66px;
-  background: var(--muted);
-  border: 0.5px solid var(--border);
-  border-radius: 12px;
+  padding: 32px 20px 54px;
+  background-image: url("../../../assets/backgrounds/steps-background.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: 8px;
   overflow: hidden;
 }
 
