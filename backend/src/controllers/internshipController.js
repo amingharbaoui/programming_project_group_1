@@ -1516,7 +1516,85 @@ async function sendContractReminder(req, res) {
   }
 }
 
+// Zoekt de id van de huidige versie van een stagevoorstel.
+async function resolveHuidigeVersieId(conn, stagevoorstelId) {
+  const [rows] = await conn.query(
+    `SELECT v.id
+     FROM stagevoorstellen sv
+     JOIN stagevoorstel_versies v
+       ON v.stagevoorstel_id = sv.id AND v.versie_nummer = sv.huidige_versie_nummer
+     WHERE sv.id = ? LIMIT 1`,
+    [stagevoorstelId]
+  );
+  return rows[0]?.id || null;
+}
+
+// GET /api/committee/applications/:id/checklist — checklist van de huidige versie ophalen.
+async function getApplicationChecklist(req, res) {
+  const voorstelId = Number(req.params.id);
+  if (!voorstelId) return fail(res, 400, "Ongeldig voorstel-id");
+
+  try {
+    const versieId = await resolveHuidigeVersieId(db, voorstelId);
+    if (!versieId) return fail(res, 404, "Voorstel of versie niet gevonden");
+
+    const [rows] = await db.query(
+      `SELECT id, criterium, is_verplicht, is_in_orde, opmerking, gecontroleerd_op
+       FROM voorstel_checklist WHERE stagevoorstel_versie_id = ? ORDER BY id ASC`,
+      [versieId]
+    );
+    return ok(res, { stagevoorstelVersieId: versieId, items: rows }, "Checklist opgehaald");
+  } catch (error) {
+    return fail(res, 500, "Checklist ophalen mislukt", error.message);
+  }
+}
+
+// PUT /api/committee/applications/:id/checklist — checklist van de huidige versie opslaan (vervangt de bestaande).
+async function saveApplicationChecklist(req, res) {
+  const voorstelId = Number(req.params.id);
+  const userId = Number(req.user?.id);
+  const items = Array.isArray(req.body?.items) ? req.body.items : [];
+
+  if (!voorstelId) return fail(res, 400, "Ongeldig voorstel-id");
+  if (items.length === 0) return fail(res, 400, "Geen checklist-items meegegeven");
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const versieId = await resolveHuidigeVersieId(conn, voorstelId);
+    if (!versieId) { await conn.rollback(); return fail(res, 404, "Voorstel of versie niet gevonden"); }
+
+    await conn.query("DELETE FROM voorstel_checklist WHERE stagevoorstel_versie_id = ?", [versieId]);
+    for (const it of items) {
+      const criterium = String(it.criterium || "").trim();
+      if (!criterium) continue;
+      await conn.query(
+        `INSERT INTO voorstel_checklist
+           (stagevoorstel_versie_id, criterium, is_verplicht, is_in_orde, opmerking, gecontroleerd_door_id, gecontroleerd_op)
+         VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+        [versieId, criterium, it.isVerplicht === false ? 0 : 1, it.isInOrde ? 1 : 0, it.opmerking || null, userId]
+      );
+    }
+
+    const [rows] = await conn.query(
+      `SELECT id, criterium, is_verplicht, is_in_orde, opmerking, gecontroleerd_op
+       FROM voorstel_checklist WHERE stagevoorstel_versie_id = ? ORDER BY id ASC`,
+      [versieId]
+    );
+    await conn.commit();
+
+    return ok(res, { stagevoorstelVersieId: versieId, items: rows }, "Checklist opgeslagen");
+  } catch (error) {
+    await conn.rollback();
+    return fail(res, 500, "Checklist opslaan mislukt", error.message);
+  } finally {
+    conn.release();
+  }
+}
+
 module.exports = {
+  getApplicationChecklist,
+  saveApplicationChecklist,
   createInternship,
   saveDraft,
   withdrawInternship,
