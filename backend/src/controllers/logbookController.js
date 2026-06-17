@@ -288,6 +288,7 @@ async function createLogbook(req, res) {
     }
 
     for (const day of finalDays) {
+      const competenties = Array.isArray(day.competenties) ? day.competenties : [];
       await connection.query(
         `
         INSERT INTO logboek_dagen
@@ -300,11 +301,12 @@ async function createLogbook(req, res) {
           reflectie,
           problemen,
           leerpunten,
+          competenties,
           aantal_uren,
           aangemaakt_op,
           aangepast_op
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         `,
         [
           weekId,
@@ -315,6 +317,7 @@ async function createLogbook(req, res) {
           day.reflectie || null,
           day.problemen || null,
           day.leerpunten || null,
+          competenties.length > 0 ? JSON.stringify(competenties) : null,
           Number(day.aantalUren || day.aantal_uren || 0)
         ]
       );
@@ -428,6 +431,7 @@ async function getLogbooksByStudent(req, res) {
         reflectie,
         problemen,
         leerpunten,
+        competenties,
         aantal_uren
       FROM logboek_dagen
       WHERE logboek_week_id IN (?)
