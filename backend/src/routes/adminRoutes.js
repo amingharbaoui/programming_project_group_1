@@ -11,6 +11,7 @@ const {
 const { getSettings, updateStageRule, updateDocumentType, createDocumentType } = require("../controllers/settingsController");
 const { inviteMentor } = require("../controllers/userController");
 const { approveDocument, rejectDocument } = require("../controllers/documentController");
+const { registerOvereenkomst } = require("../controllers/contractController");
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
 
 const router = express.Router();
@@ -22,6 +23,7 @@ router.get("/dossiers/:id", getAdminDossierById);
 router.patch("/dossiers/:id/status", updateAdminDossierStatus);
 router.patch("/dossiers/:id/assign", assignDossier);
 router.patch("/dossiers/:id/startklaar", registerDossierStartklaar);
+router.patch("/dossiers/:id/overeenkomst/registreer", registerOvereenkomst);
 router.post("/dossiers/:id/eindoverzicht", generateEindoverzicht);
 router.post("/dossiers/:id/reminder", sendContractReminder);
 
