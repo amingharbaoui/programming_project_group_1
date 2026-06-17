@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import AppLayout from "./components/layout/AppLayout";
+import MentorLayout from "./features/mentor/MentorLayout";
 import LoginPage from "./components/layout/LoginPage.jsx";
 
 import StageApplicationPage from "./features/student/pages/StageApplicationPage";
@@ -55,6 +56,12 @@ export default function App() {
             <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/admin/competencies" element={<CompetenciesPage />} />
 
+            <Route path="/docent/students" element={<DocentStudentsPage />} />
+            <Route path="/docent/logbooks" element={<DocentLogbooksPage />} />
+            <Route path="/docent/evaluations" element={<DocentEvaluationsPage />} />
+          </Route>
+
+          <Route element={<MentorLayout />}>
             <Route path="/mentor/students" element={<MentorStudentsPage />} />
             <Route path="/mentor/dossier" element={<MentorDossierPage />} />
             <Route path="/mentor/logbooks" element={<MentorLogbooksPage />} />
@@ -62,10 +69,6 @@ export default function App() {
             <Route path="/mentor/contract" element={<MentorContractPage />} />
             <Route path="/mentor/afspraken" element={<MentorAfsprakenPage />} />
             <Route path="/mentor/planning" element={<MentorPlanningPage />} />
-
-            <Route path="/docent/students" element={<DocentStudentsPage />} />
-            <Route path="/docent/logbooks" element={<DocentLogbooksPage />} />
-            <Route path="/docent/evaluations" element={<DocentEvaluationsPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
