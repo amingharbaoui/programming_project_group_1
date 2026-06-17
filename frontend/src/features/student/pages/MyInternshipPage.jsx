@@ -132,15 +132,17 @@ function BegeleidingKaart({ data, wacht }) {
   );
 }
 
-function TaakKaart({ status, contractSigned, navigate }) {
-  const taken = [];
+const VERBERG_DOC = new Set(["reflectiebijlage", "eindoverzicht", "stageovereenkomst"]);
+const DOC_ACTIE_STATUS = new Set(["ontbreekt", "afgekeurd"]);
 
-  if (status === "goedgekeurd" && !contractSigned) {
-    taken.push({ icon: "ti-signature", label: "Onderteken je stageovereenkomst digitaal.", path: "/student/contract", iconCls: "amber" });
-    taken.push({ icon: "ti-upload", label: "Upload je verplichte stagecumenten.", path: "/student/documents", iconCls: "amber" });
-  } else if (status === "goedgekeurd" && contractSigned) {
-    taken.push({ icon: "ti-circle-check", label: "Alles in orde — je stage start binnenkort.", path: null, iconCls: "groen" });
+function TaakKaart({ status, contractStudentGekend, docsOk, navigate }) {
+  if (status !== "goedgekeurd") {
+    // Stage loopt of andere fase — geen taken meer van toepassing
+    return null;
   }
+
+  const contractOk = !!contractStudentGekend;
+  const alleOk = contractOk && docsOk;
 
   return (
     <div className="taak-kaart">
@@ -148,22 +150,45 @@ function TaakKaart({ status, contractSigned, navigate }) {
         <i className="ti ti-list-check"></i>
         Wat moet je nu doen
       </div>
-      {taken.length === 0 ? (
+
+      {alleOk ? (
         <div className="taak-rij">
-          <div className={`taak-icon groen`}><i className="ti ti-circle-check"></i></div>
-          <div className="taak-info">Niets te doen — je bent helemaal mee.</div>
+          <div className="taak-icon groen"><i className="ti ti-circle-check"></i></div>
+          <div className="taak-info">Alles in orde — je stage start binnenkort.</div>
         </div>
-      ) : taken.map((t, i) => (
-        <div key={i} className="taak-rij">
-          <div className={`taak-icon ${t.iconCls}`}><i className={`ti ${t.icon}`}></i></div>
-          <div className="taak-info">{t.label}</div>
-          {t.path && (
-            <button className="btn primary sm" onClick={() => navigate(t.path)}>
-              Ga <IconArrowRight size={13} />
-            </button>
-          )}
-        </div>
-      ))}
+      ) : (
+        <>
+          {/* Contract taak */}
+          <div className="taak-rij">
+            <div className={`taak-icon ${contractOk ? "groen" : "amber"}`}>
+              <i className={`ti ${contractOk ? "ti-circle-check" : "ti-signature"}`}></i>
+            </div>
+            <div className="taak-info">
+              {contractOk ? "Stageovereenkomst ondertekend." : "Onderteken je stageovereenkomst digitaal."}
+            </div>
+            {!contractOk && (
+              <button className="btn primary sm" onClick={() => navigate("/student/contract")}>
+                Ga <IconArrowRight size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* Documenten taak */}
+          <div className="taak-rij">
+            <div className={`taak-icon ${docsOk ? "groen" : "amber"}`}>
+              <i className={`ti ${docsOk ? "ti-circle-check" : "ti-upload"}`}></i>
+            </div>
+            <div className="taak-info">
+              {docsOk ? "Verplichte documenten geüpload." : "Upload je verplichte stagedocumenten."}
+            </div>
+            {!docsOk && (
+              <button className="btn primary sm" onClick={() => navigate("/student/documents")}>
+                Ga <IconArrowRight size={13} />
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -178,7 +203,9 @@ export default function MyInternshipPage() {
   const [intrekModal,      setIntrekModal]      = useState(false);
   const [intrekken,        setIntrekken]        = useState(false);
   const [intrekFout,       setIntrekFout]       = useState(null);
-  const [contractGetekend, setContractGetekend] = useState(false);
+  const [contractStudentGekend, setContractStudentGekend] = useState(false);
+  const [volledigGetekend, setVolledigGetekend] = useState(false);
+  const [docsOk, setDocsOk] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -193,11 +220,31 @@ export default function MyInternshipPage() {
       try {
         const res = await apiRequest("GET", "/contracts/my");
         const c = res.data;
-        if (c?.student_getekend_op && c?.bedrijf_getekend_op && c?.opleiding_getekend_op) {
-          setContractGetekend(true);
-        }
+        setContractStudentGekend(!!c?.student_getekend_op);
+        setVolledigGetekend(!!(c?.student_getekend_op && c?.bedrijf_getekend_op && c?.opleiding_getekend_op));
       } catch {
         // geen contract — ok
+      }
+      try {
+        const [docsRes, soortenRes] = await Promise.all([
+          apiRequest("GET", "/documents/my"),
+          apiRequest("GET", "/documents/soorten"),
+        ]);
+        const docs = docsRes.data ?? [];
+        const soorten = (soortenRes.data ?? []).filter((s) => {
+          const t = (s.type ?? "").toLowerCase();
+          const n = (s.naam ?? "").toLowerCase();
+          return !VERBERG_DOC.has(t) && !VERBERG_DOC.has(n);
+        });
+        const alleGoed = soorten.length > 0 && soorten.every((s) => {
+          const actief = docs
+            .filter((d) => d.document_soort_id === s.id)
+            .sort((a, b) => (b.versie_nummer ?? 0) - (a.versie_nummer ?? 0))[0];
+          return actief && !DOC_ACTIE_STATUS.has(actief.status);
+        });
+        setDocsOk(alleGoed);
+      } catch {
+        // docs niet beschikbaar
       }
     }
     fetchData();
@@ -428,8 +475,8 @@ export default function MyInternshipPage() {
       {/* ── GOEDGEKEURD / TERUGGESTUURD / VALIDATIE ── */}
       {isGoedgekeurd && (
         <>
-          <ProgressBar status={currentStatus} contractGetekend={contractGetekend} />
-          <TaakKaart status={currentStatus} contractSigned={contractGetekend} navigate={navigate} />
+          <ProgressBar status={currentStatus} contractGetekend={volledigGetekend} />
+          <TaakKaart status={currentStatus} contractStudentGekend={contractStudentGekend} docsOk={docsOk} navigate={navigate} />
           <div style={{ borderTop: "1px solid var(--border)", marginTop: 16, paddingTop: 14 }}>
             <div className="grid_2">
               <DossierKaart
