@@ -47,6 +47,13 @@ app.use("/api/documents", documentRoutes);
 app.use("/api/notifications", notificationRoutes);
 app.use("/api/planning", planningRoutes);
 
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Route niet gevonden"
+  });
+});
+
 app.listen(PORT, () => {
-  console.log("Server draait op poort", PORT);
+  console.log(`Server is running on port ${PORT}`);
 });
