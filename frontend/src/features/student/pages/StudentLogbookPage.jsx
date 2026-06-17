@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { apiRequest } from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import "./Logboek.css";
 import {
   IconCalendar,
   IconSend,
