@@ -7,7 +7,6 @@ import {
   IconCircleCheck,
   IconAlertCircle,
   IconEye,
-  IconHistory,
   IconFolderOpen,
 } from "@tabler/icons-react";
 
@@ -32,12 +31,10 @@ function formatDatum(d) {
 
 /* ── Verplicht document kaart ── */
 function DocumentKaart({ soort, documenten, onUpload }) {
-  const [bezig, setBezig]               = useState(false);
-  const [historiekOpen, setHistoriekOpen] = useState(false);
+  const [bezig, setBezig] = useState(false);
   const inputRef = useRef(null);
 
-  const actief    = documenten?.[0] ?? null;
-  const historiek = documenten?.slice(1) ?? [];
+  const actief = documenten?.[0] ?? null;
 
   async function handleBestandKiezen(e) {
     const bestand = e.target.files?.[0];
@@ -100,27 +97,6 @@ function DocumentKaart({ soort, documenten, onUpload }) {
         />
       </div>
 
-      {historiek.length > 0 && (
-        <div className="doc-historiek">
-          <button className="doc-historiek-toggle" onClick={() => setHistoriekOpen((o) => !o)}>
-            <IconHistory size={13} />
-            {historiekOpen ? "Historiek verbergen" : `${historiek.length} eerdere versie(s)`}
-          </button>
-          {historiekOpen && (
-            <div className="doc-historiek-lijst">
-              {historiek.map((d) => (
-                <div key={d.id} className="doc-historiek-rij">
-                  <span>v{d.versie_nummer} · {formatDatum(d.opgeladen_op)}</span>
-                  <StatusBadge status={d.status} />
-                  {d.bestand_url && (
-                    <a href={d.bestand_url} target="_blank" rel="noreferrer" className="btn sm">Bekijken</a>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -256,11 +232,6 @@ export default function StudentDocumentsPage() {
           <IconFolderOpen size={16} />
           Eigen documenten
         </div>
-        <p style={{ fontSize: 12.5, color: "var(--sub)", marginBottom: 14, lineHeight: 1.55 }}>
-          Komt er iets tussen — een attest, een aangepaste planning, een extra verslag — voeg het hier toe.
-          Je docent en de administratie kunnen het inkijken.
-        </p>
-
         {eigenDocs.length > 0 && (
           <div className="doc-lijst" style={{ marginBottom: 14 }}>
             {eigenDocs.map((doc) => (
