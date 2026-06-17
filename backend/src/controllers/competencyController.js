@@ -50,9 +50,19 @@ async function listCompetencies(req, res) {
       .filter((c) => c.is_actief)
       .reduce((sum, c) => sum + Number(c.gewicht_percentage || 0), 0);
 
+    // Dossiers hangen niet met een FK aan een profiel, maar via opleiding + academiejaar.
+    let aantalDossiers = 0;
+    if (profielen[0]) {
+      const [telling] = await db.query(
+        "SELECT COUNT(*) AS aantal FROM stagedossiers WHERE opleiding = ? AND academiejaar = ?",
+        [profielen[0].opleiding, profielen[0].academiejaar]
+      );
+      aantalDossiers = telling[0]?.aantal || 0;
+    }
+
     return ok(
       res,
-      { profiel: profielen[0] || null, competenties, totaalGewicht },
+      { profiel: profielen[0] || null, competenties, totaalGewicht, aantalDossiers },
       "Competenties opgehaald"
     );
   } catch (error) {

@@ -149,11 +149,11 @@ function userMayEditAsRole(dossier, role, userId) {
 
 // Student/mentor/docent slaat scores + motivatie per competentie op.
 async function saveScores(req, res) {
-  const evaluationId = Number(req.params.evaluationId);
+  const evaluationId = Number(req.params.id ?? req.params.evaluationId);
   const role = req.user?.hoofdrol;
   const userId = getUserId(req);
-  const ingediend = Boolean(req.body.ingediend);
-  const scores = Array.isArray(req.body.scores) ? req.body.scores : [];
+  const ingediend = Boolean(req.body?.ingediend);
+  const scores = Array.isArray(req.body?.scores) ? req.body.scores : [];
 
   if (!evaluationId) return fail(res, 400, "Ongeldig evaluatie-id");
   if (!["student", "mentor", "docent"].includes(role)) return fail(res, 403, "Deze rol kan geen scores invullen");
@@ -262,10 +262,10 @@ function mayActAsDocent(evaluatie, role, userId) {
 
 // Docent berekent het eindresultaat uit de docentscores.
 async function calculateResult(req, res) {
-  const evaluationId = Number(req.params.evaluationId);
+  const evaluationId = Number(req.params.id ?? req.params.evaluationId);
   const role = req.user?.hoofdrol;
   const userId = getUserId(req);
-  const eindpresentatieScore = req.body.eindpresentatieScore ?? req.body.eindpresentatie_score ?? null;
+  const eindpresentatieScore = req.body?.eindpresentatieScore ?? req.body?.eindpresentatie_score ?? null;
 
   if (!evaluationId) return fail(res, 400, "Ongeldig evaluatie-id");
   if (eindpresentatieScore !== null) {
@@ -329,7 +329,7 @@ async function calculateResult(req, res) {
 
 // Docent geeft het eindresultaat vrij.
 async function releaseResult(req, res) {
-  const evaluationId = Number(req.params.evaluationId);
+  const evaluationId = Number(req.params.id ?? req.params.evaluationId);
   const role = req.user?.hoofdrol;
   const userId = getUserId(req);
 

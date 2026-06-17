@@ -43,7 +43,11 @@ router.patch("/dossier/:dossierId/afspraken", updateAfspraken);
 
 // Planning: bedrijfsbezoek bevestigen of alternatief voorstellen (story 30)
 router.get("/planning", listMentorPlanning);
+router.get("/planning/:dossierId", listMentorPlanning);
 router.patch("/planning/:id/confirm", confirmMentorPlanning);
 router.patch("/planning/:id/alternative", proposeAlternative);
+// Aliassen die de frontend gebruikt (NL-benamingen)
+router.patch("/planning/:id/bevestig", confirmMentorPlanning);
+router.patch("/planning/:id/alternatief", proposeAlternative);
 
 module.exports = router;

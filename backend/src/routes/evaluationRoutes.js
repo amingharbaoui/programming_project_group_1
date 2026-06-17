@@ -17,4 +17,11 @@ router.patch("/:id/scores", saveScores);
 router.patch("/:id/calculate", requireRole("administratie", "docent"), calculateResult);
 router.patch("/:id/release", requireRole("administratie", "docent"), releaseResult);
 
+// Aliassen zodat de frontend (POST + pad zonder /student) ook werkt
+router.post("/:id/scores", saveScores);
+router.post("/:id/calculate", requireRole("administratie", "docent"), calculateResult);
+router.post("/:id/release", requireRole("administratie", "docent"), releaseResult);
+// Let op: deze catch-all GET moet als laatste staan (anders vangt hij /my-students etc.)
+router.get("/:studentId", getEvaluationsForStudent);
+
 module.exports = router;
