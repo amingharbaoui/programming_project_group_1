@@ -142,10 +142,7 @@ export default function StudentContractPage() {
     <div className="page-inner">
 
       <div className="page-header">
-        <div>
-          <h1>Stageovereenkomst</h1>
-          <p>Dossier {contract.dossiernummer}</p>
-        </div>
+        <h1>Stageovereenkomst</h1>
         <button className="btn sm" onClick={() => window.print()}>
           <IconPrinter size={14} /> Afdrukken / PDF
         </button>
@@ -219,20 +216,6 @@ export default function StudentContractPage() {
               {bezig ? "Bezig…" : "Digitaal ondertekenen"}
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Al getekend */}
-      {alGetekend && (
-        <div className="card">
-          <div className="card_title">
-            <IconCircleCheck size={16} />
-            Ondertekend
-          </div>
-          <span className="status s_ok">
-            <IconCircleCheck size={13} />
-            Je hebt ondertekend op <strong>{formatDatumTijd(contract.student_getekend_op)}</strong>
-          </span>
         </div>
       )}
 
