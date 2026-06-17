@@ -83,3 +83,27 @@
 .mtr .form-input{width:100%;padding:8px 11px;border:0.5px solid var(--border);border-radius:7px;font-family:var(--font);font-size:13px;color:var(--dark);background:var(--white);outline:none;}
 .mtr .form-input:focus{border-color:var(--red);}
 .mtr .req{color:var(--red);margin-left:2px;}
+
+/* logboek */
+.mtr .s-amber{background:var(--amber-bg);color:var(--amber);}
+.mtr .zone-act{margin-bottom:18px;}
+.mtr .zone-act.leeg{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--sub);padding:4px 2px;}
+.mtr .zone-act.leeg i{color:var(--green);font-size:16px;}
+.mtr .logweek{background:var(--white);border-radius:9px;border:0.5px solid var(--border);margin-bottom:10px;overflow:hidden;}
+.mtr .logweek-header{display:flex;align-items:center;gap:9px;padding:11px 14px;cursor:pointer;transition:background .12s;flex-wrap:wrap;}
+.mtr .logweek-header:hover{background:var(--muted);}
+.mtr .logweek-chevron{margin-left:auto;font-size:16px;color:var(--faint);transition:transform .2s;}
+.mtr .logweek-header.open .logweek-chevron{transform:rotate(180deg);}
+.mtr .logweek-body{display:none;border-top:0.5px solid var(--border);padding:14px;}
+.mtr .logweek-body.open{display:block;}
+.mtr .wk-pills{display:inline-flex;gap:3px;}
+.mtr .wk-pill{font-size:9px;font-weight:600;width:22px;height:16px;border-radius:4px;display:inline-flex;align-items:center;justify-content:center;background:var(--green-bg);color:var(--green);}
+.mtr .wk-pill.mis{background:var(--red-light);color:var(--red);}
+.mtr .entry{background:var(--muted);border-radius:8px;padding:13px 15px;margin-bottom:8px;}
+.mtr .entry .e-dag{font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:9px;}
+.mtr .entry .e-veld{font-size:12.5px;line-height:1.6;color:var(--gray);margin-bottom:8px;display:flex;gap:8px;}
+.mtr .entry .e-veld b{color:var(--faint);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px;flex:0 0 86px;padding-top:2px;}
+.mtr .comment-thread{margin-top:8px;border-left:2px solid var(--red-mid);padding-left:10px;}
+.mtr .comment{font-size:12.5px;margin-bottom:6px;line-height:1.45;}
+.mtr .comment .wie{font-weight:600;font-size:11.5px;display:flex;align-items:center;gap:5px;}
+.mtr .comment .wat{color:var(--gray);margin-top:1px;}
