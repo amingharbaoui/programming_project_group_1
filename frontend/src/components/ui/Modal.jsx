@@ -13,7 +13,7 @@ import { useEffect } from "react";
  *   children  – body-inhoud (JSX)
  *   footer    – knoppenrij onderaan (JSX, optioneel)
  */
-export default function Modal({ open, onClose, icon, titel, sub, children, footer }) {
+export default function Modal({ open, onClose, icon, titel, sub, children, footer, wide }) {
   // Sluiten bij Escape-toets
   useEffect(() => {
     function onKey(e) {
@@ -30,7 +30,7 @@ export default function Modal({ open, onClose, icon, titel, sub, children, foote
       className="modal-overlay"
       onClick={(e) => e.target === e.currentTarget && onClose?.()}
     >
-      <div className="modal" role="dialog" aria-modal="true">
+      <div className={`modal${wide ? " modal--wide" : ""}`} role="dialog" aria-modal="true">
         {/* Kop */}
         <div className="modal-head">
           {icon && (

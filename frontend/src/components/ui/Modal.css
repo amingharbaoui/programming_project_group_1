@@ -23,6 +23,11 @@
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.22);
 }
 
+/* Brede variant voor previews */
+.modal--wide {
+  max-width: min(900px, 92vw);
+}
+
 /* Kop */
 .modal-head {
   padding: 15px 18px;

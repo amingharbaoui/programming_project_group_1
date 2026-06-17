@@ -20,6 +20,7 @@ const STATUS_MAP = {
   goedgekeurd:   ["s_ok",    "Goedgekeurd"],
   geregistreerd: ["s_ok",    "Geregistreerd"],
 };
+const CONTRACT_GEREGISTREERD = ["startklaar", "gestart", "lopend", "presentatie", "afgerond", "geregistreerd"];
 
 function StatusBadge({ status }) {
   const [cls, label] = STATUS_MAP[status] ?? ["s_grijs", status ?? "–"];
@@ -31,8 +32,21 @@ function formatDatum(d) {
   return new Date(d).toLocaleDateString("nl-BE", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+function isAfbeelding(url) {
+  return /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url ?? "");
+}
+
+function deadlineVoorDocument(soort, documenten, contract) {
+  if (soort.type === "stageovereenkomst") {
+    return CONTRACT_GEREGISTREERD.includes(contract?.status) ? "" : "vóór de start";
+  }
+
+  const actief = documenten?.[0];
+  return ["goedgekeurd", "geregistreerd"].includes(actief?.status) ? "" : "tegen start";
+}
+
 /* ── Verplicht document kaart ── */
-function DocumentKaart({ soort, documenten, onUpload, onFout }) {
+function DocumentKaart({ soort, documenten, onUpload, onFout, onBekijken }) {
   const [bezig, setBezig] = useState(false);
   const inputRef = useRef(null);
 
@@ -79,9 +93,9 @@ function DocumentKaart({ soort, documenten, onUpload, onFout }) {
         <StatusBadge status={actief?.status ?? "ontbreekt"} />
 
         {actief?.bestand_url && (
-          <a href={actief.bestand_url} target="_blank" rel="noreferrer" className="btn sm">
+          <button className="btn sm" onClick={() => onBekijken(actief.bestand_url, soort.naam)}>
             <IconEye size={14} /> Bekijken
-          </a>
+          </button>
         )}
 
         <button className="btn sm primary" disabled={bezig} onClick={() => inputRef.current?.click()}>
@@ -103,10 +117,9 @@ function DocumentKaart({ soort, documenten, onUpload, onFout }) {
 
 /* ── Stageovereenkomst rij (niet uploadbaar, link naar contract pagina) ── */
 function OvereenkomstRij({ contract, navigate }) {
-  const GEREGISTREERD = ["startklaar","gestart","lopend","presentatie","afgerond","geregistreerd"];
   const status = !contract
     ? "ontbreekt"
-    : GEREGISTREERD.includes(contract.status)
+    : CONTRACT_GEREGISTREERD.includes(contract.status)
     ? "geregistreerd"
     : ["volledig_ondertekend","in_controle_bij_administratie","validatie"].includes(contract.status)
     ? "in_controle"
@@ -116,7 +129,7 @@ function OvereenkomstRij({ contract, navigate }) {
 
   const meta = !contract
     ? "Digitaal te ondertekenen — regelt je verzekering"
-    : GEREGISTREERD.includes(contract.status)
+    : CONTRACT_GEREGISTREERD.includes(contract.status)
     ? "Geregistreerd door de administratie"
     : ["volledig_ondertekend","in_controle_bij_administratie","validatie"].includes(contract.status)
     ? "Volledig ondertekend — in controle bij administratie"
@@ -136,7 +149,7 @@ function OvereenkomstRij({ contract, navigate }) {
       <div className="doc-rij-rechts">
         <StatusBadge status={status} />
         <button className="btn sm" onClick={() => navigate("/student/contract")}>
-          {GEREGISTREERD.includes(contract?.status) ? "Bekijk" : "Ga naar"}
+          {CONTRACT_GEREGISTREERD.includes(contract?.status) ? "Bekijk" : "Ga naar"}
           <IconArrowRight size={13} />
         </button>
       </div>
@@ -145,7 +158,7 @@ function OvereenkomstRij({ contract, navigate }) {
 }
 
 /* ── Eigen document rij ── */
-function EigenDocRij({ doc, onDelete }) {
+function EigenDocRij({ doc, onBekijken }) {
   return (
     <div className="doc-rij">
       <div className="doc-rij-links">
@@ -158,9 +171,9 @@ function EigenDocRij({ doc, onDelete }) {
       <div className="doc-rij-rechts">
         <StatusBadge status={doc.status} />
         {doc.bestand_url && (
-          <a href={doc.bestand_url} target="_blank" rel="noreferrer" className="btn sm">
+          <button className="btn sm" onClick={() => onBekijken(doc.bestand_url, doc.bestand_naam)}>
             <IconEye size={14} /> Bekijken
-          </a>
+          </button>
         )}
       </div>
     </div>
@@ -176,6 +189,7 @@ export default function StudentDocumentsPage() {
   const [loading, setLoading]       = useState(true);
   const [fout, setFout]             = useState(null);
   const [uploadFout, setUploadFout] = useState(null);
+  const [preview, setPreview] = useState(null); // { url, naam }
   const [eigenBezig, setEigenBezig] = useState(false);
   const eigenInputRef = useRef(null);
 
@@ -280,32 +294,49 @@ export default function StudentDocumentsPage() {
       })()}
 
       {/* Verplichte documenten */}
-      <div className="card">
-        <div className="card_title">
+      <section className="docs-section">
+        <div className="card_title docs-section-title">
           <i className="ti ti-file" style={{ fontSize: 16 }}></i>
           Verplichte documenten
         </div>
 
         {soorten.length === 0 ? (
-          <p style={{ fontSize: 13, color: "var(--sub)" }}>Geen verplichte documenten gevonden.</p>
+          <div className="card"><p style={{ fontSize: 13, color: "var(--sub)" }}>Geen verplichte documenten gevonden.</p></div>
         ) : (
-          <div className="doc-lijst">
-            {soorten.map((soort) =>
-              soort.type === "stageovereenkomst" ? (
-                <OvereenkomstRij key={soort.id} contract={contractData} navigate={navigate} />
-              ) : (
-                <DocumentKaart
-                  key={soort.id}
-                  soort={soort}
-                  documenten={groeperPerSoort(soort.id)}
-                  onUpload={laadData}
-                  onFout={setUploadFout}
-                />
-              )
-            )}
+          <div className="doc-verplicht-lijst">
+            {soorten.map((soort) => {
+              const docsVoorSoort = groeperPerSoort(soort.id);
+              const deadline = deadlineVoorDocument(soort, docsVoorSoort, contractData);
+
+              return (
+                <div className="doc-verplicht-item" key={soort.id}>
+                  <div className="doc-verplicht-card">
+                    {soort.type === "stageovereenkomst" ? (
+                      <OvereenkomstRij contract={contractData} navigate={navigate} />
+                    ) : (
+                      <DocumentKaart
+                        soort={soort}
+                        documenten={docsVoorSoort}
+                        onUpload={laadData}
+                        onFout={setUploadFout}
+                        onBekijken={(url, naam) => setPreview({ url, naam })}
+                      />
+                    )}
+                  </div>
+                  <div className="doc-deadline">
+                    {deadline && (
+                      <>
+                        <i className="ti ti-clock"></i>
+                        <span>{deadline}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
-      </div>
+      </section>
 
       {/* Eigen documenten */}
       <div className="card">
@@ -316,7 +347,7 @@ export default function StudentDocumentsPage() {
         {eigenDocs.length > 0 && (
           <div className="doc-lijst" style={{ marginBottom: 14 }}>
             {eigenDocs.map((doc) => (
-              <EigenDocRij key={doc.id} doc={doc} onDelete={laadData} />
+              <EigenDocRij key={doc.id} doc={doc} onBekijken={(url, naam) => setPreview({ url, naam })} />
             ))}
           </div>
         )}
@@ -340,6 +371,42 @@ export default function StudentDocumentsPage() {
       </div>
 
     </div>
+
+    {/* Preview-modal */}
+    <Modal
+      wide
+      open={!!preview}
+      onClose={() => setPreview(null)}
+      icon="ti-eye"
+      titel={preview?.naam ?? "Document"}
+      footer={
+        <a
+          href={preview?.url}
+          target="_blank"
+          rel="noreferrer"
+          className="btn"
+          style={{ marginRight: "auto" }}
+        >
+          <i className="ti ti-external-link"></i> Openen in nieuw tabblad
+        </a>
+      }
+    >
+      {preview && (
+        isAfbeelding(preview.url) ? (
+          <img
+            src={preview.url}
+            alt={preview.naam}
+            style={{ maxWidth: "100%", display: "block", borderRadius: 6 }}
+          />
+        ) : (
+          <embed
+            src={preview.url}
+            type="application/pdf"
+            style={{ width: "100%", height: "65vh", border: "none", borderRadius: 6 }}
+          />
+        )
+      )}
+    </Modal>
 
     {/* Fout-modal bij mislukte upload */}
     <Modal
