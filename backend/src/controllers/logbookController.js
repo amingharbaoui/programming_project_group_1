@@ -470,6 +470,9 @@ async function mentorCheckLogbookWeek(req, res) {
   } = req.body;
 
   const needsResubmission = Boolean(herindieningNodig);
+  if (needsResubmission && !((feedback || mentorFeedback) && String(feedback || mentorFeedback).trim())) {
+    return fail(res, 400, "Feedback is verplicht wanneer je de week terugstuurt voor aanpassing");
+  }
   const connection = await db.getConnection();
 
   try {
@@ -541,6 +544,9 @@ async function docentReviewLogbookWeek(req, res) {
   } = req.body;
 
   const needsResubmission = Boolean(herindieningNodig);
+  if (needsResubmission && !((feedback || docentFeedback) && String(feedback || docentFeedback).trim())) {
+    return fail(res, 400, "Feedback is verplicht wanneer je de week terugstuurt voor aanpassing");
+  }
   const connection = await db.getConnection();
 
   try {
