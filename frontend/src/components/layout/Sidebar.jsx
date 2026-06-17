@@ -103,11 +103,33 @@ export default function Sidebar({ collapsed }) {
         }
       }
 
+      // Logboek-dot alleen tonen als de huidige week nog NIET is ingediend
+      let showLogboekDot = !!(access.dot === "logboek");
+      if (showLogboekDot) {
+        try {
+          const logRes = await apiRequest("GET", `/logbooks/${user.id}`);
+          const weken = Array.isArray(logRes.data) ? logRes.data : [];
+          // Bereken huidige weeknummer op basis van startdatum
+          const startdatum = access.startdatum ? new Date(access.startdatum) : null;
+          if (startdatum) {
+            const vandaag = new Date();
+            const verschil = Math.floor((vandaag - startdatum) / (1000 * 60 * 60 * 24));
+            const huidigeWeek = Math.max(1, Math.ceil((verschil + 1) / 7));
+            const alIngediend = weken.some(
+              (w) => w.week_nummer === huidigeWeek && w.status !== "ontbreekt"
+            );
+            if (alIngediend) showLogboekDot = false;
+          }
+        } catch {
+          // Fout bij ophalen logboek: dot toch tonen als fallback
+        }
+      }
+
       setFaseStatus(access.key);
       setFaseInfo({ idx: access.faseIdx, naam: access.fase, actie: access.actie });
       setOpenPaths(nextOpenPaths);
       setWarnPaths(warn);
-      setDotPaths(access.dot && STUDENT_KEY_PATHS[access.dot] ? new Set([STUDENT_KEY_PATHS[access.dot]]) : new Set());
+      setDotPaths(showLogboekDot ? new Set([STUDENT_KEY_PATHS["logboek"]]) : (access.dot && access.dot !== "logboek" && STUDENT_KEY_PATHS[access.dot] ? new Set([STUDENT_KEY_PATHS[access.dot]]) : new Set()));
       setLockedGroups(locked);
     }
 
