@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import "../../student/pages/LoginPage.css";
+import "../../../components/layout/LoginPage.css";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 
