@@ -27,6 +27,9 @@ import MentorPlanningPage from "./features/mentor/pages/MentorPlanningPage";
 import DocentStudentsPage from "./features/docent/pages/DocentStudentsPage";
 import DocentLogbooksPage from "./features/docent/pages/DocentLogbooksPage";
 import DocentEvaluationsPage from "./features/docent/pages/DocentEvaluationsPage";
+import DocentProposalsPage from "./features/docent/pages/DocentProposalsPage";
+import DocentStudentDossierPage from "./features/docent/pages/DocentStudentDossierPage";
+import DocentPlanningPage from "./features/docent/pages/DocentPlanningPage";
 
 export default function App() {
   return (
@@ -62,8 +65,11 @@ export default function App() {
             <Route path="/mentor/planning" element={<MentorPlanningPage />} />
 
             <Route path="/docent/students" element={<DocentStudentsPage />} />
+            <Route path="/docent/students/:dossierId/dossier" element={<DocentStudentDossierPage />} />
+            <Route path="/docent/proposals" element={<DocentProposalsPage />} />
             <Route path="/docent/logbooks" element={<DocentLogbooksPage />} />
             <Route path="/docent/evaluations" element={<DocentEvaluationsPage />} />
+            <Route path="/docent/planning" element={<DocentPlanningPage />} />
           </Route>
         </Routes>
       </BrowserRouter>

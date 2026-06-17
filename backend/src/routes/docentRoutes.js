@@ -23,21 +23,21 @@ const router = express.Router();
 
 router.use(authenticateDemoUser, requireRole("docent"));
 
-// Studenten (story 37)
+// Studenten (story 35)
 router.get("/students", getDocentStudents);
-router.get("/students/:id/dossier", getDocentStudentDossier);
+router.get("/students/:dossierId/dossier", getDocentStudentDossier);
 
-// Stagevoorstellen read-only (story 36)
+// Voorstellen (story 36)
 router.get("/proposals", getDocentProposals);
 router.get("/proposals/:id", getDocentProposalById);
 
-// Logboeken
-router.get("/logbooks/missing", getMissingLogbooksForDocent);
-router.post("/logbooks/missing/:studentId/reminder", sendMissingLogbookReminder);
+// Logboeken (stories 39, 40)
 router.get("/logbooks/:studentId", getLogbooksByStudent);
 router.patch("/logbooks/:weekId/review", docentReviewLogbookWeek);
+router.get("/logbooks/missing", getMissingLogbooksForDocent);
+router.post("/logbooks/:studentId/remind", sendMissingLogbookReminder);
 
-// Planning: bedrijfsbezoek en eindpresentatie (stories 38 en 42)
+// Planning (stories 38, 42)
 router.get("/planning", listDocentPlanning);
 router.post("/planning/visit", createVisit);
 router.post("/planning/presentation", createPresentation);
