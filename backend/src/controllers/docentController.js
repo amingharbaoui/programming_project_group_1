@@ -5,7 +5,7 @@ const { ok, fail } = require("../utils/response");
 // Geeft alle studenten terug die gekoppeld zijn aan de ingelogde docent (stagebegeleider).
 async function getDocentStudents(req, res) {
   const docentId = Number(req.user?.id);
-  if (!docentId) return fail(res, "Niet ingelogd", 401);
+  if (!docentId) return fail(res, 401, "Niet ingelogd");
 
   try {
     const [rows] = await db.query(

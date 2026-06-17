@@ -1,5 +1,6 @@
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
+const { meld } = require("../utils/notify");
 
 // GET /mentor/students
 // Geeft alle studenten terug die gekoppeld zijn aan de ingelogde mentor via stagedossiers.
@@ -149,6 +150,20 @@ async function updateAfspraken(req, res) {
     );
 
     if (result.affectedRows === 0) return fail(res, 403, "Geen toegang tot dit dossier");
+
+    // Student verwittigen dat de afspraken gedeeld zijn (story 29)
+    const [drows] = await db.query(
+      "SELECT student_id FROM stagedossiers WHERE id = ? LIMIT 1",
+      [dossierId]
+    );
+    if (drows[0]?.student_id) {
+      await meld(drows[0].student_id, {
+        titel: "Praktische afspraken gedeeld",
+        bericht: "Je mentor heeft de praktische afspraken voor je stage gedeeld.",
+        aangemaaktDoorId: mentorId,
+        stagedossierId: dossierId
+      });
+    }
 
     return ok(res, { dossierId }, "Praktische afspraken opgeslagen");
   } catch (err) {
