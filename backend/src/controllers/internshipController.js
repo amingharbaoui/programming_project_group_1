@@ -417,10 +417,10 @@ async function saveDraft(req, res) {
         [
           stagevoorstelId, bedrijfId,
           finalBedrijfNaam || null, bedrijfsafdeling || null, bedrijfsadres || null,
-          mentorNaam || null, mentorEmail || null, mentorTelefoon || null, mentorFunctie || null,
-          stagefunctie || null, opdrachtomschrijving || null,
-          startdatum || null, einddatum || null,
-          aantalWeken, finalUrenPerWeek, totaalUren,
+          mentorNaam || "", mentorEmail || "", mentorTelefoon || null, mentorFunctie || null,
+          stagefunctie || "", opdrachtomschrijving || "",
+          startdatum || stageRegel.stagevenster_start, einddatum || stageRegel.stagevenster_einde,
+          aantalWeken ?? 0, finalUrenPerWeek, totaalUren ?? 0,
           studentId
         ]
       );
