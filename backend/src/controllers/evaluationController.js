@@ -116,10 +116,14 @@ async function getEvaluationsForStudent(req, res) {
       scores = scoreRows;
     }
 
-    const result = evaluaties.map((e) => ({
-      ...e,
-      scores: scores.filter((s) => s.evaluatie_id === e.id),
-    }));
+    // Student en mentor mogen het berekende resultaat pas zien nadat de docent het vrijgegeven heeft.
+    const verbergResultaat = role === "student" || role === "mentor";
+    const result = evaluaties.map((e) => {
+      const basis = verbergResultaat && e.status !== "vrijgegeven"
+        ? { ...e, eindcijfer: null, competentie_score: null, eindpresentatie_score: null }
+        : e;
+      return { ...basis, scores: scores.filter((s) => s.evaluatie_id === e.id) };
+    });
 
     return ok(res, { stagedossierId: dossier.id, competenties, evaluaties: result }, "Evaluaties opgehaald");
   } catch (error) {
@@ -158,6 +162,15 @@ async function saveScores(req, res) {
   if (!evaluationId) return fail(res, 400, "Ongeldig evaluatie-id");
   if (!["student", "mentor", "docent"].includes(role)) return fail(res, 403, "Deze rol kan geen scores invullen");
   if (scores.length === 0) return fail(res, 400, "Geen scores meegegeven");
+
+  // Een ingevulde score moet op de schaal 1-5 liggen.
+  for (const s of scores) {
+    if (s.score === null || s.score === undefined || s.score === "") continue;
+    const waarde = Number(s.score);
+    if (!Number.isFinite(waarde) || waarde < 1 || waarde > 5) {
+      return fail(res, 400, "Score moet tussen 1 en 5 liggen");
+    }
+  }
 
   const conn = await db.getConnection();
   try {
@@ -412,6 +425,14 @@ async function releaseResult(req, res) {
         aangemaaktDoorId: userId,
         stagedossierId: evaluatie.stagedossier_id
       });
+      if (evaluatie.mentor_id) {
+        await meld(evaluatie.mentor_id, {
+          titel: "Eindresultaat vrijgegeven",
+          bericht: "Het eindresultaat van je stagiair is vrijgegeven.",
+          aangemaaktDoorId: userId,
+          stagedossierId: evaluatie.stagedossier_id
+        });
+      }
       const [admins] = await db.query(
         "SELECT id FROM gebruikers WHERE hoofdrol = 'administratie' AND status = 'actief'"
       );
