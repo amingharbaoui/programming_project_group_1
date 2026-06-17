@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import api, { apiRequest } from "../../../services/api";
 import "./StudentDocumentsPage.css";
+import Modal from "../../../components/ui/Modal";
 import {
   IconUpload,
   IconFile,
-  IconCircleCheck,
   IconAlertCircle,
   IconEye,
   IconFolderOpen,
+  IconArrowRight,
 } from "@tabler/icons-react";
 
 const STATUS_MAP = {
@@ -30,7 +32,7 @@ function formatDatum(d) {
 }
 
 /* ── Verplicht document kaart ── */
-function DocumentKaart({ soort, documenten, onUpload }) {
+function DocumentKaart({ soort, documenten, onUpload, onFout }) {
   const [bezig, setBezig] = useState(false);
   const inputRef = useRef(null);
 
@@ -45,12 +47,10 @@ function DocumentKaart({ soort, documenten, onUpload }) {
       const formData = new FormData();
       formData.append("document_soort_id", soort.id);
       formData.append("bestand", bestand);
-      await api.post("/documents/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      await api.post("/documents/upload", formData);
       onUpload();
     } catch (err) {
-      alert(err.response?.data?.message || "Upload mislukt.");
+      onFout(err.response?.data?.message || "Upload mislukt. Probeer opnieuw.");
     } finally {
       setBezig(false);
     }
@@ -101,6 +101,49 @@ function DocumentKaart({ soort, documenten, onUpload }) {
   );
 }
 
+/* ── Stageovereenkomst rij (niet uploadbaar, link naar contract pagina) ── */
+function OvereenkomstRij({ contract, navigate }) {
+  const GEREGISTREERD = ["startklaar","gestart","lopend","presentatie","afgerond","geregistreerd"];
+  const status = !contract
+    ? "ontbreekt"
+    : GEREGISTREERD.includes(contract.status)
+    ? "geregistreerd"
+    : ["volledig_ondertekend","in_controle_bij_administratie","validatie"].includes(contract.status)
+    ? "in_controle"
+    : contract.student_getekend_op
+    ? "ingediend"
+    : "ontbreekt";
+
+  const meta = !contract
+    ? "Digitaal te ondertekenen — regelt je verzekering"
+    : GEREGISTREERD.includes(contract.status)
+    ? "Geregistreerd door de administratie"
+    : ["volledig_ondertekend","in_controle_bij_administratie","validatie"].includes(contract.status)
+    ? "Volledig ondertekend — in controle bij administratie"
+    : contract.student_getekend_op
+    ? "Jij tekende — wacht op het bedrijf"
+    : "Digitaal te ondertekenen — regelt je verzekering";
+
+  return (
+    <div className="doc-rij">
+      <div className="doc-rij-links">
+        <i className="ti ti-file-certificate" style={{ fontSize: 16, color: "var(--sub)", flexShrink: 0 }}></i>
+        <div>
+          <div className="doc-naam">Stageovereenkomst</div>
+          <div className="doc-meta">{meta}</div>
+        </div>
+      </div>
+      <div className="doc-rij-rechts">
+        <StatusBadge status={status} />
+        <button className="btn sm" onClick={() => navigate("/student/contract")}>
+          {GEREGISTREERD.includes(contract?.status) ? "Bekijk" : "Ga naar"}
+          <IconArrowRight size={13} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* ── Eigen document rij ── */
 function EigenDocRij({ doc, onDelete }) {
   return (
@@ -126,10 +169,13 @@ function EigenDocRij({ doc, onDelete }) {
 
 /* ── Hoofd component ── */
 export default function StudentDocumentsPage() {
+  const navigate = useNavigate();
   const [documenten, setDocumenten] = useState([]);
   const [soorten, setSoorten]       = useState([]);
+  const [contractData, setContractData] = useState(null);
   const [loading, setLoading]       = useState(true);
   const [fout, setFout]             = useState(null);
+  const [uploadFout, setUploadFout] = useState(null);
   const [eigenBezig, setEigenBezig] = useState(false);
   const eigenInputRef = useRef(null);
 
@@ -144,11 +190,20 @@ export default function StudentDocumentsPage() {
         apiRequest("GET", "/documents/soorten").catch(() => ({ data: [] })),
       ]);
       setDocumenten(docsRes.data ?? []);
-      setSoorten(soortenRes.data ?? []);
+      // Reflectiebijlage en Eindoverzicht niet tonen (automatisch/niet van toepassing)
+      const VERBERG = new Set(["reflectiebijlage", "eindoverzicht"]);
+      setSoorten((soortenRes.data ?? []).filter((s) => !VERBERG.has(s.type) && !VERBERG.has(s.naam?.toLowerCase())));
     } catch (err) {
       setFout(err.response?.data?.message || "Documenten konden niet geladen worden.");
     } finally {
       setLoading(false);
+    }
+    // Contract status ophalen voor de Stageovereenkomst rij
+    try {
+      const res = await apiRequest("GET", "/contracts/my");
+      setContractData(res.data ?? null);
+    } catch {
+      setContractData(null);
     }
   }
 
@@ -174,7 +229,7 @@ export default function StudentDocumentsPage() {
       });
       await laadData();
     } catch (err) {
-      alert(err.response?.data?.message || "Upload mislukt.");
+      setUploadFout(err.response?.data?.message || "Upload mislukt. Probeer opnieuw.");
     } finally {
       setEigenBezig(false);
     }
@@ -190,6 +245,7 @@ export default function StudentDocumentsPage() {
   }
 
   return (
+    <>
     <div className="page-inner">
 
       <div className="page-header">
@@ -203,10 +259,30 @@ export default function StudentDocumentsPage() {
         </div>
       )}
 
+      {/* Amber banner: ontbrekende verplichte docs */}
+      {(() => {
+        const uploadSoorten = soorten.filter(s => s.type !== "stageovereenkomst");
+        const ontbreekt = uploadSoorten.filter(s => {
+          const actief = groeperPerSoort(s.id)[0];
+          return !actief || ["ontbreekt", "afgekeurd"].includes(actief.status);
+        }).length;
+        if (!ontbreekt) return null;
+        return (
+          <div className="banner amber" style={{ padding: "10px 14px" }}>
+            <i className="ti ti-alert-circle"></i>
+            <div>
+              <div className="b-title" style={{ fontSize: 13 }}>
+                Nog {ontbreekt} verplicht{ontbreekt > 1 ? "e documenten" : " document"} in orde te brengen
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Verplichte documenten */}
       <div className="card">
         <div className="card_title">
-          <IconFile size={16} />
+          <i className="ti ti-file" style={{ fontSize: 16 }}></i>
           Verplichte documenten
         </div>
 
@@ -214,14 +290,19 @@ export default function StudentDocumentsPage() {
           <p style={{ fontSize: 13, color: "var(--sub)" }}>Geen verplichte documenten gevonden.</p>
         ) : (
           <div className="doc-lijst">
-            {soorten.map((soort) => (
-              <DocumentKaart
-                key={soort.id}
-                soort={soort}
-                documenten={groeperPerSoort(soort.id)}
-                onUpload={laadData}
-              />
-            ))}
+            {soorten.map((soort) =>
+              soort.type === "stageovereenkomst" ? (
+                <OvereenkomstRij key={soort.id} contract={contractData} navigate={navigate} />
+              ) : (
+                <DocumentKaart
+                  key={soort.id}
+                  soort={soort}
+                  documenten={groeperPerSoort(soort.id)}
+                  onUpload={laadData}
+                  onFout={setUploadFout}
+                />
+              )
+            )}
           </div>
         )}
       </div>
@@ -259,5 +340,20 @@ export default function StudentDocumentsPage() {
       </div>
 
     </div>
+
+    {/* Fout-modal bij mislukte upload */}
+    <Modal
+      open={!!uploadFout}
+      onClose={() => setUploadFout(null)}
+      icon="ti-alert-circle"
+      titel="Upload mislukt"
+      sub={uploadFout}
+      footer={
+        <button className="btn primary" onClick={() => setUploadFout(null)}>
+          <i className="ti ti-check"></i> Begrepen
+        </button>
+      }
+    />
+    </>
   );
 }
