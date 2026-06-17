@@ -43,7 +43,7 @@ async function getDocentStudents(req, res) {
     return ok(res, rows, "Docent studenten opgehaald");
   } catch (err) {
     console.error("getDocentStudents error:", err);
-    return fail(res, "Studenten ophalen mislukt", 500);
+    return fail(res, 500, "Studenten ophalen mislukt");
   }
 }
 

@@ -695,6 +695,7 @@ async function getCommitteeApplications(req, res) {
           ORDER BY vb.beslist_op DESC
           LIMIT 1
         )
+      WHERE sp.status <> 'concept'
       ORDER BY sp.aangemaakt_op DESC
       `
     );
