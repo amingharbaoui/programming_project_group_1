@@ -5,7 +5,7 @@ const { ok, fail } = require("../utils/response");
 // Geeft alle studenten terug die gekoppeld zijn aan de ingelogde mentor via stagedossiers.
 async function getMentorStudents(req, res) {
   const mentorId = Number(req.user?.id);
-  if (!mentorId) return fail(res, "Niet ingelogd", 401);
+  if (!mentorId) return fail(res, 401, "Niet ingelogd");
 
   try {
     const [rows] = await db.query(
@@ -40,7 +40,7 @@ async function getMentorStudents(req, res) {
     return ok(res, rows, "Mentor studenten opgehaald");
   } catch (err) {
     console.error("getMentorStudents error:", err);
-    return fail(res, "Studenten ophalen mislukt", 500);
+    return fail(res, 500, "Studenten ophalen mislukt");
   }
 }
 
@@ -55,7 +55,7 @@ async function getMentorContract(req, res) {
       "SELECT id FROM stagedossiers WHERE id = ? AND mentor_id = ? LIMIT 1",
       [dossierId, mentorId]
     );
-    if (!dossier) return fail(res, "Geen toegang tot dit dossier", 403);
+    if (!dossier) return fail(res, 403, "Geen toegang tot dit dossier");
 
     const [[contract]] = await db.query(
       `SELECT * FROM stageovereenkomsten WHERE stagedossier_id = ? LIMIT 1`,
@@ -65,7 +65,7 @@ async function getMentorContract(req, res) {
     return ok(res, contract || null, "Contract opgehaald");
   } catch (err) {
     console.error("getMentorContract error:", err);
-    return fail(res, "Contract ophalen mislukt", 500);
+    return fail(res, 500, "Contract ophalen mislukt");
   }
 }
 
@@ -81,15 +81,15 @@ async function tekenContract(req, res) {
       "SELECT id FROM stagedossiers WHERE id = ? AND mentor_id = ? LIMIT 1",
       [dossierId, mentorId]
     );
-    if (!dossier) return fail(res, "Geen toegang tot dit dossier", 403);
+    if (!dossier) return fail(res, 403, "Geen toegang tot dit dossier");
 
     // Haal huidige status op
     const [[contract]] = await db.query(
       "SELECT id, status, bedrijf_getekend_op FROM stageovereenkomsten WHERE stagedossier_id = ? LIMIT 1",
       [dossierId]
     );
-    if (!contract) return fail(res, "Geen stageovereenkomst gevonden", 404);
-    if (contract.bedrijf_getekend_op) return fail(res, "Contract is al getekend door mentor", 409);
+    if (!contract) return fail(res, 404, "Geen stageovereenkomst gevonden");
+    if (contract.bedrijf_getekend_op) return fail(res, 409, "Contract is al getekend door mentor");
 
     // Nieuwe status bepalen
     const nieuweStatus =
@@ -105,7 +105,7 @@ async function tekenContract(req, res) {
     return ok(res, { status: nieuweStatus }, "Contract getekend door mentor");
   } catch (err) {
     console.error("tekenContract error:", err);
-    return fail(res, "Tekenen mislukt", 500);
+    return fail(res, 500, "Tekenen mislukt");
   }
 }
 
@@ -122,12 +122,12 @@ async function getAfspraken(req, res) {
        LIMIT 1`,
       [dossierId, mentorId]
     );
-    if (!row) return fail(res, "Geen toegang tot dit dossier", 403);
+    if (!row) return fail(res, 403, "Geen toegang tot dit dossier");
 
     return ok(res, row, "Afspraken opgehaald");
   } catch (err) {
     console.error("getAfspraken error:", err);
-    return fail(res, "Afspraken ophalen mislukt", 500);
+    return fail(res, 500, "Afspraken ophalen mislukt");
   }
 }
 
@@ -137,7 +137,7 @@ async function updateAfspraken(req, res) {
   const dossierId         = Number(req.params.dossierId);
   const { afspraken }     = req.body;
 
-  if (!afspraken && afspraken !== "") return fail(res, "Veld 'afspraken' ontbreekt", 400);
+  if (!afspraken && afspraken !== "") return fail(res, 400, "Veld 'afspraken' ontbreekt");
 
   try {
     const [result] = await db.query(
@@ -148,12 +148,12 @@ async function updateAfspraken(req, res) {
       [afspraken, dossierId, mentorId]
     );
 
-    if (result.affectedRows === 0) return fail(res, "Geen toegang tot dit dossier", 403);
+    if (result.affectedRows === 0) return fail(res, 403, "Geen toegang tot dit dossier");
 
     return ok(res, { dossierId }, "Praktische afspraken opgeslagen");
   } catch (err) {
     console.error("updateAfspraken error:", err);
-    return fail(res, "Afspraken opslaan mislukt", 500);
+    return fail(res, 500, "Afspraken opslaan mislukt");
   }
 }
 
