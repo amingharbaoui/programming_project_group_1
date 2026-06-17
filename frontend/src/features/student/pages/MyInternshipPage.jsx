@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiRequest } from "../../../services/api";
 import "./MyInternshipPage.css";
+import Modal from "../../../components/ui/Modal";
 import {
   IconSend, IconX, IconCheck, IconBriefcase, IconPlus,
   IconInfoCircle, IconUsers, IconFileDescription, IconChevronRight,
@@ -248,48 +249,8 @@ export default function MyInternshipPage() {
     : "Mijn stage";
 
   return (
+    <>
     <div className="page-inner">
-
-      {/* Popup na indienen */}
-      {showPopup && (
-        <div className="popup-overlay">
-          <div className="popup">
-            <div className="popup-header">
-              <div className="card_title"><IconSend size={16} />Stagevoorstel ingediend</div>
-              <button className="btn" onClick={() => setShowPopup(false)}><IconX size={16} /></button>
-            </div>
-            <div className="popup-body">
-              <p>Je stagevoorstel werd ingediend bij de stagecommissie. Je krijgt een melding na de beoordeling.</p>
-            </div>
-            <div className="actions">
-              <button className="btn primary" onClick={() => setShowPopup(false)}><IconCheck size={16} />Begrepen</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bevestigingsmodal intrekken */}
-      {intrekModal && (
-        <div className="popup-overlay">
-          <div className="popup">
-            <div className="popup-header">
-              <div className="card_title"><IconAlertCircle size={16} />Voorstel intrekken</div>
-              <button className="btn" onClick={() => setIntrekModal(false)}><IconX size={16} /></button>
-            </div>
-            <div className="popup-body">
-              <p>Ben je zeker dat je je stagevoorstel wil intrekken? Het voorstel wordt niet meer beoordeeld door de stagecommissie.</p>
-              {intrekFout && <p className="status s_rood" style={{ marginTop: 8 }}>{intrekFout}</p>}
-            </div>
-            <div className="actions">
-              <button className="btn" onClick={() => setIntrekModal(false)} disabled={intrekken}>Annuleren</button>
-              <button className="btn primary" style={{ background: "var(--red)" }} onClick={handleIntrekken} disabled={intrekken}>
-                <IconArrowBackUp size={16} />
-                {intrekken ? "Bezig..." : "Ja, intrekken"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="page-header">
         <h1>{pageTitle}</h1>
@@ -483,5 +444,42 @@ export default function MyInternshipPage() {
       )}
 
     </div>
+
+    {/* Modal: stagevoorstel ingediend */}
+    <Modal
+      open={showPopup}
+      onClose={() => setShowPopup(false)}
+      icon="ti-send"
+      titel="Stagevoorstel ingediend"
+      footer={
+        <button className="btn primary" onClick={() => setShowPopup(false)}>
+          <i className="ti ti-check"></i> Begrepen
+        </button>
+      }
+    >
+      <p>Je stagevoorstel werd ingediend bij de stagecommissie. Je krijgt een melding na de beoordeling.</p>
+    </Modal>
+
+    {/* Modal: voorstel intrekken bevestiging */}
+    <Modal
+      open={intrekModal}
+      onClose={() => { if (!intrekken) setIntrekModal(false); }}
+      icon="ti-arrow-back-up"
+      titel="Voorstel intrekken"
+      sub="Ben je zeker?"
+      footer={
+        <>
+          <button className="btn" onClick={() => setIntrekModal(false)} disabled={intrekken}>Annuleren</button>
+          <button className="btn primary" style={{ background: "var(--red)" }} onClick={handleIntrekken} disabled={intrekken}>
+            <i className="ti ti-arrow-back-up"></i>
+            {intrekken ? "Bezig..." : "Ja, intrekken"}
+          </button>
+        </>
+      }
+    >
+      <p>Ben je zeker dat je je stagevoorstel wil intrekken? Het voorstel wordt niet meer beoordeeld door de stagecommissie.</p>
+      {intrekFout && <p className="status s_rood" style={{ marginTop: 8 }}>{intrekFout}</p>}
+    </Modal>
+    </>
   );
 }
