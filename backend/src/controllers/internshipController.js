@@ -615,7 +615,12 @@ async function getMyInternship(req, res) {
         b.beslissing AS laatste_beslissing,
         b.feedback AS laatste_feedback,
         b.motivering AS laatste_motivering,
-        b.beslist_op AS laatste_beslist_op
+        b.beslist_op AS laatste_beslist_op,
+
+        d.id AS dossier_id,
+        d.status AS dossier_status,
+        d.praktische_afspraken,
+        d.praktische_afspraken_gedeeld_op
       FROM stagevoorstellen sp
       JOIN stagevoorstel_versies v
         ON v.stagevoorstel_id = sp.id
@@ -628,6 +633,7 @@ async function getMyInternship(req, res) {
           ORDER BY vb.beslist_op DESC
           LIMIT 1
         )
+      LEFT JOIN stagedossiers d ON d.stagevoorstel_id = sp.id
       WHERE sp.student_id = ?
       ORDER BY sp.aangemaakt_op DESC
       LIMIT 1
@@ -713,6 +719,9 @@ async function decideApplication(req, res) {
     approved: "goedgekeurd",
     goedgekeurd: "goedgekeurd",
 
+    goedgekeurd_met_uitzondering: "goedgekeurd_met_uitzondering",
+    approve_exception: "goedgekeurd_met_uitzondering",
+
     reject: "afgekeurd",
     rejected: "afgekeurd",
     afgekeurd: "afgekeurd",
@@ -725,8 +734,21 @@ async function decideApplication(req, res) {
   const beslissing = decisionMap[rawDecision];
 
   if (!beslissing) {
-    return fail(res, 400, "Ongeldige beslissing. Gebruik goedgekeurd, afgekeurd of aanpassingen_gevraagd");
+    return fail(res, 400, "Ongeldige beslissing. Gebruik goedgekeurd, goedgekeurd_met_uitzondering, afgekeurd of aanpassingen_gevraagd");
   }
+
+  // Validaties zoals in de mockup: motivering/feedback verplicht waar nodig.
+  if (beslissing === "afgekeurd" && !motivering) {
+    return fail(res, 400, "Een motivering is verplicht bij een afkeuring");
+  }
+  if (beslissing === "goedgekeurd_met_uitzondering" && !uitzonderingMotivering) {
+    return fail(res, 400, "Een motivering is verplicht bij een goedkeuring met uitzondering");
+  }
+  if (beslissing === "aanpassingen_gevraagd" && !feedback) {
+    return fail(res, 400, "Feedback is verplicht wanneer je aanpassingen vraagt");
+  }
+
+  const isGoedkeuring = beslissing === "goedgekeurd" || beslissing === "goedgekeurd_met_uitzondering";
 
   const connection = await db.getConnection();
 
@@ -787,7 +809,7 @@ async function decideApplication(req, res) {
 
     const updateParams = [beslissing];
 
-    if (beslissing === "goedgekeurd") {
+    if (isGoedkeuring) {
       updateSql += ", goedgekeurd_op = NOW()";
     }
 
@@ -800,7 +822,7 @@ async function decideApplication(req, res) {
 
     await connection.query(updateSql, updateParams);
 
-    if (beslissing === "goedgekeurd") {
+    if (isGoedkeuring) {
       await createDossierAfterApproval(connection, stagevoorstelId);
     }
 
@@ -810,6 +832,7 @@ async function decideApplication(req, res) {
     try {
       const berichtMap = {
         goedgekeurd: "Je stagevoorstel is goedgekeurd.",
+        goedgekeurd_met_uitzondering: "Je stagevoorstel is goedgekeurd met uitzondering.",
         afgekeurd: "Je stagevoorstel is afgekeurd.",
         aanpassingen_gevraagd: "De stagecommissie vraagt aanpassingen aan je stagevoorstel."
       };
@@ -1592,9 +1615,32 @@ async function saveApplicationChecklist(req, res) {
   }
 }
 
+// GET /api/committee/applications/:id/decisions — volledige beslissingshistoriek van een voorstel.
+async function getApplicationDecisions(req, res) {
+  const voorstelId = Number(req.params.id);
+  if (!voorstelId) return fail(res, 400, "Ongeldig voorstel-id");
+
+  try {
+    const [rows] = await db.query(
+      `SELECT vb.id, vb.beslissing, vb.feedback, vb.motivering, vb.uitzondering_motivering,
+              vb.beslist_op, vb.stagevoorstel_versie_id,
+              CONCAT(g.voornaam, ' ', g.achternaam) AS beslist_door_naam
+       FROM voorstel_beslissingen vb
+       LEFT JOIN gebruikers g ON g.id = vb.beslist_door_id
+       WHERE vb.stagevoorstel_id = ?
+       ORDER BY vb.beslist_op ASC`,
+      [voorstelId]
+    );
+    return ok(res, rows, "Beslissingshistoriek opgehaald");
+  } catch (error) {
+    return fail(res, 500, "Beslissingshistoriek ophalen mislukt", error.message);
+  }
+}
+
 module.exports = {
   getApplicationChecklist,
   saveApplicationChecklist,
+  getApplicationDecisions,
   createInternship,
   saveDraft,
   withdrawInternship,
