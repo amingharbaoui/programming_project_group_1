@@ -485,6 +485,18 @@ async function mentorCheckLogbookWeek(req, res) {
       return fail(res, 404, "Logboekweek niet gevonden");
     }
 
+    // Een mentor mag enkel de weken van zijn eigen stagiair nakijken.
+    const [mentorKoppeling] = await connection.query(
+      `SELECT d.mentor_id
+       FROM logboek_weken lw
+       JOIN stagedossiers d ON d.id = lw.stagedossier_id
+       WHERE lw.id = ? LIMIT 1`,
+      [weekId]
+    );
+    if (Number(mentorKoppeling[0]?.mentor_id) !== requestedMentorId) {
+      return fail(res, 403, "Je bent niet de mentor van deze stagiair");
+    }
+
     const validMentorId = await getValidMentorIdForWeek(connection, weekId, requestedMentorId);
 
     await connection.query(
@@ -557,6 +569,18 @@ async function docentReviewLogbookWeek(req, res) {
 
     if (existing.length === 0) {
       return fail(res, 404, "Logboekweek niet gevonden");
+    }
+
+    // Een docent mag enkel de weken van zijn eigen student nakijken.
+    const [docentKoppeling] = await connection.query(
+      `SELECT d.stagebegeleider_id
+       FROM logboek_weken lw
+       JOIN stagedossiers d ON d.id = lw.stagedossier_id
+       WHERE lw.id = ? LIMIT 1`,
+      [weekId]
+    );
+    if (Number(docentKoppeling[0]?.stagebegeleider_id) !== requestedDocentId) {
+      return fail(res, 403, "Je bent niet de stagebegeleider van deze student");
     }
 
     const validDocentId = await getValidDocentIdForWeek(connection, weekId, requestedDocentId);
