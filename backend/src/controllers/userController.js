@@ -1,6 +1,13 @@
 const crypto = require("crypto");
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
+const { emailMelding } = require("../utils/notify");
+
+function hashLocalPassword(password) {
+  const salt = crypto.randomBytes(16).toString("hex");
+  const derived = crypto.pbkdf2Sync(String(password), salt, 120000, 32, "sha256").toString("hex");
+  return `pbkdf2_sha256$120000$${salt}$${derived}`;
+}
 
 async function getUsers(req, res) {
   try {
@@ -68,7 +75,7 @@ async function reactivateUser(req, res) {
   }
 }
 
-// Mentor uitnodigen: maakt een mentor-account (status uitgenodigd) + mentoren-rij + activatielink (demo, geen e-mail).
+// Mentor uitnodigen: maakt een mentor-account + activatielink en registreert de uitnodiging via het e-mailkanaal.
 async function inviteMentor(req, res) {
   const { voornaam, achternaam, email, functie } = req.body;
   let bedrijfId = req.body.bedrijfId ?? req.body.bedrijf_id ?? null;
@@ -112,7 +119,17 @@ async function inviteMentor(req, res) {
     );
 
     await conn.commit();
-    return ok(res, { mentorId, bedrijfId, activatielink: `/activeren?token=${token}` }, "Mentor uitgenodigd");
+
+    const activatielink = `/activeren?token=${token}`;
+    await emailMelding(mentorId, {
+      titel: "Uitnodiging stageplatform",
+      bericht: `Je bent uitgenodigd als mentor. Activeer je account via ${activatielink}`,
+      type: "herinnering",
+      ernst: "medium",
+      aangemaaktDoorId: Number(req.user?.id) || null
+    });
+
+    return ok(res, { mentorId, bedrijfId, activatielink, emailStatus: "geregistreerd" }, "Mentor uitgenodigd");
   } catch (error) {
     await conn.rollback();
     if (error.code === "ER_DUP_ENTRY") return fail(res, 409, "Dubbele invoer");
@@ -122,9 +139,100 @@ async function inviteMentor(req, res) {
   }
 }
 
+async function getMentorInvitation(req, res) {
+  const token = req.params.token || req.query.token;
+  if (!token) return fail(res, 400, "Token ontbreekt");
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT
+        g.id,
+        g.voornaam,
+        g.achternaam,
+        g.email,
+        g.status,
+        m.functie,
+        m.uitnodiging_status,
+        m.uitnodiging_vervalt_op,
+        b.naam AS bedrijf_naam
+      FROM mentoren m
+      JOIN gebruikers g ON g.id = m.gebruiker_id
+      JOIN bedrijven b ON b.id = m.bedrijf_id
+      WHERE m.uitnodiging_token = ?
+      LIMIT 1
+      `,
+      [token]
+    );
+
+    const invitation = rows[0];
+    if (!invitation) return fail(res, 404, "Uitnodiging niet gevonden");
+    if (invitation.uitnodiging_vervalt_op && new Date(invitation.uitnodiging_vervalt_op) < new Date()) {
+      return fail(res, 410, "Uitnodiging is verlopen");
+    }
+
+    return ok(res, invitation, "Uitnodiging opgehaald");
+  } catch (error) {
+    return fail(res, 500, "Uitnodiging ophalen mislukt", error.message);
+  }
+}
+
+async function activateMentor(req, res) {
+  const { token, wachtwoord, telefoon } = req.body;
+  if (!token) return fail(res, 400, "Token ontbreekt");
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT m.gebruiker_id, m.uitnodiging_vervalt_op
+      FROM mentoren m
+      JOIN gebruikers g ON g.id = m.gebruiker_id
+      WHERE m.uitnodiging_token = ?
+      LIMIT 1
+      `,
+      [token]
+    );
+
+    const mentor = rows[0];
+    if (!mentor) return fail(res, 404, "Uitnodiging niet gevonden");
+    if (mentor.uitnodiging_vervalt_op && new Date(mentor.uitnodiging_vervalt_op) < new Date()) {
+      return fail(res, 410, "Uitnodiging is verlopen");
+    }
+
+    const wachtwoordHash = wachtwoord ? hashLocalPassword(wachtwoord) : null;
+    await db.query(
+      `
+      UPDATE gebruikers
+      SET status = 'actief',
+          wachtwoord_hash = COALESCE(?, wachtwoord_hash),
+          aangepast_op = NOW()
+      WHERE id = ?
+      `,
+      [wachtwoordHash, mentor.gebruiker_id]
+    );
+    await db.query(
+      `
+      UPDATE mentoren
+      SET uitnodiging_status = 'geactiveerd',
+          uitnodiging_token = NULL,
+          geactiveerd_op = NOW(),
+          telefoon = COALESCE(?, telefoon)
+      WHERE gebruiker_id = ?
+      `,
+      [telefoon || null, mentor.gebruiker_id]
+    );
+
+    return ok(res, { mentorId: mentor.gebruiker_id }, "Mentoraccount geactiveerd");
+  } catch (error) {
+    return fail(res, 500, "Mentor activeren mislukt", error.message);
+  }
+}
+
 module.exports = {
   getUsers,
   deactivateUser,
   reactivateUser,
-  inviteMentor
+  inviteMentor,
+  getMentorInvitation,
+  activateMentor
 };
