@@ -74,23 +74,19 @@
 
 /* Dropzone */
 .dropzone {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
   border: 1.5px dashed var(--border);
-  border-radius: 8px;
-  padding: 14px;
-  color: var(--sub);
-  font-size: 13px;
-  transition: border-color .15s, background .15s;
+  border-radius: 10px;
+  padding: 34px 20px;
+  text-align: center;
+  color: var(--faint);
+  cursor: pointer;
+  transition: all .15s;
+  background: var(--white);
 }
-.dropzone:hover {
-  border-color: var(--red);
-  background: var(--faint);
-  color: var(--dark);
-}
-.dz-t { font-weight: 500; }
+.dropzone:hover { border-color: var(--red-mid); background: #fffafb; }
+.dropzone i { font-size: 30px; display: block; margin-bottom: 8px; color: var(--faint); }
+.dz-t { font-size: 13.5px; color: var(--gray); font-weight: 500; }
+.dz-s { font-size: 12px; color: var(--faint); margin-top: 3px; }
 
 /* s_blauw status */
 .status.s_blauw { background: #eff6ff; color: #2563eb; }

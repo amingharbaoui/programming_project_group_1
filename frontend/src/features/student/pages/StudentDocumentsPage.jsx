@@ -8,7 +8,6 @@ import {
   IconAlertCircle,
   IconEye,
   IconHistory,
-  IconPlus,
   IconFolderOpen,
 } from "@tabler/icons-react";
 
@@ -275,8 +274,9 @@ export default function StudentDocumentsPage() {
           onClick={() => !eigenBezig && eigenInputRef.current?.click()}
           style={{ cursor: eigenBezig ? "not-allowed" : "pointer", opacity: eigenBezig ? .6 : 1 }}
         >
-          <IconPlus size={16} style={{ color: "var(--sub)" }} />
-          <span className="dz-t">{eigenBezig ? "Bezig met uploaden…" : "Document toevoegen"}</span>
+          <i className="ti ti-upload"></i>
+          <div className="dz-t">{eigenBezig ? "Bezig met uploaden…" : "Document toevoegen"}</div>
+          {!eigenBezig && <div className="dz-s">pdf, docx, png, jpg</div>}
         </div>
         <input
           ref={eigenInputRef}
