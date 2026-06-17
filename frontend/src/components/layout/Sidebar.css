@@ -42,6 +42,7 @@
 }
 .brand-logo { width: 160px; height: auto; display: block; }
 .brand-icon-img { height: 36px; width: auto; display: block; }
+.ehb-logo { height: 44px; width: auto; display: block; }
 
 .sidebar-nav { flex: 1; padding: 12px 0 6px; overflow-y: auto; display: flex; flex-direction: column; }
 .nav-item {
@@ -69,13 +70,50 @@
 .nav-item.locked .lock { margin-left: auto; font-size: 13px; color: var(--faint); }
 .sidebar.collapsed .nav-item.locked .lock { display: none; }
 
+/* Warn-cirkel (rode !-badge) */
+.nav-warn {
+	margin-left: auto;
+	width: 17px;
+	height: 17px;
+	border-radius: 50%;
+	background: var(--red);
+	color: #fff;
+	font-size: 11px;
+	font-weight: 700;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+.sidebar.collapsed .nav-warn { display: none; }
+
+/* Side-status fase-kaart */
+.side-status {
+	margin: 8px 12px;
+	padding: 12px 13px;
+	background: var(--white);
+	border-radius: 9px;
+	border: 1.5px solid #0a0a0a;
+	box-shadow: 0 4px 12px rgba(0,0,0,.10);
+}
+.side-status .fase { font-size: 11px; color: var(--sub); }
+.side-status .fase-naam { font-size: 13.5px; font-weight: 600; margin: 2px 0 8px; }
+.side-status .volgende { font-size: 12px; color: var(--gray); line-height: 1.45; display: flex; gap: 6px; align-items: flex-start; }
+.side-status .volgende i { font-size: 14px; color: var(--red); margin-top: 1px; flex-shrink: 0; }
+.sidebar.collapsed .side-status { display: none; }
+
+/* 5-bolletjes voortgang in side-status */
+.side-prog { display: flex; gap: 3px; margin-top: 9px; }
+.side-prog span { flex: 1; height: 3px; border-radius: 2px; background: var(--border); }
+.side-prog span.done { background: var(--red); }
+
 .sidebar-footer {
 	border-top: 1px solid var(--border);
 	display: flex;
 	align-items: center;
+	padding: 14px 16px;
 }
 .sidebar.collapsed .sidebar-footer { justify-content: center; padding: 10px 4px; }
-.ehb-logo { height: 54px; width: auto; display: block; }
 .ehb-logo-small { display: none; }
 .sidebar.collapsed .ehb-logo-wide { display: none; }
 .sidebar.collapsed .ehb-logo-small { display: block; width: 44px; height: auto; }
