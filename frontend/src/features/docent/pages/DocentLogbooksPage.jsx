@@ -2,21 +2,22 @@ import { useEffect, useState } from "react";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 
-// Demo studenten die gekoppeld kunnen zijn aan een docent.
-// De backend beslist zelf of de ingelogde docent toegang heeft.
-const DEMO_STUDENTEN = [
-  { id: 1, naam: "Demo Student" },
-  { id: 6, naam: "Demo Student 2" },
-  { id: 7, naam: "Demo Student 3" },
-  { id: 8, naam: "Demo Student 4" },
-];
-
 function getStatusClass(status) {
   if (status === "goedgekeurd_door_docent") return "s_ok";
   if (status === "afgecheckt_door_mentor") return "s_info";
   if (status === "ingediend") return "s_info";
   if (status?.includes("teruggestuurd")) return "s_rood";
   return "s_grijs";
+}
+
+function getStatusLabel(status) {
+  if (status === "goedgekeurd_door_docent") return "Goedgekeurd door docent";
+  if (status === "afgecheckt_door_mentor") return "Afgecheckt door mentor";
+  if (status === "ingediend") return "Ingediend door student";
+  if (status === "teruggestuurd_door_docent") return "Teruggestuurd door docent";
+  if (status === "teruggestuurd_door_mentor") return "Teruggestuurd door mentor";
+  if (status === "in_opbouw") return "In opbouw";
+  return status || "-";
 }
 
 function formatDate(value) {
@@ -27,13 +28,39 @@ function formatDate(value) {
 export default function DocentLogbooksPage() {
   const { user } = useAuth();
 
-  const [studentId, setStudentId] = useState(1);
+  const [studenten, setStudenten] = useState([]);
+  const [studentId, setStudentId] = useState(null);
   const [weeks, setWeeks] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const [feedbackByWeek, setFeedbackByWeek] = useState({});
   const [actionLoadingId, setActionLoadingId] = useState(null);
+  const [remindLoading, setRemindLoading] = useState(false);
+  const [remindMelding, setRemindMelding] = useState({ weekNr: null, tekst: "", type: "" });
+
+  // Laad studenten van API
+  useEffect(() => {
+    async function loadStudenten() {
+      try {
+        const res = await api.get("/docent/students", {
+          headers: { "x-user-id": String(user.id) },
+        });
+        const data = res.data.data || [];
+        setStudenten(data);
+        if (data.length > 0) {
+          const sid = data[0].student_id || data[0].id;
+          setStudentId(sid);
+          loadLogbooks(sid);
+        } else {
+          setLoading(false);
+        }
+      } catch {
+        setLoading(false);
+      }
+    }
+    loadStudenten();
+  }, []);
 
   async function loadLogbooks(sid) {
     try {
@@ -51,30 +78,23 @@ export default function DocentLogbooksPage() {
     }
   }
 
-  useEffect(() => {
-    loadLogbooks(studentId);
-  }, []);
-
   function handleStudentChange(e) {
     const newId = Number(e.target.value);
     setStudentId(newId);
     setFeedbackByWeek({});
+    setRemindMelding({ weekNr: null, tekst: "", type: "" });
     loadLogbooks(newId);
   }
 
   async function reviewWeek(weekId, herindieningNodig = false) {
     try {
       setActionLoadingId(weekId);
-
-      // Geen hardcoded x-user-id — de api instantie gebruikt automatisch
-      // de ingelogde gebruiker (ingesteld via AuthContext/setApiUserId).
       await api.patch(`/docent/logbooks/${weekId}/review`, {
         feedback: feedbackByWeek[weekId] || "Logboek nagekeken door docent.",
         herindieningNodig,
       }, {
         headers: { "x-user-id": String(user.id) },
       });
-
       await loadLogbooks(studentId);
     } catch (err) {
       alert(err.response?.data?.message || err.message || "Docentcontrole mislukt");
@@ -83,39 +103,82 @@ export default function DocentLogbooksPage() {
     }
   }
 
+  async function handleHerinner(weekNr) {
+    try {
+      setRemindLoading(true);
+      setRemindMelding({ weekNr: null, tekst: "", type: "" });
+      await api.post(`/docent/logbooks/${studentId}/remind`, {}, {
+        headers: { "x-user-id": String(user.id) },
+      });
+      setRemindMelding({ weekNr, tekst: "Herinnering verstuurd naar student.", type: "s_ok" });
+    } catch (err) {
+      setRemindMelding({
+        weekNr,
+        tekst: err.response?.data?.message || "Herinnering versturen mislukt.",
+        type: "s_rood",
+      });
+    } finally {
+      setRemindLoading(false);
+    }
+  }
+
+  // Bereken ontbrekende weeknummers (gaten in de reeks)
+  function getOntbrekendeWeken(weeks) {
+    if (weeks.length === 0) return [];
+    const aanwezig = new Set(weeks.map((w) => w.week_nummer));
+    const max = Math.max(...weeks.map((w) => w.week_nummer));
+    const ontbrekend = [];
+    for (let n = 1; n < max; n++) {
+      if (!aanwezig.has(n)) ontbrekend.push(n);
+    }
+    return ontbrekend;
+  }
+
+  const ontbrekendeWeken = getOntbrekendeWeken(weeks);
+
+  // Combineer bestaande weken + ontbrekende, gesorteerd aflopend
+  const alleWeken = [
+    ...weeks.map((w) => ({ ...w, ontbreekt: false })),
+    ...ontbrekendeWeken.map((n) => ({ week_nummer: n, ontbreekt: true })),
+  ].sort((a, b) => b.week_nummer - a.week_nummer);
+
+  const geselecteerdeStudent = studenten.find(
+    (s) => (s.student_id || s.id) === studentId
+  );
+
   return (
     <div className="page_inner">
       <div className="page_header">
         <div>
-          <h1>Docent logboeken</h1>
+          <h1>Logboeken</h1>
           <p>Bekijk logboeken, mentorfeedback en geef docentfeedback.</p>
         </div>
-        <button className="btn sm" onClick={() => loadLogbooks(studentId)}>
+        <button className="btn sm" onClick={() => studentId && loadLogbooks(studentId)}>
           Vernieuwen
         </button>
       </div>
 
       {/* Student selector */}
-      <div className="card" style={{ marginBottom: "12px" }}>
-        <div className="card_title">Student kiezen</div>
-        <div className="form_group">
-          <label className="form_label">Student</label>
-          <select
-            className="form_input"
-            value={studentId}
-            onChange={handleStudentChange}
-          >
-            {DEMO_STUDENTEN.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.naam} (ID {s.id})
-              </option>
-            ))}
-          </select>
+      {studenten.length > 0 && (
+        <div className="card" style={{ marginBottom: "12px" }}>
+          <div className="card_title">Student kiezen</div>
+          <div className="form_group" style={{ marginBottom: 0 }}>
+            <label className="form_label">Student</label>
+            <select
+              className="form_input"
+              value={studentId || ""}
+              onChange={handleStudentChange}
+            >
+              {studenten.map((s) => (
+                <option key={s.dossier_id} value={s.student_id || s.id}>
+                  {s.voornaam} {s.achternaam}
+                  {s.bedrijf ? ` — ${s.bedrijf}` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        <p className="muted">
-          Ingelogd als: <strong>{user?.name}</strong> (ID {user?.id})
-        </p>
-      </div>
+      )}
 
       {loading && (
         <div className="card">
@@ -129,91 +192,178 @@ export default function DocentLogbooksPage() {
         </div>
       )}
 
-      {!loading && !error && weeks.length === 0 && (
+      {!loading && !error && alleWeken.length === 0 && (
         <div className="empty_state">Geen logboeken gevonden voor deze student.</div>
       )}
 
-      {!loading && !error && weeks.map((week) => (
-        <div className="card" key={week.id}>
-          <div className="card_title">Week {week.week_nummer}</div>
-
-          <div className="kv">
-            <span className="k">Periode</span>
-            <span className="v">{formatDate(week.week_start)} – {formatDate(week.week_einde)}</span>
-          </div>
-
-          <div className="kv">
-            <span className="k">Status</span>
-            <span className={`status ${getStatusClass(week.status)}`}>{week.status}</span>
-          </div>
-
-          <div className="kv">
-            <span className="k">Mentorfeedback</span>
-            <span className="v">{week.mentor_feedback || "Nog geen feedback van mentor"}</span>
-          </div>
-
-          {week.docent_feedback && (
-            <div className="kv">
-              <span className="k">Jouw feedback</span>
-              <span className="v">{week.docent_feedback}</span>
+      {/* Ontbrekende weken banner */}
+      {!loading && ontbrekendeWeken.length > 0 && (
+        <div className="card" style={{
+          borderColor: "var(--red)",
+          background: "#fff8f8",
+          marginBottom: "12px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: "12px",
+          padding: "12px 16px",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <i className="ti ti-alert-triangle" style={{ color: "var(--red)", fontSize: "16px" }} />
+            <div>
+              <div style={{ fontSize: "13px", fontWeight: 600 }}>
+                {ontbrekendeWeken.length === 1
+                  ? `Week ${ontbrekendeWeken[0]} niet ingediend`
+                  : `${ontbrekendeWeken.length} weken niet ingediend (${ontbrekendeWeken.join(", ")})`}
+              </div>
+              {geselecteerdeStudent && (
+                <div style={{ fontSize: "12px", color: "var(--sub)" }}>
+                  {geselecteerdeStudent.voornaam} {geselecteerdeStudent.achternaam} loopt achter op het logboek.
+                </div>
+              )}
             </div>
-          )}
-
-          <table className="tbl" style={{ marginTop: "12px" }}>
-            <thead>
-              <tr>
-                <th>Datum</th>
-                <th>Titel</th>
-                <th>Taken</th>
-                <th>Reflectie</th>
-                <th>Problemen</th>
-                <th>Uren</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(week.dagen || []).map((day) => (
-                <tr key={day.id}>
-                  <td>{formatDate(day.datum)}</td>
-                  <td>{day.titel || "-"}</td>
-                  <td>{day.uitgevoerde_taken || "-"}</td>
-                  <td>{day.reflectie || "-"}</td>
-                  <td>{day.problemen || "-"}</td>
-                  <td>{day.aantal_uren || 0}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          <div className="form_group" style={{ marginTop: "14px" }}>
-            <label className="form_label">Feedback docent</label>
-            <textarea
-              className="form_textarea"
-              placeholder="Geef feedback als docent..."
-              value={feedbackByWeek[week.id] || ""}
-              onChange={(e) =>
-                setFeedbackByWeek({ ...feedbackByWeek, [week.id]: e.target.value })
-              }
-            />
           </div>
-
-          <div className="actions" style={{ marginTop: "8px" }}>
-            <button
-              className="btn"
-              disabled={actionLoadingId === week.id}
-              onClick={() => reviewWeek(week.id, true)}
-            >
-              Aanpassing vragen
-            </button>
-            <button
-              className="btn primary"
-              disabled={actionLoadingId === week.id}
-              onClick={() => reviewWeek(week.id, false)}
-            >
-              Nagekeken
-            </button>
-          </div>
+          <button
+            className="btn sm"
+            onClick={() => handleHerinner("algemeen")}
+            disabled={remindLoading}
+          >
+            <i className="ti ti-bell" /> Herinnering sturen
+          </button>
         </div>
-      ))}
+      )}
+
+      {remindMelding.tekst && (
+        <div style={{ marginBottom: "10px" }}>
+          <span className={`status ${remindMelding.type}`}>{remindMelding.tekst}</span>
+        </div>
+      )}
+
+      {!loading && !error && alleWeken.map((week) => {
+        if (week.ontbreekt) {
+          // Ontbrekende week rij
+          return (
+            <div
+              key={`ontbreekt_${week.week_nummer}`}
+              className="card"
+              style={{ borderColor: "var(--red)", marginBottom: "8px" }}
+            >
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "9px",
+                flexWrap: "wrap",
+              }}>
+                <span style={{ fontSize: "13.5px", fontWeight: 600 }}>Week {week.week_nummer}</span>
+                <span className="status s_rood">
+                  <i className="ti ti-alert-triangle" /> Niet ingediend door student
+                </span>
+                <div style={{ marginLeft: "auto" }}>
+                  <button
+                    className="btn sm"
+                    disabled={remindLoading}
+                    onClick={() => handleHerinner(week.week_nummer)}
+                  >
+                    <i className="ti ti-bell" /> Herinnering sturen
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        // Bestaande week
+        return (
+          <div className="card" key={week.id} style={{ marginBottom: "8px" }}>
+            <div className="card_title">
+              Week {week.week_nummer}
+              <span className={`status ${getStatusClass(week.status)}`}>
+                {getStatusLabel(week.status)}
+              </span>
+              {week.blokkade && (
+                <span className="status s_rood" style={{ marginLeft: "4px" }}>
+                  <i className="ti ti-alert-triangle" /> {week.blokkade}
+                </span>
+              )}
+            </div>
+
+            <div className="kv">
+              <span className="k">Periode</span>
+              <span className="v">{formatDate(week.week_start)} – {formatDate(week.week_einde)}</span>
+            </div>
+
+            {week.mentor_feedback && (
+              <div className="kv">
+                <span className="k">Mentorfeedback</span>
+                <span className="v">{week.mentor_feedback}</span>
+              </div>
+            )}
+
+            {week.docent_feedback && (
+              <div className="kv">
+                <span className="k">Jouw feedback</span>
+                <span className="v">{week.docent_feedback}</span>
+              </div>
+            )}
+
+            {(week.dagen || []).length > 0 && (
+              <table className="tbl" style={{ marginTop: "12px" }}>
+                <thead>
+                  <tr>
+                    <th>Datum</th>
+                    <th>Taken</th>
+                    <th>Reflectie</th>
+                    <th>Uren</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {week.dagen.map((day) => (
+                    <tr key={day.id}>
+                      <td>{formatDate(day.datum)}</td>
+                      <td>{day.uitgevoerde_taken || "-"}</td>
+                      <td>{day.reflectie || "-"}</td>
+                      <td>{day.aantal_uren || 0}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {!["goedgekeurd_door_docent"].includes(week.status) && (
+              <>
+                <div className="form_group" style={{ marginTop: "14px" }}>
+                  <label className="form_label">Feedback docent</label>
+                  <textarea
+                    className="form_textarea"
+                    placeholder="Geef feedback als docent..."
+                    value={feedbackByWeek[week.id] || ""}
+                    onChange={(e) =>
+                      setFeedbackByWeek({ ...feedbackByWeek, [week.id]: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="actions" style={{ marginTop: "8px" }}>
+                  <button
+                    className="btn"
+                    disabled={actionLoadingId === week.id}
+                    onClick={() => reviewWeek(week.id, true)}
+                  >
+                    Aanpassing vragen
+                  </button>
+                  <button
+                    className="btn primary"
+                    disabled={actionLoadingId === week.id}
+                    onClick={() => reviewWeek(week.id, false)}
+                  >
+                    {actionLoadingId === week.id ? "Verwerken..." : "Nagekeken"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

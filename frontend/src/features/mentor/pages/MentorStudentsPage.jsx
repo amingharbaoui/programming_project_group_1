@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 
@@ -36,6 +37,7 @@ function getLogboekLabel(status) {
 
 export default function MentorStudentsPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [studenten, setStudenten] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -56,7 +58,20 @@ export default function MentorStudentsPage() {
   }
 
   useEffect(() => {
-    loadStudenten();
+    async function init() {
+      try {
+        const res = await api.get("/mentor/students", {
+          headers: { "x-user-id": String(user.id) },
+        });
+        setStudenten(res.data.data || []);
+      } catch (err) {
+        setError(err.response?.data?.message || "Studenten ophalen mislukt");
+      } finally {
+        setLoading(false);
+      }
+    }
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -127,8 +142,8 @@ export default function MentorStudentsPage() {
 
                   <td className="right">
                     <div className="actions">
-                      <button className="btn sm">Logboek</button>
-                      <button className="btn sm">Evaluatie</button>
+                      <button className="btn sm" onClick={() => navigate(`/mentor/logbooks?student=${s.id}`)}>Logboek</button>
+                      <button className="btn sm" onClick={() => navigate(`/mentor/evaluation?student=${s.id}`)}>Evaluatie</button>
                     </div>
                   </td>
                 </tr>

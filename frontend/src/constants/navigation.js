@@ -26,12 +26,14 @@ export const NAVIGATION = {
     { label: "Evaluatie",  path: "/mentor/evaluation", icon: "ti-clipboard-check" },
     { label: "Contract",   path: "/mentor/contract",   icon: "ti-writing" },
     { label: "Afspraken",  path: "/mentor/afspraken",  icon: "ti-calendar" },
+    { label: "Planning",   path: "/mentor/planning",   icon: "ti-calendar-event" },
   ],
 
   [ROLES.DOCENT]: [
     { label: "Studenten",  path: "/docent/students",    icon: "ti-users" },
+    { label: "Voorstellen",path: "/docent/proposals",   icon: "ti-file-text" },
     { label: "Logboeken",  path: "/docent/logbooks",    icon: "ti-notebook" },
     { label: "Evaluaties", path: "/docent/evaluations", icon: "ti-clipboard-check" },
+    { label: "Planning",   path: "/docent/planning",    icon: "ti-calendar-event" },
   ],
 };
-

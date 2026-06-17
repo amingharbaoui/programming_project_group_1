@@ -22,15 +22,20 @@ import DossiersPage from "./features/admin/pages/DossiersPage";
 import UsersPage from "./features/admin/pages/UsersPage";
 import CompetenciesPage from "./features/admin/pages/CompetenciesPage";
 
+import MentorActivationPage from "./features/mentor/pages/MentorActivationPage";
 import MentorStudentsPage from "./features/mentor/pages/MentorStudentsPage";
 import MentorLogbooksPage from "./features/mentor/pages/MentorLogbooksPage";
 import MentorEvaluationPage from "./features/mentor/pages/MentorEvaluationPage";
 import MentorContractPage from "./features/mentor/pages/MentorContractPage";
 import MentorAfsprakenPage from "./features/mentor/pages/MentorAfsprakenPage";
+import MentorPlanningPage from "./features/mentor/pages/MentorPlanningPage";
 
 import DocentStudentsPage from "./features/docent/pages/DocentStudentsPage";
 import DocentLogbooksPage from "./features/docent/pages/DocentLogbooksPage";
 import DocentEvaluationsPage from "./features/docent/pages/DocentEvaluationsPage";
+import DocentProposalsPage from "./features/docent/pages/DocentProposalsPage";
+import DocentStudentDossierPage from "./features/docent/pages/DocentStudentDossierPage";
+import DocentPlanningPage from "./features/docent/pages/DocentPlanningPage";
 
 function StudentFaseGuard({ path, children }) {
   const { user } = useAuth();
@@ -99,8 +104,10 @@ export default function App() {
       <BrowserRouter>
         <Routes>
 
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/mentor/activate" element={<MentorActivationPage />} />
+
           <Route element={<AppLayout />}>
             <Route path="/student" element={<MyInternshipPage />} />
             <Route path="/student/application" element={<StageApplicationPage />} />
@@ -122,10 +129,14 @@ export default function App() {
             <Route path="/mentor/evaluation" element={<MentorEvaluationPage />} />
             <Route path="/mentor/contract" element={<MentorContractPage />} />
             <Route path="/mentor/afspraken" element={<MentorAfsprakenPage />} />
+            <Route path="/mentor/planning" element={<MentorPlanningPage />} />
 
             <Route path="/docent/students" element={<DocentStudentsPage />} />
+            <Route path="/docent/students/:dossierId/dossier" element={<DocentStudentDossierPage />} />
+            <Route path="/docent/proposals" element={<DocentProposalsPage />} />
             <Route path="/docent/logbooks" element={<DocentLogbooksPage />} />
             <Route path="/docent/evaluations" element={<DocentEvaluationsPage />} />
+            <Route path="/docent/planning" element={<DocentPlanningPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
