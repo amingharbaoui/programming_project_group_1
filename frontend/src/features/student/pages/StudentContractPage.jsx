@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { apiRequest } from "../../../services/api";
 import "./StudentContractPage.css";
+import Modal from "../../../components/ui/Modal";
 import {
   IconFileCheck,
-  IconUser,
   IconBuilding,
-  IconCalendar,
   IconWriting,
   IconCircleCheck,
   IconClock,
@@ -104,9 +103,9 @@ export default function StudentContractPage() {
     setFout(null);
     try {
       const res = await apiRequest("POST", "/contracts/sign");
-      setSuccesmelding(`Ondertekend op ${formatDatumTijd(res.data.getekendOp)}`);
       await laadContract();
       setAkkoord(false);
+      setSuccesmelding(formatDatumTijd(res.data.getekendOp));
     } catch (err) {
       setFout(err.response?.data?.message || "Ondertekenen mislukt.");
     } finally {
@@ -154,11 +153,21 @@ export default function StudentContractPage() {
         </div>
       )}
 
-      {succesmelding && (
-        <div className="card">
-          <span className="status s_ok"><IconCircleCheck size={14} /> {succesmelding}</span>
-        </div>
-      )}
+      {/* Succesmodal na ondertekenen */}
+      <Modal
+        open={!!succesmelding}
+        onClose={() => setSuccesmelding(null)}
+        icon="ti-signature"
+        titel="Stageovereenkomst ondertekend"
+        sub={succesmelding ? `Ondertekend op ${succesmelding}` : ""}
+        footer={
+          <button className="btn primary" onClick={() => setSuccesmelding(null)}>
+            <i className="ti ti-check"></i> Begrepen
+          </button>
+        }
+      >
+        <p>Je handtekening is geregistreerd. De overeenkomst wordt nu doorgezonden naar het bedrijf voor hun handtekening.</p>
+      </Modal>
 
       {/* Status */}
       <div className="card">
