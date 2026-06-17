@@ -150,6 +150,13 @@ async function uploadDocument(req, res) {
 
     await connection.commit();
 
+    try {
+      const [admins] = await db.query("SELECT id FROM gebruikers WHERE hoofdrol = 'administratie' AND status = 'actief'");
+      for (const a of admins) {
+        await meld(a.id, { titel: "Nieuw document ingediend", bericht: "Een student heeft een document opgeladen ter controle.", aangemaaktDoorId: studentId, stagedossierId: dossier_id, documentId: result.insertId });
+      }
+    } catch (e) { console.error("Melding document upload mislukt:", e.message); }
+
     return ok(
       res,
       {
@@ -205,6 +212,13 @@ async function uploadEigenDocument(req, res) {
     );
 
     await connection.commit();
+
+    try {
+      const [admins] = await db.query("SELECT id FROM gebruikers WHERE hoofdrol = 'administratie' AND status = 'actief'");
+      for (const a of admins) {
+        await meld(a.id, { titel: "Nieuw document toegevoegd", bericht: "Een student heeft een eigen document toegevoegd aan zijn dossier.", aangemaaktDoorId: studentId, stagedossierId: dossier_id, documentId: result.insertId });
+      }
+    } catch (e) { console.error("Melding eigen document mislukt:", e.message); }
 
     return ok(
       res,

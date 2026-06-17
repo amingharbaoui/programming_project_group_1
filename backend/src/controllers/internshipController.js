@@ -843,6 +843,19 @@ async function decideApplication(req, res) {
         aangemaaktDoorId: beslistDoorId,
         stagevoorstelId
       });
+
+      // Bij een goedkeuring krijgt de administratie een melding zodat ze het dossier kunnen opvolgen.
+      if (isGoedkeuring) {
+        const [admins] = await db.query("SELECT id FROM gebruikers WHERE hoofdrol = 'administratie' AND status = 'actief'");
+        for (const a of admins) {
+          await meld(a.id, {
+            titel: "Nieuw goedgekeurd stagevoorstel",
+            bericht: "Een stagevoorstel is goedgekeurd; het dossier kan administratief opgevolgd worden.",
+            aangemaaktDoorId: beslistDoorId,
+            stagevoorstelId
+          });
+        }
+      }
     } catch (notifyError) {
       console.error("Melding student mislukt:", notifyError.message);
     }
@@ -1364,7 +1377,7 @@ async function generateEindoverzicht(req, res) {
     await conn.beginTransaction();
 
     const [d] = await conn.query(
-      `SELECT d.id, d.dossiernummer, d.eindresultaat, d.eindresultaat_vrijgegeven_op,
+      `SELECT d.id, d.student_id, d.stagebegeleider_id, d.dossiernummer, d.eindresultaat, d.eindresultaat_vrijgegeven_op,
               d.startdatum, d.einddatum, d.opleiding, d.academiejaar, d.totaal_uren,
               sg.voornaam AS student_voornaam, sg.achternaam AS student_achternaam, s.studentennummer,
               b.naam AS bedrijf_naam,
@@ -1444,6 +1457,17 @@ async function generateEindoverzicht(req, res) {
     );
 
     await conn.commit();
+
+    // Student en docent verwittigen dat het eindoverzicht klaarstaat.
+    try {
+      const doorId = Number(req.user?.id) || null;
+      await meld(dossier.student_id, { titel: "Eindoverzicht beschikbaar", bericht: "Het eindoverzicht van je stage staat klaar bij je documenten.", aangemaaktDoorId: doorId, stagedossierId: dossierId, documentId: docResult.insertId || null });
+      if (dossier.stagebegeleider_id) {
+        await meld(dossier.stagebegeleider_id, { titel: "Eindoverzicht gegenereerd", bericht: "Het eindoverzicht van je student is gegenereerd.", aangemaaktDoorId: doorId, stagedossierId: dossierId, documentId: docResult.insertId || null });
+      }
+    } catch (notifyError) {
+      console.error("Melding eindoverzicht mislukt:", notifyError.message);
+    }
 
     return ok(
       res,
