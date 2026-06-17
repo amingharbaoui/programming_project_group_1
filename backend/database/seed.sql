@@ -76,6 +76,16 @@ INSERT INTO stagevoorstellen
 VALUES
 (1, 1, 1, 1, 3, 'goedgekeurd', 1, NOW(), NOW(), NOW(), NOW());
 
+INSERT INTO stagevoorstel_versies
+(stagevoorstel_id, versie_nummer, bedrijf_id, bedrijf_naam, bedrijfsafdeling, bedrijfsadres,
+ mentor_naam, mentor_email, mentor_telefoon, mentor_functie, stagefunctie, opdrachtomschrijving,
+ startdatum, einddatum, aantal_weken, uren_per_week, totaal_uren, ingediend_door_id, ingediend_op, aangemaakt_op)
+VALUES
+(1, 1, 1, 'CodeLab Brussels', 'Software Development', 'Nijverheidsstraat 10, 1000 Brussel',
+ 'Demo Mentor', 'mentor@bedrijf.be', '+3200000001', 'Lead Developer', 'Software Developer Stagiair',
+ 'De stagiair werkt mee aan de ontwikkeling en het testen van webapplicaties binnen het team en volgt de sprintwerking mee op.',
+ '2026-02-09', '2026-06-27', 13, 38, 494, 1, NOW(), NOW());
+
 INSERT INTO stagedossiers
 (id, dossiernummer, stagevoorstel_id, student_id, bedrijf_id, stagebegeleider_id, mentor_id, status, opleiding, academiejaar, startdatum, einddatum, aantal_weken, uren_per_week, totaal_uren, aangemaakt_op, aangepast_op)
 VALUES
