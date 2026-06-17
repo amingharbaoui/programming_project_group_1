@@ -233,10 +233,105 @@ async function deleteCompetency(req, res) {
   }
 }
 
+// Maakt een nieuwe (concept-)versie van een profiel met een kopie van alle competenties.
+// Wordt gebruikt door "Nieuwe versie maken" en "Dupliceren".
+async function duplicateProfile(req, res) {
+  const bronId = Number(req.params.id);
+
+  if (!bronId) {
+    return fail(res, 400, "Ongeldig profiel-id");
+  }
+
+  const conn = await db.getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    const [bronnen] = await conn.query(
+      "SELECT * FROM competentie_profielen WHERE id = ? LIMIT 1",
+      [bronId]
+    );
+    const bron = bronnen[0];
+
+    if (!bron) {
+      await conn.rollback();
+      return fail(res, 404, "Bronprofiel niet gevonden");
+    }
+
+    // Volgnummer bepalen voor de nieuwe versie binnen opleiding + academiejaar.
+    const [telling] = await conn.query(
+      "SELECT COUNT(*) AS aantal FROM competentie_profielen WHERE opleiding = ? AND academiejaar = ?",
+      [bron.opleiding, bron.academiejaar]
+    );
+    const nieuweVersie = `v${(telling[0]?.aantal || 1) + 1}.0`;
+
+    const [result] = await conn.query(
+      `
+      INSERT INTO competentie_profielen
+        (opleiding, academiejaar, naam, versie, status, aangemaakt_door_id, aangemaakt_op, aangepast_op)
+      VALUES (?, ?, ?, ?, 'concept', ?, NOW(), NOW())
+      `,
+      [bron.opleiding, bron.academiejaar, bron.naam, nieuweVersie, getUserId(req)]
+    );
+
+    const nieuwId = result.insertId;
+
+    // Alle competenties van het bronprofiel mee kopiëren.
+    await conn.query(
+      `
+      INSERT INTO competenties
+        (competentie_profiel_id, code, naam, beschrijving, gewicht_percentage, volgorde, is_actief, aangemaakt_op, aangepast_op)
+      SELECT ?, code, naam, beschrijving, gewicht_percentage, volgorde, is_actief, NOW(), NOW()
+      FROM competenties
+      WHERE competentie_profiel_id = ?
+      `,
+      [nieuwId, bronId]
+    );
+
+    await conn.commit();
+
+    return ok(res, { id: nieuwId, versie: nieuweVersie, status: "concept" }, "Nieuwe profielversie aangemaakt");
+  } catch (error) {
+    await conn.rollback();
+    if (error.code === "ER_DUP_ENTRY") {
+      return fail(res, 409, "Er bestaat al een profielversie met dit versienummer");
+    }
+    return fail(res, 500, "Nieuwe versie aanmaken mislukt", error.message);
+  } finally {
+    conn.release();
+  }
+}
+
+// Zet een profiel op gearchiveerd.
+async function archiveProfile(req, res) {
+  const profielId = Number(req.params.id);
+
+  if (!profielId) {
+    return fail(res, 400, "Ongeldig profiel-id");
+  }
+
+  try {
+    const [result] = await db.query(
+      "UPDATE competentie_profielen SET status = 'gearchiveerd', aangepast_op = NOW() WHERE id = ?",
+      [profielId]
+    );
+
+    if (result.affectedRows === 0) {
+      return fail(res, 404, "Profiel niet gevonden");
+    }
+
+    return ok(res, { id: profielId, status: "gearchiveerd" }, "Competentieprofiel gearchiveerd");
+  } catch (error) {
+    return fail(res, 500, "Profiel archiveren mislukt", error.message);
+  }
+}
+
 module.exports = {
   listCompetencies,
   createCompetency,
   updateCompetency,
   deleteCompetency,
-  publishProfile
+  publishProfile,
+  duplicateProfile,
+  archiveProfile
 };
