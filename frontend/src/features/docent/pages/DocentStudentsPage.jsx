@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 
@@ -37,6 +38,7 @@ function getLogboekLabel(status) {
 
 export default function DocentStudentsPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [studenten, setStudenten] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -156,8 +158,9 @@ export default function DocentStudentsPage() {
 
                   <td className="right">
                     <div className="actions">
-                      <button className="btn sm">Logboek</button>
-                      <button className="btn sm">Evaluatie</button>
+                      <button className="btn sm" onClick={() => navigate("/docent/logbooks")}>Logboek</button>
+                      <button className="btn sm" onClick={() => navigate("/docent/evaluations")}>Evaluatie</button>
+                      <button className="btn sm primary" onClick={() => navigate(`/docent/students/${s.dossier_id}/dossier`)}>Dossier</button>
                     </div>
                   </td>
                 </tr>
