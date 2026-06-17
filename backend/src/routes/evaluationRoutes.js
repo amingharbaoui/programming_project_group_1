@@ -21,11 +21,4 @@ router.post("/:evaluationId/release", requireRole("docent", "administratie"), re
 // Lezen door de betrokken rollen.
 router.get("/:studentId", requireRole("student", "mentor", "docent", "administratie"), getEvaluationsForStudent);
 
-// Aliassen zodat de frontend (POST + pad zonder /student) ook werkt
-router.post("/:id/scores", saveScores);
-router.post("/:id/calculate", requireRole("administratie", "docent"), calculateResult);
-router.post("/:id/release", requireRole("administratie", "docent"), releaseResult);
-// Let op: deze catch-all GET moet als laatste staan (anders vangt hij /my-students etc.)
-router.get("/:studentId", getEvaluationsForStudent);
-
 module.exports = router;
