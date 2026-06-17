@@ -157,11 +157,6 @@
   margin-top: 16px;
 }
 
-/* s_blauw status (niet in global) */
-.status.s_blauw {
-  background: #eff6ff;
-  color: #2563eb;
-}
 
 @media (max-width: 980px) {
   .contract-grid {

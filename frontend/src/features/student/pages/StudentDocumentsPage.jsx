@@ -36,6 +36,14 @@ function isAfbeelding(url) {
   return /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url ?? "");
 }
 
+// Zet /uploads/bestandsnaam.pdf om naar /api/documents/bestand/bestandsnaam.pdf
+// zodat het via de Vite-proxy (/api) gaat — die werkt altijd
+function bestandSrc(url) {
+  if (!url) return "";
+  const filename = url.replace(/^\/uploads\//, "");
+  return `/api/documents/bestand/${filename}`;
+}
+
 function deadlineVoorDocument(soort, documenten, contract) {
   if (soort.type === "stageovereenkomst") {
     return CONTRACT_GEREGISTREERD.includes(contract?.status) ? "" : "vóór de start";
@@ -105,6 +113,7 @@ function DocumentKaart({ soort, documenten, onUpload, onFout, onBekijken }) {
         <input
           ref={inputRef}
           type="file"
+          name="bestand"
           accept=".pdf,.png,.jpg,.jpeg"
           style={{ display: "none" }}
           onChange={handleBestandKiezen}
@@ -364,6 +373,7 @@ export default function StudentDocumentsPage() {
         <input
           ref={eigenInputRef}
           type="file"
+          name="eigenBestand"
           accept=".pdf,.png,.jpg,.jpeg"
           style={{ display: "none" }}
           onChange={handleEigenUpload}
@@ -381,7 +391,7 @@ export default function StudentDocumentsPage() {
       titel={preview?.naam ?? "Document"}
       footer={
         <a
-          href={preview?.url}
+          href={bestandSrc(preview?.url)}
           target="_blank"
           rel="noreferrer"
           className="btn"
@@ -394,14 +404,14 @@ export default function StudentDocumentsPage() {
       {preview && (
         isAfbeelding(preview.url) ? (
           <img
-            src={preview.url}
+            src={bestandSrc(preview.url)}
             alt={preview.naam}
             style={{ maxWidth: "100%", display: "block", borderRadius: 6 }}
           />
         ) : (
-          <embed
-            src={preview.url}
-            type="application/pdf"
+          <iframe
+            src={bestandSrc(preview.url)}
+            title={preview.naam}
             style={{ width: "100%", height: "65vh", border: "none", borderRadius: 6 }}
           />
         )
