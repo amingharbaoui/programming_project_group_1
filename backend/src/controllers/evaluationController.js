@@ -374,6 +374,24 @@ async function releaseResult(req, res) {
     if (!mayActAsDocent(evaluatie, role, userId)) { await conn.rollback(); return fail(res, 403, "Alleen de gekoppelde docent of administratie kan vrijgeven"); }
     if (evaluatie.status !== "klaar_voor_vrijgave") { await conn.rollback(); return fail(res, 409, "Resultaat moet eerst berekend worden voor het vrijgegeven kan worden"); }
 
+    // Finale-gating: logboek moet afgewerkt zijn en de eindpresentatie moet gegeven zijn.
+    const [openWeken] = await conn.query(
+      "SELECT COUNT(*) AS aantal FROM logboek_weken WHERE stagedossier_id = ? AND status = 'ingediend'",
+      [evaluatie.stagedossier_id]
+    );
+    if (openWeken[0].aantal > 0) {
+      await conn.rollback();
+      return fail(res, 409, "Er staan nog logboekweken op 'ingediend' — die moeten eerst afgecheckt zijn voor je het resultaat vrijgeeft.");
+    }
+    const [pres] = await conn.query(
+      "SELECT status FROM planning_momenten WHERE stagedossier_id = ? AND type = 'eindpresentatie' ORDER BY id DESC LIMIT 1",
+      [evaluatie.stagedossier_id]
+    );
+    if (pres.length > 0 && pres[0].status !== "gegeven") {
+      await conn.rollback();
+      return fail(res, 409, "De eindpresentatie moet eerst plaatsgevonden hebben voor je het resultaat vrijgeeft.");
+    }
+
     await conn.query(
       "UPDATE evaluaties SET status = 'vrijgegeven', vrijgegeven_door_id = ?, vrijgegeven_op = NOW(), aangepast_op = NOW() WHERE id = ?",
       [userId, evaluationId]
