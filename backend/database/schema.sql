@@ -217,6 +217,7 @@ CREATE TABLE `logboek_weken` (
   `docent_id` int DEFAULT NULL,
   `docent_feedback` text,
   `docent_nagekeken_op` timestamp NULL DEFAULT NULL,
+  `student_antwoord` text,
   `herindiening_nodig` tinyint(1) DEFAULT '0',
   `blokkade` text COMMENT 'Bijvoorbeeld week 11 ontbreekt',
   `aangemaakt_op` timestamp NULL DEFAULT NULL,
