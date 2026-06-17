@@ -1,6 +1,6 @@
 import "./Sidebar.css";
 import { useState, useEffect } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import stageifyLogo from "../../assets/stageify-logo/stageify_logo_wide.png";
 import stageifyIcon from "../../assets/stageify-logo/stageify_original.png";
 import ehbLogoWide from "../../assets/ehb-logo/erasmus_wide_version.png";
@@ -50,6 +50,7 @@ function heeftDocumentActieNodig(soorten = [], documenten = []) {
 
 export default function Sidebar({ collapsed }) {
   const { user } = useAuth();
+  const location = useLocation();
   const items = NAVIGATION[user.role] || [];
 
   const [lockedGroups, setLockedGroups]   = useState(new Set(["contract_docs", "logboek_eval"]));
@@ -111,7 +112,7 @@ export default function Sidebar({ collapsed }) {
     }
 
     fetchLockState();
-  }, [user.role, user.id]);
+  }, [user.role, user.id, location.pathname]);
 
   // Bepaal welke items naar "Afgehandeld" zakken
   const isAfgehandeld =
