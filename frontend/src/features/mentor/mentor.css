@@ -159,3 +159,19 @@
 .mtr .modal-head .mh-x{margin-left:auto;}
 .mtr .modal-body{padding:16px 18px;overflow-y:auto;font-size:13.5px;line-height:1.65;color:var(--gray);}
 .mtr .modal-foot{padding:12px 18px;border-top:0.5px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+
+/* dossier */
+.mtr .tag{font-size:9.5px;padding:1px 6px;border-radius:8px;background:var(--red-light);color:var(--red);font-weight:500;}
+.mtr .prof{display:flex;gap:11px;align-items:flex-start;padding:10px 0;border-bottom:0.5px solid var(--border);}
+.mtr .prof:last-of-type{border-bottom:none;padding-bottom:2px;}
+.mtr .p-naam{font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.mtr .p-mail{font-size:11.5px;color:var(--faint);margin-top:2px;}
+.mtr .grid-2c{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;}
+@media(max-width:720px){.mtr .grid-2c{grid-template-columns:1fr;}}
+.mtr .dossier{margin-top:18px;border-top:1px solid var(--border);padding-top:4px;}
+.mtr .dossier-kop{width:100%;display:flex;align-items:center;gap:8px;background:none;border:none;font-family:var(--font);font-size:13px;font-weight:600;color:var(--dark);padding:10px 2px;cursor:pointer;}
+.mtr .dossier-kop i{transition:transform .2s;color:var(--sub);}
+.mtr .dossier-kop.open i{transform:rotate(90deg);}
+.mtr .dossier-body{display:none;padding-top:8px;}
+.mtr .dossier-body.open{display:block;}
+.mtr .dossier-body > .card{margin-bottom:12px;}

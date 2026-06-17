@@ -18,6 +18,7 @@ import CompetenciesPage from "./features/admin/pages/CompetenciesPage";
 
 import MentorActivationPage from "./features/mentor/pages/MentorActivationPage";
 import MentorStudentsPage from "./features/mentor/pages/MentorStudentsPage";
+import MentorDossierPage from "./features/mentor/pages/MentorDossierPage";
 import MentorLogbooksPage from "./features/mentor/pages/MentorLogbooksPage";
 import MentorEvaluationPage from "./features/mentor/pages/MentorEvaluationPage";
 import MentorContractPage from "./features/mentor/pages/MentorContractPage";
@@ -55,6 +56,7 @@ export default function App() {
             <Route path="/admin/competencies" element={<CompetenciesPage />} />
 
             <Route path="/mentor/students" element={<MentorStudentsPage />} />
+            <Route path="/mentor/dossier" element={<MentorDossierPage />} />
             <Route path="/mentor/logbooks" element={<MentorLogbooksPage />} />
             <Route path="/mentor/evaluation" element={<MentorEvaluationPage />} />
             <Route path="/mentor/contract" element={<MentorContractPage />} />

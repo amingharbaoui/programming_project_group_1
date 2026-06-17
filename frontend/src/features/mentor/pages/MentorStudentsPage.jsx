@@ -92,7 +92,7 @@ export default function MentorStudentsPage() {
                           <div className="prof-av" style={{ width: 30, height: 30, fontSize: 11 }}>{initialen(s)}</div>
                           <div
                             style={{ fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}
-                            onClick={() => navigate(`/mentor/contract?student=${s.id}`)}
+                            onClick={() => navigate(`/mentor/dossier?student=${s.id}`)}
                           >
                             {s.voornaam} {s.achternaam}
                             <div style={{ fontSize: 11.5, fontWeight: 400, color: "var(--faint)" }}>{s.bedrijf || "-"}</div>
@@ -123,7 +123,7 @@ export default function MentorStudentsPage() {
                       </td>
 
                       <td style={{ textAlign: "right" }}>
-                        <button className="btn sm" onClick={() => navigate(`/mentor/contract?student=${s.id}`)}>
+                        <button className="btn sm" onClick={() => navigate(`/mentor/dossier?student=${s.id}`)}>
                           Open dossier <i className="ti ti-chevron-right" />
                         </button>
                       </td>
