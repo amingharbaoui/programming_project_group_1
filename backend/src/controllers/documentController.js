@@ -280,4 +280,20 @@ async function rejectDocument(req, res) {
   }
 }
 
-module.exports = { getDocuments, uploadDocument, uploadEigenDocument, uploadMiddleware, getSoorten, approveDocument, rejectDocument };
+/* GET /api/documents/bestand/:filename — bestand serveren */
+const fs = require("fs");
+const UPLOADS_DIR = path.join(__dirname, "../../uploads");
+
+function serveBestand(req, res) {
+  const filename = req.params.filename;
+  if (!filename || filename.includes("..") || filename.includes("/") || filename.includes("\\")) {
+    return res.status(400).json({ success: false, message: "Ongeldige bestandsnaam" });
+  }
+  const filePath = path.join(UPLOADS_DIR, filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ success: false, message: "Bestand niet gevonden" });
+  }
+  res.sendFile(filePath);
+}
+
+module.exports = { getDocuments, uploadDocument, uploadEigenDocument, uploadMiddleware, getSoorten, approveDocument, rejectDocument, serveBestand };
