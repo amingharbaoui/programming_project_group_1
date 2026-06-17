@@ -74,24 +74,28 @@ export default function Sidebar({ collapsed }) {
         }
         // Fase-info voor side-status blok
         setFaseInfo(FASE_MAP[status] ?? FASE_MAP.geen);
-        // Warn-cirkels
-        setWarnPaths(new Set(WARN_STATUS[status] ?? []));
+        // Warn-cirkels op basis van internship-status
+        const warn = new Set(WARN_STATUS[status] ?? []);
+        // Contract-warn alleen tonen als student nog niet getekend heeft
+        if (contractRes.status === "fulfilled") {
+          const contract = contractRes.value?.data;
+          if (!contract || contract.status !== "klaar_voor_student") {
+            warn.delete("/student/contract");
+          }
+          // Unlock logboek + evaluatie als alle 3 partijen getekend hebben
+          if (
+            contract &&
+            contract.student_getekend_op &&
+            contract.bedrijf_getekend_op &&
+            contract.opleiding_getekend_op
+          ) {
+            locked.delete("contract_docs");
+            locked.delete("logboek_eval");
+          }
+        }
+        setWarnPaths(warn);
       } else {
         setFaseInfo(FASE_MAP.geen);
-      }
-
-      // Unlock logboek + evaluatie als alle 3 partijen getekend hebben
-      if (contractRes.status === "fulfilled") {
-        const contract = contractRes.value?.data;
-        if (
-          contract &&
-          contract.student_getekend_op &&
-          contract.bedrijf_getekend_op &&
-          contract.opleiding_getekend_op
-        ) {
-          locked.delete("contract_docs");
-          locked.delete("logboek_eval");
-        }
       }
 
       setLockedGroups(locked);
