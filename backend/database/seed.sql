@@ -97,3 +97,53 @@ INSERT INTO planning_momenten
 VALUES
 (1, 'bedrijfsbezoek', 'voorgesteld', '2026-06-25 10:00:00', 'CodeLab Brussels — Nijverheidsstraat 10, 1000 Brussel', 3, NOW(), NOW()),
 (1, 'tussentijdse_bespreking', 'bevestigd', '2026-05-14 14:00:00', 'Online (Teams)', 3, NOW(), NOW());
+
+-- Goedkeuringsbeslissing van de commissie voor het voorstel.
+INSERT INTO voorstel_beslissingen
+(stagevoorstel_id, stagevoorstel_versie_id, beslist_door_id, beslissing, feedback, motivering, beslist_op)
+VALUES
+(1, 1, 2, 'goedgekeurd', NULL, 'Sterk voorstel — voldoet aan alle criteria.', NOW());
+
+-- Stageovereenkomst: volledig ondertekend en geregistreerd door de administratie.
+INSERT INTO stageovereenkomsten
+(id, stagedossier_id, status, versie_nummer, bestand_url, student_getekend_op, bedrijf_getekend_op, opleiding_getekend_op, gecontroleerd_door_id, gecontroleerd_op, geregistreerd_door_id, geregistreerd_op, aangemaakt_op, aangepast_op)
+VALUES
+(1, 1, 'geregistreerd', 1, '/uploads/demo-overeenkomst.pdf', '2026-02-06 10:00:00', '2026-02-07 09:00:00', '2026-02-10 11:00:00', 4, '2026-02-10 11:00:00', 4, '2026-02-10 11:00:00', NOW(), NOW());
+
+UPDATE stagedossiers SET verzekering_in_orde = 1 WHERE id = 1;
+
+-- Documenten: overeenkomst geregistreerd, stageplan goedgekeurd, verzekeringsbewijs nog te controleren (admin-actie).
+INSERT INTO documenten
+(stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam, opgeladen_door_id, opgeladen_op, gecontroleerd_door_id, gecontroleerd_op, aangemaakt_op, aangepast_op)
+VALUES
+(1, 1, 'geregistreerd', 1, '/uploads/demo-overeenkomst.pdf', 'stageovereenkomst.pdf', 1, '2026-02-06 10:00:00', 4, '2026-02-10 11:00:00', NOW(), NOW()),
+(1, 3, 'goedgekeurd',   1, '/uploads/demo-stageplan.pdf',    'stageplan.pdf',         1, '2026-02-12 09:30:00', 4, '2026-02-13 10:00:00', NOW(), NOW()),
+(1, 2, 'ingediend',     1, '/uploads/demo-verzekering.pdf',  'verzekeringsbewijs.pdf', 1, '2026-02-12 09:00:00', NULL, NULL, NOW(), NOW());
+
+-- Evaluatiemomenten: tussentijds staat open (student/mentor/docent kunnen invullen), finaal nog niet open.
+INSERT INTO evaluaties
+(id, stagedossier_id, type, status, deadline_student, deadline_mentor, deadline_docent, aangemaakt_op, aangepast_op)
+VALUES
+(1, 1, 'tussentijds', 'open',      '2026-05-08', '2026-05-11', '2026-05-15', NOW(), NOW()),
+(2, 1, 'finaal',      'niet_open', '2026-06-19', '2026-06-21', '2026-06-26', NOW(), NOW());
+
+-- Logboek: week 1 volledig nagekeken, week 2 ingediend (mentor moet afchecken).
+INSERT INTO logboek_weken
+(id, stagedossier_id, week_nummer, week_start, week_einde, status, totaal_uren, ingediend_op, mentor_id, mentor_feedback, mentor_nagekeken_op, docent_id, docent_feedback, docent_nagekeken_op, aangemaakt_op, aangepast_op)
+VALUES
+(1, 1, 1, '2026-02-09', '2026-02-13', 'goedgekeurd_door_docent', 38.0, '2026-02-13 17:00:00', 5, 'Goede eerste week, mooi op dreef.', '2026-02-16 09:00:00', 3, 'Prima logboek.', '2026-02-17 10:00:00', NOW(), NOW()),
+(2, 1, 2, '2026-02-16', '2026-02-20', 'ingediend',                38.0, '2026-02-20 17:00:00', 5, NULL, NULL, 3, NULL, NULL, NOW(), NOW());
+
+INSERT INTO logboek_dagen
+(logboek_week_id, datum, status, titel, uitgevoerde_taken, reflectie, aantal_uren, aangemaakt_op, aangepast_op)
+VALUES
+(1, '2026-02-09', 'ingevuld', 'Onboarding',  'Kennismaking team, dev-omgeving opgezet.', 'Veel nieuwe tools, maar goed begeleid.', 7.6, NOW(), NOW()),
+(1, '2026-02-10', 'ingevuld', 'Eerste taak', 'Bug gefixt in de loginflow.',              'Codebase wordt duidelijker.',           7.6, NOW(), NOW()),
+(1, '2026-02-11', 'ingevuld', 'Code review', 'Mee in een code review gezeten.',          'Geleerd hoe het team kwaliteit bewaakt.', 7.6, NOW(), NOW()),
+(1, '2026-02-12', 'ingevuld', 'Feature',     'Kleine UI-aanpassing gebouwd.',            'Trots op eerste merge.',                7.6, NOW(), NOW()),
+(1, '2026-02-13', 'ingevuld', 'Retro',       'Sprint-retro bijgewoond.',                 'Begrijp de sprintwerking nu beter.',    7.6, NOW(), NOW()),
+(2, '2026-02-16', 'ingevuld', 'API-werk',    'Endpoint uitgebreid met validatie.',       'Backend wordt vertrouwder.',            7.6, NOW(), NOW()),
+(2, '2026-02-17', 'ingevuld', 'Tests',       'Unit tests geschreven.',                   'Testen vangt fouten vroeg.',            7.6, NOW(), NOW()),
+(2, '2026-02-18', 'ingevuld', 'Bugfix',      'Edge case opgelost.',                      'Debuggen gaat vlotter.',                7.6, NOW(), NOW()),
+(2, '2026-02-19', 'ingevuld', 'Docs',        'Documentatie aangevuld.',                  'Schrijven dwingt tot helder denken.',   7.6, NOW(), NOW()),
+(2, '2026-02-20', 'ingevuld', 'Demo',        'Feature gedemod aan het team.',            'Spannend maar leerrijk.',               7.6, NOW(), NOW());
