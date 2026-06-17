@@ -263,8 +263,16 @@ async function proposeAlternative(req, res) {
 
 async function listMentorPlanning(req, res) {
   const mentorId = getUserId(req);
+  const dossierId = req.params.dossierId ? Number(req.params.dossierId) : null;
 
   try {
+    const params = [mentorId];
+    let dossierFilter = "";
+    if (dossierId) {
+      dossierFilter = "AND pm.stagedossier_id = ?";
+      params.push(dossierId);
+    }
+
     const [rows] = await db.query(
       `
       SELECT
@@ -280,10 +288,10 @@ async function listMentorPlanning(req, res) {
       JOIN gebruikers gs ON gs.id = sd.student_id
       JOIN gebruikers gd ON gd.id = sd.stagebegeleider_id
       JOIN bedrijven b ON b.id = sd.bedrijf_id
-      WHERE sd.mentor_id = ?
+      WHERE sd.mentor_id = ? ${dossierFilter}
       ORDER BY pm.gepland_op IS NULL, pm.gepland_op ASC, pm.id DESC
       `,
-      [mentorId]
+      params
     );
 
     return ok(res, rows, "Mentorplanning opgehaald");
