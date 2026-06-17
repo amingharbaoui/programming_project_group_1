@@ -75,11 +75,16 @@ async function getMentorContract(req, res) {
 async function tekenContract(req, res) {
   const mentorId  = Number(req.user?.id);
   const dossierId = Number(req.params.dossierId);
+  const tekenbevoegd = Boolean(req.body?.tekenbevoegd ?? req.body?.tekenBevoegd ?? req.body?.bevoegd);
+
+  if (!tekenbevoegd) {
+    return fail(res, 400, "Je moet eerst bevestigen dat je tekenbevoegd bent voor het stagebedrijf");
+  }
 
   try {
     // Security check
     const [[dossier]] = await db.query(
-      "SELECT id FROM stagedossiers WHERE id = ? AND mentor_id = ? LIMIT 1",
+      "SELECT id, student_id FROM stagedossiers WHERE id = ? AND mentor_id = ? LIMIT 1",
       [dossierId, mentorId]
     );
     if (!dossier) return fail(res, 403, "Geen toegang tot dit dossier");
@@ -102,6 +107,29 @@ async function tekenContract(req, res) {
        WHERE stagedossier_id = ?`,
       [nieuweStatus, dossierId]
     );
+
+    // Student en administratie verwittigen dat het stagebedrijf getekend heeft (story 28).
+    try {
+      if (dossier.student_id) {
+        await meld(dossier.student_id, {
+          titel: "Stagebedrijf ondertekende de overeenkomst",
+          bericht: "Je mentor ondertekende de stageovereenkomst namens het stagebedrijf.",
+          aangemaaktDoorId: mentorId,
+          stagedossierId: dossierId
+        });
+      }
+      const [admins] = await db.query("SELECT id FROM gebruikers WHERE hoofdrol = 'administratie' AND status = 'actief'");
+      for (const a of admins) {
+        await meld(a.id, {
+          titel: "Stagebedrijf ondertekende de overeenkomst",
+          bericht: "Het stagebedrijf ondertekende de stageovereenkomst; je kan ze nu controleren en registreren.",
+          aangemaaktDoorId: mentorId,
+          stagedossierId: dossierId
+        });
+      }
+    } catch (notifyError) {
+      console.error("Melding mentor tekenen mislukt:", notifyError.message);
+    }
 
     return ok(res, { status: nieuweStatus }, "Contract getekend door mentor");
   } catch (err) {

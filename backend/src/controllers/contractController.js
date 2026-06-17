@@ -67,7 +67,7 @@ async function signContract(req, res) {
 
     const [rows] = await connection.query(
       `
-      SELECT so.id, so.status, so.student_getekend_op
+      SELECT so.id, so.status, so.student_getekend_op, so.stagedossier_id, d.mentor_id
       FROM stageovereenkomsten so
       JOIN stagedossiers d ON d.id = so.stagedossier_id
       WHERE d.student_id = ?
@@ -103,6 +103,29 @@ async function signContract(req, res) {
     );
 
     await connection.commit();
+
+    // Volgende ondertekenaar (mentor/bedrijf) en de administratie verwittigen.
+    try {
+      if (contract.mentor_id) {
+        await meld(contract.mentor_id, {
+          titel: "Stageovereenkomst ondertekend door student",
+          bericht: "De student ondertekende de stageovereenkomst. Jij kan ze nu als stagebedrijf ondertekenen.",
+          aangemaaktDoorId: studentId,
+          stagedossierId: contract.stagedossier_id
+        });
+      }
+      const [admins] = await db.query("SELECT id FROM gebruikers WHERE hoofdrol = 'administratie' AND status = 'actief'");
+      for (const a of admins) {
+        await meld(a.id, {
+          titel: "Student ondertekende de overeenkomst",
+          bericht: "Een student ondertekende de stageovereenkomst.",
+          aangemaaktDoorId: studentId,
+          stagedossierId: contract.stagedossier_id
+        });
+      }
+    } catch (notifyError) {
+      console.error("Melding ondertekenen mislukt:", notifyError.message);
+    }
 
     return ok(
       res,
