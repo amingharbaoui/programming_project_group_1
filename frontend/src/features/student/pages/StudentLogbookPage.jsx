@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { apiRequest } from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 import "./Logboek.css";
+import Modal from "../../../components/ui/Modal";
 import {
   IconCalendar,
   IconSend,
@@ -239,13 +240,33 @@ function leegDag() {
   };
 }
 
-function defaultLogbook(weekNummer = 1) {
+// Berekent maandag–vrijdag van week `weekNummer` vanuit de stage-startdatum
+function berekenWeekDatums(startDatum, weekNummer) {
+  if (!startDatum) return { weekStart: "", weekEinde: "", dagDatums: ["", "", "", "", ""] };
+  const ma = new Date(startDatum);
+  ma.setDate(ma.getDate() + (weekNummer - 1) * 7);
+  const vr = new Date(ma);
+  vr.setDate(vr.getDate() + 4);
+  const dagDatums = [0, 1, 2, 3, 4].map((i) => {
+    const d = new Date(ma);
+    d.setDate(d.getDate() + i);
+    return d.toISOString().slice(0, 10);
+  });
+  return {
+    weekStart: ma.toISOString().slice(0, 10),
+    weekEinde: vr.toISOString().slice(0, 10),
+    dagDatums,
+  };
+}
+
+function defaultLogbook(weekNummer = 1, startDatum = null) {
+  const { weekStart, weekEinde, dagDatums } = berekenWeekDatums(startDatum, weekNummer);
   return {
     stagedossierId: "",
     weekNummer,
-    weekStart: "",
-    weekEinde: "",
-    dagen: [leegDag(), leegDag(), leegDag(), leegDag(), leegDag()],
+    weekStart,
+    weekEinde,
+    dagen: dagDatums.map((datum) => ({ ...leegDag(), datum })),
   };
 }
 
@@ -268,7 +289,7 @@ function weekNaarFormulier(week) {
 }
 
 /* ---------- Week formulier (nieuw + bewerken) ---------- */
-function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken }) {
+function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aantalWeken }) {
   const [ingediendeDagen, setIngediendeDagen] = useState(
     logbook.dagen.map(() => false)
   );
@@ -326,8 +347,8 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken }) {
         <div className="card_title">
           <IconCalendar size={16} />
           {isBewerken
-            ? `Week ${logbook.weekNummer} aanpassen`
-            : "Week informatie"}
+            ? `Week ${logbook.weekNummer}${aantalWeken ? ` van ${aantalWeken}` : ""} aanpassen`
+            : `Week ${logbook.weekNummer}${aantalWeken ? ` van ${aantalWeken}` : ""}`}
         </div>
         <div className="form_row">
           <div className="form_group">
@@ -524,7 +545,9 @@ export default function StudentLogbookPage() {
   const [error, setError] = useState(null);
   const [weken, setWeken] = useState([]);
   const [submitted, setSubmitted] = useState(false);
+  const [ingediendWeekNr, setIngediendWeekNr] = useState(null);
   const [startDatum, setStartDatum] = useState(null);
+  const [eindDatum, setEindDatum]   = useState(null);
 
   // Gate: logboek alleen toegankelijk als voorstel goedgekeurd + contract getekend
   const [voorstelStatus, setVoorstelStatus] = useState(null);
@@ -536,20 +559,15 @@ export default function StudentLogbookPage() {
   const [logbook, setLogbook] = useState(defaultLogbook(1));
 
   /* Weken ophalen van backend */
-  async function fetchWeken(currentWeekNummer) {
+  async function fetchWeken(sd = null) {
     try {
       const res = await apiRequest("GET", `/logbooks/${user.id}`);
       const data = Array.isArray(res.data) ? res.data : [];
       setWeken(data);
 
-      if (data.length > 0 && !editWeek) {
-        const maxWeek = Math.max(...data.map((w) => w.week_nummer));
-        const alIngediend = data.some(
-          (w) => w.week_nummer === (currentWeekNummer ?? 1)
-        );
-        if (alIngediend) {
-          setLogbook(defaultLogbook(maxWeek + 1));
-        }
+      if (!editWeek) {
+        const maxWeek = data.length > 0 ? Math.max(...data.map((w) => w.week_nummer)) : 0;
+        setLogbook(defaultLogbook(maxWeek + 1, sd));
       }
     } catch (err) {
       console.error("Kan logboeken niet ophalen:", err);
@@ -561,29 +579,38 @@ export default function StudentLogbookPage() {
   useEffect(() => {
     setLoadingWeken(true);
 
-    // Stagevoorstel status + startdatum ophalen
-    apiRequest("GET", "/internships/my")
-      .then((res) => {
-        if (res.data) {
-          setVoorstelStatus(res.data.status);
-          if (res.data.startdatum ?? res.data.startDatum) {
-            setStartDatum(new Date(res.data.startdatum ?? res.data.startDatum));
-          }
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoadingGate(false));
+    async function init() {
+      let sd = null;
 
-    // Contract status ophalen
-    apiRequest("GET", "/contracts/my")
-      .then((res) => {
-        if (res.data?.student_getekend_op) {
-          setContractGetekend(true);
-        }
-      })
-      .catch(() => {});
+      // Stagevoorstel + contract parallel ophalen
+      const [internRes, contractRes] = await Promise.allSettled([
+        apiRequest("GET", "/internships/my"),
+        apiRequest("GET", "/contracts/my"),
+      ]);
 
-    fetchWeken(1);
+      if (internRes.status === "fulfilled" && internRes.value?.data) {
+        const data = internRes.value.data;
+        setVoorstelStatus(data.status);
+        const rawStart = data.startdatum ?? data.startDatum;
+        const rawEind  = data.einddatum  ?? data.eindDatum;
+        if (rawStart) {
+          sd = new Date(rawStart);
+          setStartDatum(sd);
+        }
+        if (rawEind) setEindDatum(new Date(rawEind));
+      }
+
+      if (contractRes.status === "fulfilled" && contractRes.value?.data?.student_getekend_op) {
+        setContractGetekend(true);
+      }
+
+      setLoadingGate(false);
+
+      // Weken ophalen met gekende startDatum zodat datums auto-ingevuld worden
+      await fetchWeken(sd);
+    }
+
+    init();
   }, [user.id]);
 
   /* Beschikbaarheidslogica */
@@ -592,6 +619,11 @@ export default function StudentLogbookPage() {
     ? Math.floor((vandaag - startDatum) / (1000 * 60 * 60 * 24))
     : 0;
   const beschikbareWeek = Math.max(1, Math.ceil((verschilDagen + 1) / 7));
+
+  // Totaal aantal weken op basis van stageperiode (start → eind)
+  const aantalWeken = startDatum && eindDatum
+    ? Math.ceil((eindDatum - startDatum) / (1000 * 60 * 60 * 24 * 7))
+    : null;
 
   const huidigFormulierWeek = editWeek ? editWeek.week_nummer : logbook.weekNummer;
   const weekAlIngediend =
@@ -644,9 +676,11 @@ export default function StudentLogbookPage() {
         })),
       });
 
+      const weekNrIngediend = Number(logbook.weekNummer);
       setEditWeek(null);
-      await fetchWeken(logbook.weekNummer);
+      await fetchWeken(startDatum);
       setSubmitted(true);
+      setIngediendWeekNr(weekNrIngediend);
     } catch (err) {
       const backendMsg = err.response?.data?.message;
       if (backendMsg?.toLowerCase().includes("stagedossier")) {
@@ -678,7 +712,7 @@ export default function StudentLogbookPage() {
     setError(null);
     const maxWeek =
       weken.length > 0 ? Math.max(...weken.map((w) => w.week_nummer)) : 0;
-    setLogbook(defaultLogbook(maxWeek + 1));
+    setLogbook(defaultLogbook(maxWeek + 1, startDatum));
   }
 
   /* Nieuwe week starten */
@@ -688,7 +722,7 @@ export default function StudentLogbookPage() {
     setError(null);
     const maxWeek =
       weken.length > 0 ? Math.max(...weken.map((w) => w.week_nummer)) : 0;
-    setLogbook(defaultLogbook(maxWeek + 1));
+    setLogbook(defaultLogbook(maxWeek + 1, startDatum));
   }
 
   /* ---------- Render ---------- */
@@ -830,6 +864,7 @@ export default function StudentLogbookPage() {
             onSubmit={handleWeekIndienen}
             saving={saving}
             isBewerken={true}
+            aantalWeken={aantalWeken}
           />
         </>
       )}
@@ -907,10 +942,30 @@ export default function StudentLogbookPage() {
               onSubmit={handleWeekIndienen}
               saving={saving}
               isBewerken={false}
+              aantalWeken={aantalWeken}
             />
           )}
         </>
       )}
+
+      {/* Modal: week succesvol ingediend */}
+      <Modal
+        open={!!ingediendWeekNr}
+        onClose={() => setIngediendWeekNr(null)}
+        icon="ti-send"
+        titel={`Week ${ingediendWeekNr} ingediend`}
+        sub="Je mentor krijgt een melding."
+        footer={
+          <button className="btn primary" onClick={() => setIngediendWeekNr(null)}>
+            <i className="ti ti-check"></i> Begrepen
+          </button>
+        }
+      >
+        <p>
+          Je logboek voor week {ingediendWeekNr} is verstuurd. Je mentor ontvangt
+          een melding en controleert je uren en activiteiten.
+        </p>
+      </Modal>
     </div>
   );
 }
