@@ -298,6 +298,7 @@ async function createLogbook(req, res) {
     }
 
     for (const day of finalDays) {
+      const competenties = Array.isArray(day.competenties) ? day.competenties : [];
       await connection.query(
         `
         INSERT INTO logboek_dagen
@@ -310,11 +311,12 @@ async function createLogbook(req, res) {
           reflectie,
           problemen,
           leerpunten,
+          competenties,
           aantal_uren,
           aangemaakt_op,
           aangepast_op
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         `,
         [
           weekId,
@@ -325,6 +327,7 @@ async function createLogbook(req, res) {
           day.reflectie || null,
           day.problemen || null,
           day.leerpunten || null,
+          competenties.length > 0 ? JSON.stringify(competenties) : null,
           Number(day.aantalUren || day.aantal_uren || 0)
         ]
       );
@@ -438,6 +441,7 @@ async function getLogbooksByStudent(req, res) {
         reflectie,
         problemen,
         leerpunten,
+        competenties,
         aantal_uren,
         mentor_bevestigd_op
       FROM logboek_dagen
@@ -447,28 +451,9 @@ async function getLogbooksByStudent(req, res) {
       [weekIds]
     );
 
-    // Gekoppelde competenties per dag ophalen (story 7).
-    const dayIds = days.map((day) => day.id);
-    const compsByDay = {};
-    if (dayIds.length > 0) {
-      const [compRows] = await db.query(
-        `SELECT ldc.logboek_dag_id, c.id, c.code, c.naam
-         FROM logboek_dag_competenties ldc
-         JOIN competenties c ON c.id = ldc.competentie_id
-         WHERE ldc.logboek_dag_id IN (?)
-         ORDER BY c.volgorde ASC, c.id ASC`,
-        [dayIds]
-      );
-      for (const r of compRows) {
-        if (!compsByDay[r.logboek_dag_id]) compsByDay[r.logboek_dag_id] = [];
-        compsByDay[r.logboek_dag_id].push({ id: r.id, code: r.code, naam: r.naam });
-      }
-    }
-
     const daysByWeek = {};
 
     for (const day of days) {
-      day.competenties = compsByDay[day.id] || [];
       if (!daysByWeek[day.logboek_week_id]) {
         daysByWeek[day.logboek_week_id] = [];
       }
@@ -891,31 +876,18 @@ async function saveLogbookDay(req, res) {
       "SELECT id FROM logboek_dagen WHERE logboek_week_id = ? AND datum = ? LIMIT 1",
       [weekId, datum]
     );
-    let dagId;
+    const competentiesJson = competenties && competenties.length > 0 ? JSON.stringify(competenties) : null;
     if (bestaand.length > 0) {
-      dagId = bestaand[0].id;
       await conn.query(
-        `UPDATE logboek_dagen SET status = ?, titel = ?, uitgevoerde_taken = ?, reflectie = ?, problemen = ?, leerpunten = ?, aantal_uren = ?, aangepast_op = NOW() WHERE id = ?`,
-        [status, titel || null, uitgevoerdeTaken || null, reflectie || null, problemen || null, leerpunten || null, aantalUren, dagId]
+        `UPDATE logboek_dagen SET status = ?, titel = ?, uitgevoerde_taken = ?, reflectie = ?, problemen = ?, leerpunten = ?, competenties = ?, aantal_uren = ?, aangepast_op = NOW() WHERE id = ?`,
+        [status, titel || null, uitgevoerdeTaken || null, reflectie || null, problemen || null, leerpunten || null, competentiesJson, aantalUren, bestaand[0].id]
       );
     } else {
-      const [ins] = await conn.query(
-        `INSERT INTO logboek_dagen (logboek_week_id, datum, status, titel, uitgevoerde_taken, reflectie, problemen, leerpunten, aantal_uren, aangemaakt_op, aangepast_op)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-        [weekId, datum, status, titel || null, uitgevoerdeTaken || null, reflectie || null, problemen || null, leerpunten || null, aantalUren]
+      await conn.query(
+        `INSERT INTO logboek_dagen (logboek_week_id, datum, status, titel, uitgevoerde_taken, reflectie, problemen, leerpunten, competenties, aantal_uren, aangemaakt_op, aangepast_op)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        [weekId, datum, status, titel || null, uitgevoerdeTaken || null, reflectie || null, problemen || null, leerpunten || null, competentiesJson, aantalUren]
       );
-      dagId = ins.insertId;
-    }
-
-    // Gekoppelde competenties van deze dag bijwerken (enkel als het veld is meegestuurd).
-    if (competenties !== null) {
-      await conn.query("DELETE FROM logboek_dag_competenties WHERE logboek_dag_id = ?", [dagId]);
-      for (const competentieId of competenties) {
-        await conn.query(
-          "INSERT IGNORE INTO logboek_dag_competenties (logboek_dag_id, competentie_id, aangemaakt_op) VALUES (?, ?, NOW())",
-          [dagId, competentieId]
-        );
-      }
     }
 
     // Weektotaal herberekenen.

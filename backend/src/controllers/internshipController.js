@@ -583,6 +583,7 @@ async function getMyInternship(req, res) {
         sp.heringediend_op,
         sp.goedgekeurd_op,
         sp.afgekeurd_op,
+        d.status AS dossier_status,
 
         v.id AS versie_id,
         v.bedrijf_naam,

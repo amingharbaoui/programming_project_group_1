@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
 import { apiRequest } from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import "./Logboek.css";
+import Modal from "../../../components/ui/Modal";
 import {
   IconCalendar,
+  IconCalendarOff,
   IconSend,
   IconPlus,
   IconCircleCheck,
@@ -142,17 +145,31 @@ function LogboekWeek({ week, onBewerken, onVernieuwen }) {
           )}
 
           {/* Dag rijen */}
-          {(week.dagen || []).map((dag, i) => (
-            <div className="dag-rij" key={i}>
-              <span className="dag-naam">{dagNaam(dag.datum, i)}</span>
-              <span className="dag-samenvatting">
-                {dag.titel || dag.uitgevoerde_taken || "–"}
-              </span>
-              <span style={{ fontSize: "12px", color: "var(--sub)", flexShrink: 0 }}>
-                {dag.aantal_uren}u
-              </span>
-            </div>
-          ))}
+          {(week.dagen || []).map((dag, i) => {
+            const dagCompetenties = Array.isArray(dag.competenties)
+              ? dag.competenties
+              : (dag.competenties ? JSON.parse(dag.competenties) : []);
+            return (
+              <div className="dag-rij" key={i}>
+                <div className="dag-rij-hoofd">
+                  <span className="dag-naam">{dagNaam(dag.datum, i)}</span>
+                  <span className="dag-samenvatting">
+                    {dag.titel || dag.uitgevoerde_taken || "–"}
+                  </span>
+                  <span style={{ fontSize: "12px", color: "var(--sub)", flexShrink: 0 }}>
+                    {dag.aantal_uren}u
+                  </span>
+                </div>
+                {dagCompetenties.length > 0 && (
+                  <div className="dag-lo-chips">
+                    {dagCompetenties.map((code) => (
+                      <span key={code} className="dag-lo-badge">{code}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           <div style={{ fontSize: "12.5px", color: "var(--sub)", marginTop: 8 }}>
             Totaal: <strong>{Number(week.totaal_uren).toFixed(1)}u</strong>
@@ -227,6 +244,20 @@ function AntwoordBlok({ week, onAntwoordOpgeslagen }) {
   );
 }
 
+const LO_COMPETENTIES = [
+  { code: "LO1",  naam: "Beheersing van het planningsproces" },
+  { code: "LO2",  naam: "Ontwerpen van IT-oplossingen" },
+  { code: "LO3",  naam: "Implementatie van digitale producten" },
+  { code: "LO4",  naam: "Integratie van technologie en infrastructuur" },
+  { code: "LO5",  naam: "Onderzoekende houding" },
+  { code: "LO6",  naam: "Helder en transparant communiceren" },
+  { code: "LO7",  naam: "Probleemoplossend vermogen" },
+  { code: "LO8",  naam: "Persoonlijke ontwikkeling" },
+  { code: "LO9",  naam: "Professionele attitude" },
+  { code: "LO10", naam: "Ondernemend handelen" },
+  { code: "LO11", naam: "Ethisch en deontologisch handelen" },
+];
+
 function leegDag() {
   return {
     datum: "",
@@ -235,16 +266,54 @@ function leegDag() {
     reflectie: "",
     problemen: "",
     aantalUren: 0,
+    competenties: [],
   };
 }
 
-function defaultLogbook(weekNummer = 1) {
+// Berekent maandag–vrijdag van week `weekNummer` vanuit de stage-startdatum.
+// Als startDatum ontbreekt, valt het terug op de maandag van de huidige week.
+function berekenWeekDatums(startDatum, weekNummer) {
+  let basis;
+  if (startDatum) {
+    basis = new Date(startDatum);
+    basis.setHours(12, 0, 0, 0);
+  } else {
+    // Geen startdatum: gebruik maandag van de huidige week als basis
+    basis = new Date();
+    basis.setHours(12, 0, 0, 0);
+    const dag = basis.getDay(); // 0 = zon, 1 = ma, ...
+    const naarMaandag = dag === 0 ? -6 : 1 - dag;
+    basis.setDate(basis.getDate() + naarMaandag);
+  }
+
+  // Verschuif naar de juiste week
+  const ma = new Date(basis);
+  ma.setDate(ma.getDate() + (weekNummer - 1) * 7);
+
+  const vr = new Date(ma);
+  vr.setDate(vr.getDate() + 4);
+
+  const dagDatums = [0, 1, 2, 3, 4].map((i) => {
+    const d = new Date(ma);
+    d.setDate(d.getDate() + i);
+    return d.toISOString().slice(0, 10);
+  });
+
+  return {
+    weekStart: ma.toISOString().slice(0, 10),
+    weekEinde: vr.toISOString().slice(0, 10),
+    dagDatums,
+  };
+}
+
+function defaultLogbook(weekNummer = 1, startDatum = null) {
+  const { weekStart, weekEinde, dagDatums } = berekenWeekDatums(startDatum, weekNummer);
   return {
     stagedossierId: "",
     weekNummer,
-    weekStart: "",
-    weekEinde: "",
-    dagen: [leegDag(), leegDag(), leegDag(), leegDag(), leegDag()],
+    weekStart,
+    weekEinde,
+    dagen: dagDatums.map((datum) => ({ ...leegDag(), datum })),
   };
 }
 
@@ -262,252 +331,319 @@ function weekNaarFormulier(week) {
       reflectie: dag.reflectie ?? "",
       problemen: dag.problemen ?? "",
       aantalUren: Number(dag.aantal_uren) || 0,
+      competenties: Array.isArray(dag.competenties)
+        ? dag.competenties
+        : (dag.competenties ? JSON.parse(dag.competenties) : []),
     })),
   };
 }
 
 /* ---------- Week formulier (nieuw + bewerken) ---------- */
-function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken }) {
+function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aantalWeken }) {
+  // Bereken per dag of hij al ingevuld is (status="geen_stagedag" of expliciete vlag)
   const [ingediendeDagen, setIngediendeDagen] = useState(
-    logbook.dagen.map(() => false)
-  );
-  const [openvouwDagen, setOpenvouwDagen] = useState(
-    logbook.dagen.map(() => true)
+    logbook.dagen.map((d) => !!(d.status === "geen_stagedag"))
   );
 
-  const totaalUren = logbook.dagen.reduce(
-    (sum, dag) => sum + (Number(dag.aantalUren) || 0),
-    0
-  );
+  // Actieve dag = de eerste niet-ingevulde dag (standaard dag 0)
+  const [activeDag, setActiveDag] = useState(() => {
+    const eerste = logbook.dagen.findIndex((_, i) => !ingediendeDagen[i] ?? true);
+    return eerste >= 0 ? eerste : 0;
+  });
 
-  function handleWeekChange(e) {
-    setLogbook({ ...logbook, [e.target.name]: e.target.value });
+  const vandaagIso = new Date().toISOString().slice(0, 10);
+
+  // Datum per dag berekenen
+  function dagDatum(index) {
+    if (logbook.dagen[index]?.datum) return logbook.dagen[index].datum;
+    if (!logbook.weekStart) return "";
+    const d = new Date(logbook.weekStart + "T12:00:00");
+    d.setDate(d.getDate() + index);
+    return d.toISOString().slice(0, 10);
   }
 
-  function handleDagChange(index, e) {
+  function fmtLang(iso) {
+    if (!iso) return DAG_NAMEN[0];
+    return new Date(iso + "T12:00:00").toLocaleDateString("nl-BE", {
+      weekday: "long", day: "numeric", month: "long", year: "numeric",
+    });
+  }
+  function fmtKort(iso) {
+    if (!iso) return "";
+    return new Date(iso + "T12:00:00").toLocaleDateString("nl-BE", {
+      day: "numeric", month: "short",
+    });
+  }
+  function dagAfk(index) {
+    return ["Ma", "Di", "Wo", "Do", "Vr"][index] ?? "";
+  }
+
+  const totaalUren = logbook.dagen.reduce((s, d) => s + (Number(d.aantalUren) || 0), 0);
+
+  function handleDagChange(e) {
     const updatedDagen = [...logbook.dagen];
-    updatedDagen[index] = {
-      ...updatedDagen[index],
-      [e.target.name]:
-        e.target.name === "aantalUren"
-          ? Number(e.target.value)
-          : e.target.value,
+    updatedDagen[activeDag] = {
+      ...updatedDagen[activeDag],
+      [e.target.name]: e.target.name === "aantalUren" ? Number(e.target.value) : e.target.value,
     };
     setLogbook({ ...logbook, dagen: updatedDagen });
   }
 
-  function handleDagBevestigen(index) {
-    const dag = logbook.dagen[index];
-    if (!dag.datum) {
-      alert(`Vul een datum in voor dag ${index + 1} voor je bevestigt.`);
-      return;
-    }
+  function handleDagOpslaan() {
     const updated = [...ingediendeDagen];
-    updated[index] = true;
+    updated[activeDag] = true;
     setIngediendeDagen(updated);
-    const updatedOpen = [...openvouwDagen];
-    updatedOpen[index] = false;
-    setOpenvouwDagen(updatedOpen);
+    // Ga automatisch naar volgende open dag
+    const volgende = updated.findIndex((v, i) => !v && i !== activeDag);
+    if (volgende >= 0) setActiveDag(volgende);
   }
 
-  function toggleDag(index) {
-    const updated = [...openvouwDagen];
-    updated[index] = !updated[index];
-    setOpenvouwDagen(updated);
+  function handleGeenStagedag() {
+    const updatedDagen = [...logbook.dagen];
+    updatedDagen[activeDag] = {
+      ...updatedDagen[activeDag],
+      aantalUren: 0, titel: "", uitgevoerdeTaken: "", reflectie: "", problemen: "",
+      competenties: [], status: "geen_stagedag",
+    };
+    setLogbook({ ...logbook, dagen: updatedDagen });
+    const updated = [...ingediendeDagen];
+    updated[activeDag] = true;
+    setIngediendeDagen(updated);
+    const volgende = updated.findIndex((v, i) => !v && i !== activeDag);
+    if (volgende >= 0) setActiveDag(volgende);
+  }
+
+  function toggleCompetentie(code) {
+    const updatedDagen = [...logbook.dagen];
+    const huidig = updatedDagen[activeDag].competenties ?? [];
+    updatedDagen[activeDag] = {
+      ...updatedDagen[activeDag],
+      competenties: huidig.includes(code) ? huidig.filter((c) => c !== code) : [...huidig, code],
+    };
+    setLogbook({ ...logbook, dagen: updatedDagen });
   }
 
   const allesDagBevestigd = ingediendeDagen.every(Boolean);
+  const dag = logbook.dagen[activeDag];
+  const ddatum = dagDatum(activeDag);
+  const isVandaag = ddatum === vandaagIso;
+
+  // Weekdatum bereik label bv. "1–5 jun"
+  const weekBereikLabel = logbook.weekStart
+    ? `${fmtKort(logbook.weekStart)}–${fmtKort(logbook.weekEinde)}`
+    : "";
 
   return (
     <form onSubmit={onSubmit}>
-      {/* Week info */}
-      <div className="card">
-        <div className="card_title">
-          <IconCalendar size={16} />
-          {isBewerken
-            ? `Week ${logbook.weekNummer} aanpassen`
-            : "Week informatie"}
-        </div>
-        <div className="form_row">
-          <div className="form_group">
-            <label className="form_label">
-              Weeknummer<span className="req">*</span>
-            </label>
-            <input
-              className="form_input"
-              type="number"
-              name="weekNummer"
-              value={logbook.weekNummer}
-              onChange={handleWeekChange}
-              min="1"
-              readOnly={isBewerken}
-            />
-          </div>
-          <div className="form_group">
-            <label className="form_label">Totaal uren</label>
-            <input
-              className="form_input"
-              type="number"
-              value={totaalUren}
-              readOnly
-            />
-          </div>
-        </div>
-        <div className="form_row">
-          <div className="form_group">
-            <label className="form_label">
-              Week start<span className="req">*</span>
-            </label>
-            <input
-              className="form_input"
-              type="date"
-              name="weekStart"
-              value={logbook.weekStart}
-              onChange={handleWeekChange}
-            />
-          </div>
-          <div className="form_group">
-            <label className="form_label">
-              Week einde<span className="req">*</span>
-            </label>
-            <input
-              className="form_input"
-              type="date"
-              name="weekEinde"
-              value={logbook.weekEinde}
-              onChange={handleWeekChange}
-            />
-          </div>
-        </div>
-      </div>
+      {/* Hidden velden */}
+      <input type="hidden" name="weekStart" value={logbook.weekStart} />
+      <input type="hidden" name="weekEinde" value={logbook.weekEinde} />
+      {logbook.dagen.map((d, i) => (
+        <input key={i} type="hidden" name={`datum_${i}`} value={dagDatum(i)} />
+      ))}
 
-      {/* 5 dagen */}
-      {logbook.dagen.map((dag, index) => (
-        <div className="card" key={index}>
-          <div
-            className="card_title"
-            onClick={() => toggleDag(index)}
-            style={{ cursor: "pointer", justifyContent: "space-between" }}
-          >
-            <span style={{ display: "flex", alignItems: "center", gap: 7 }}>
-              Dag {index + 1} — {DAG_NAMEN[index]}
-              {ingediendeDagen[index] && (
-                <span className="status s_ok">
-                  <IconCircleCheck size={12} />
-                  Ingevuld
-                </span>
-              )}
-            </span>
-            {openvouwDagen[index] ? (
-              <IconChevronUp size={16} />
-            ) : (
-              <IconChevronDown size={16} />
-            )}
+      {/* ── ACTIEVE DAG FORM ── */}
+      <div className="card vdag-card">
+        {/* Header */}
+        <div className="vdag-header">
+          <div className="vdag-header-links">
+            <div className="vdag-titel">
+              {isVandaag && <span className="vdag-label">Vandaag · </span>}
+              <span className="vdag-datum">{fmtLang(ddatum)}</span>
+            </div>
+            <div className="vdag-subtitle">
+              Week {logbook.weekNummer}{aantalWeken ? ` van ${aantalWeken}` : ""}
+              {" · "}
+              {ingediendeDagen[activeDag]
+                ? (dag?.status === "geen_stagedag" ? "Geen stagedag" : "Ingevuld")
+                : "nog niet ingevuld"}
+            </div>
           </div>
+          <span className={`status ${ingediendeDagen[activeDag] ? "s_ok" : "s_open"}`}>
+            {ingediendeDagen[activeDag]
+              ? (dag?.status === "geen_stagedag" ? "Geen stagedag" : <><IconCircleCheck size={11}/> Ingevuld</>)
+              : "Open"}
+          </span>
+        </div>
 
-          {openvouwDagen[index] && (
-            <>
-              <div className="form_row">
-                <div className="form_group">
-                  <label className="form_label">Datum</label>
-                  <input
-                    className="form_input"
-                    type="date"
-                    name="datum"
-                    value={dag.datum}
-                    onChange={(e) => handleDagChange(index, e)}
-                    disabled={ingediendeDagen[index]}
-                  />
-                </div>
-                <div className="form_group">
-                  <label className="form_label">Aantal uren</label>
-                  <input
-                    className="form_input"
-                    type="number"
-                    name="aantalUren"
-                    value={dag.aantalUren}
-                    onChange={(e) => handleDagChange(index, e)}
-                    placeholder="8"
-                    disabled={ingediendeDagen[index]}
-                  />
-                </div>
-              </div>
-
+        {/* Form body — verborgen als dag al ingevuld */}
+        {!ingediendeDagen[activeDag] && (
+          <div className="vdag-body">
+            <div className="form_row">
               <div className="form_group">
                 <label className="form_label">Titel</label>
                 <input
                   className="form_input"
                   type="text"
                   name="titel"
-                  value={dag.titel}
-                  onChange={(e) => handleDagChange(index, e)}
-                  placeholder="Wat was het hoofdthema van de dag?"
-                  disabled={ingediendeDagen[index]}
+                  value={dag?.titel ?? ""}
+                  onChange={handleDagChange}
+                  placeholder="bv. API-integratie getest"
                 />
               </div>
-
-              <div className="form_group">
-                <label className="form_label">Uitgevoerde taken</label>
-                <textarea
-                  className="form_textarea"
-                  name="uitgevoerdeTaken"
-                  value={dag.uitgevoerdeTaken}
-                  onChange={(e) => handleDagChange(index, e)}
-                  placeholder="Wat heb je gedaan?"
-                  disabled={ingediendeDagen[index]}
+              <div className="form_group vdag-uren">
+                <label className="form_label">Gepresteerde uren</label>
+                <input
+                  className="form_input"
+                  type="number"
+                  name="aantalUren"
+                  value={dag?.aantalUren ?? 0}
+                  onChange={handleDagChange}
+                  placeholder="8"
+                  min="0"
                 />
               </div>
+            </div>
 
-              <div className="form_group">
-                <label className="form_label">Reflectie</label>
-                <textarea
-                  className="form_textarea"
-                  name="reflectie"
-                  value={dag.reflectie}
-                  onChange={(e) => handleDagChange(index, e)}
-                  placeholder="Hoe verliep de dag?"
-                  disabled={ingediendeDagen[index]}
-                />
+            <div className="form_group">
+              <label className="form_label">Taken</label>
+              <textarea
+                className="form_textarea"
+                name="uitgevoerdeTaken"
+                value={dag?.uitgevoerdeTaken ?? ""}
+                onChange={handleDagChange}
+                placeholder="Wat heb je gedaan?"
+              />
+            </div>
+
+            <div className="form_group">
+              <label className="form_label">Reflectie</label>
+              <textarea
+                className="form_textarea"
+                name="reflectie"
+                value={dag?.reflectie ?? ""}
+                onChange={handleDagChange}
+                placeholder="Hoe verliep de dag?"
+              />
+            </div>
+
+            <div className="form_group">
+              <label className="form_label">Problemen &amp; leerpunten</label>
+              <textarea
+                className="form_textarea"
+                name="problemen"
+                value={dag?.problemen ?? ""}
+                onChange={handleDagChange}
+                placeholder="Wat liep moeilijk? Wat heb je geleerd?"
+              />
+            </div>
+
+            <div className="form_group">
+              <label className="form_label">Aan welke competenties werkte je vandaag?</label>
+              <div className="lo-chips">
+                {LO_COMPETENTIES.map((lo) => {
+                  const geselecteerd = (dag?.competenties ?? []).includes(lo.code);
+                  return (
+                    <button
+                      key={lo.code}
+                      type="button"
+                      className={`lo-chip${geselecteerd ? " actief" : ""}`}
+                      onClick={() => toggleCompetentie(lo.code)}
+                      title={lo.naam}
+                    >
+                      <span className="lo-code">{lo.code}</span>
+                      <span className="lo-naam">{lo.naam}</span>
+                    </button>
+                  );
+                })}
               </div>
+            </div>
 
-              <div className="form_group">
-                <label className="form_label">Problemen / leerpunten</label>
-                <textarea
-                  className="form_textarea"
-                  name="problemen"
-                  value={dag.problemen}
-                  onChange={(e) => handleDagChange(index, e)}
-                  placeholder="Wat liep moeilijk? Wat heb je geleerd?"
-                  disabled={ingediendeDagen[index]}
-                />
-              </div>
+            <div className="vdag-actions">
+              <button type="button" className="btn primary" onClick={handleDagOpslaan}>
+                <IconCircleCheck size={15} /> Dag opslaan
+              </button>
+              <button type="button" className="btn ghost" onClick={handleGeenStagedag}>
+                <IconCalendarOff size={15} /> Vandaag was geen stagedag
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
-              {!ingediendeDagen[index] && (
-                <div className="actions">
-                  <button
-                    type="button"
-                    className="btn primary"
-                    onClick={() => handleDagBevestigen(index)}
-                  >
-                    <IconCircleCheck size={16} />
-                    Dag {index + 1} bevestigen
-                  </button>
-                </div>
-              )}
-            </>
+      {/* ── WEEK OVERZICHT ── */}
+      <div className="card week-overzicht-card">
+        <div className="week-overzicht-header">
+          <span className="week-overzicht-titel">Week {logbook.weekNummer}</span>
+          {weekBereikLabel && (
+            <span className="week-overzicht-bereik">{weekBereikLabel}</span>
           )}
+          <div className="week-dag-afk">
+            {[0,1,2,3,4].map((i) => {
+              const ingevuld = ingediendeDagen[i];
+              const actief = i === activeDag;
+              return (
+                <span
+                  key={i}
+                  className={`wda${actief ? " actief" : ""}${ingevuld ? " klaar" : ""}`}
+                  onClick={() => { if (!ingevuld) setActiveDag(i); }}
+                  style={{ cursor: ingevuld ? "default" : "pointer" }}
+                >
+                  {dagAfk(i)}
+                </span>
+              );
+            })}
+          </div>
+          <span className="status s_grijs" style={{ fontSize: 11 }}>
+            {allesDagBevestigd ? "Klaar om in te dienen" : "Concept"}
+          </span>
         </div>
-      ))}
 
+        {/* Dag rijen */}
+        {logbook.dagen.map((d, i) => {
+          const dd = dagDatum(i);
+          const ingevuld = ingediendeDagen[i];
+          const geenStage = d.status === "geen_stagedag" && ingevuld;
+          const actief = i === activeDag;
+          const isHvandaag = dd === vandaagIso;
+
+          return (
+            <div
+              key={i}
+              className={`week-dag-rij${actief ? " actief" : ""}${ingevuld && !geenStage ? " ingevuld" : ""}${geenStage ? " geen-stage" : ""}`}
+            >
+              <span className="week-dag-naam">{DAG_NAMEN[i]}</span>
+              <span className="week-dag-info">
+                {actief && !ingevuld
+                  ? (isHvandaag ? "Vandaag — formulier hierboven" : "Formulier hierboven")
+                  : geenStage
+                  ? "Geen stagedag"
+                  : ingevuld
+                  ? (d.titel || "Ingevuld")
+                  : <span style={{ color: "var(--red)" }}>Niet ingevuld — vul deze dag alsnog aan</span>
+                }
+              </span>
+              {ingevuld && !geenStage && (
+                <span className="status s_ok" style={{ fontSize: 11 }}>
+                  <IconCircleCheck size={11} /> Ingevuld
+                </span>
+              )}
+              {geenStage && (
+                <span className="status s_grijs" style={{ fontSize: 11 }}>Geen stagedag</span>
+              )}
+              {!ingevuld && !actief && (
+                <button
+                  type="button"
+                  className="btn ghost sm week-dag-invullen"
+                  onClick={() => setActiveDag(i)}
+                >
+                  <IconPencil size={12} /> Invullen
+                </button>
+              )}
+              {actief && !ingevuld && (
+                <span className="status s_open" style={{ fontSize: 11 }}>Open</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Week indienen knop — alleen als alle dagen ingevuld */}
       {allesDagBevestigd && (
         <div className="actions">
           <button type="submit" className="btn primary" disabled={saving}>
             <IconSend size={16} />
-            {saving
-              ? "Bezig met indienen…"
-              : isBewerken
-              ? "Opnieuw indienen"
-              : "Week indienen"}
+            {saving ? "Bezig…" : isBewerken ? "Opnieuw indienen" : "Week indienen"}
           </button>
         </div>
       )}
@@ -523,7 +659,9 @@ export default function StudentLogbookPage() {
   const [error, setError] = useState(null);
   const [weken, setWeken] = useState([]);
   const [submitted, setSubmitted] = useState(false);
+  const [ingediendWeekNr, setIngediendWeekNr] = useState(null);
   const [startDatum, setStartDatum] = useState(null);
+  const [eindDatum, setEindDatum]   = useState(null);
 
   // Gate: logboek alleen toegankelijk als voorstel goedgekeurd + contract getekend
   const [voorstelStatus, setVoorstelStatus] = useState(null);
@@ -535,20 +673,15 @@ export default function StudentLogbookPage() {
   const [logbook, setLogbook] = useState(defaultLogbook(1));
 
   /* Weken ophalen van backend */
-  async function fetchWeken(currentWeekNummer) {
+  async function fetchWeken(sd = null) {
     try {
       const res = await apiRequest("GET", `/logbooks/${user.id}`);
       const data = Array.isArray(res.data) ? res.data : [];
       setWeken(data);
 
-      if (data.length > 0 && !editWeek) {
-        const maxWeek = Math.max(...data.map((w) => w.week_nummer));
-        const alIngediend = data.some(
-          (w) => w.week_nummer === (currentWeekNummer ?? 1)
-        );
-        if (alIngediend) {
-          setLogbook(defaultLogbook(maxWeek + 1));
-        }
+      if (!editWeek) {
+        const maxWeek = data.length > 0 ? Math.max(...data.map((w) => w.week_nummer)) : 0;
+        setLogbook(defaultLogbook(maxWeek + 1, sd));
       }
     } catch (err) {
       console.error("Kan logboeken niet ophalen:", err);
@@ -560,29 +693,38 @@ export default function StudentLogbookPage() {
   useEffect(() => {
     setLoadingWeken(true);
 
-    // Stagevoorstel status + startdatum ophalen
-    apiRequest("GET", "/internships/my")
-      .then((res) => {
-        if (res.data) {
-          setVoorstelStatus(res.data.status);
-          if (res.data.startdatum ?? res.data.startDatum) {
-            setStartDatum(new Date(res.data.startdatum ?? res.data.startDatum));
-          }
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoadingGate(false));
+    async function init() {
+      let sd = null;
 
-    // Contract status ophalen
-    apiRequest("GET", "/contracts/my")
-      .then((res) => {
-        if (res.data?.student_getekend_op) {
-          setContractGetekend(true);
-        }
-      })
-      .catch(() => {});
+      // Stagevoorstel + contract parallel ophalen
+      const [internRes, contractRes] = await Promise.allSettled([
+        apiRequest("GET", "/internships/my"),
+        apiRequest("GET", "/contracts/my"),
+      ]);
 
-    fetchWeken(1);
+      if (internRes.status === "fulfilled" && internRes.value?.data) {
+        const data = internRes.value.data;
+        setVoorstelStatus(data.status);
+        const rawStart = data.startdatum ?? data.startDatum;
+        const rawEind  = data.einddatum  ?? data.eindDatum;
+        if (rawStart) {
+          sd = new Date(rawStart);
+          setStartDatum(sd);
+        }
+        if (rawEind) setEindDatum(new Date(rawEind));
+      }
+
+      if (contractRes.status === "fulfilled" && contractRes.value?.data?.student_getekend_op) {
+        setContractGetekend(true);
+      }
+
+      setLoadingGate(false);
+
+      // Weken ophalen met gekende startDatum zodat datums auto-ingevuld worden
+      await fetchWeken(sd);
+    }
+
+    init();
   }, [user.id]);
 
   /* Beschikbaarheidslogica */
@@ -591,6 +733,11 @@ export default function StudentLogbookPage() {
     ? Math.floor((vandaag - startDatum) / (1000 * 60 * 60 * 24))
     : 0;
   const beschikbareWeek = Math.max(1, Math.ceil((verschilDagen + 1) / 7));
+
+  // Totaal aantal weken op basis van stageperiode (start → eind)
+  const aantalWeken = startDatum && eindDatum
+    ? Math.ceil((eindDatum - startDatum) / (1000 * 60 * 60 * 24 * 7))
+    : null;
 
   const huidigFormulierWeek = editWeek ? editWeek.week_nummer : logbook.weekNummer;
   const weekAlIngediend =
@@ -632,20 +779,32 @@ export default function StudentLogbookPage() {
         weekNummer: Number(logbook.weekNummer),
         weekStart: logbook.weekStart,
         weekEinde: logbook.weekEinde,
-        dagen: logbook.dagen.map((dag) => ({
-          datum: dag.datum,
+        dagen: logbook.dagen.map((dag, i) => {
+          // Datum berekenen als dag.datum leeg is
+          let datum = dag.datum;
+          if (!datum && logbook.weekStart) {
+            const d = new Date(logbook.weekStart + "T12:00:00");
+            d.setDate(d.getDate() + i);
+            datum = d.toISOString().slice(0, 10);
+          }
+          return {
+          datum,
           titel: dag.titel,
           uitgevoerdeTaken: dag.uitgevoerdeTaken,
           reflectie: dag.reflectie,
           problemen: dag.problemen,
           aantalUren: Number(dag.aantalUren) || 0,
-          status: "ingediend",
-        })),
+          status: dag.status === "geen_stagedag" ? "geen_stagedag" : "ingediend",
+          competenties: dag.competenties ?? [],
+          };
+        }),
       });
 
+      const weekNrIngediend = Number(logbook.weekNummer);
       setEditWeek(null);
-      await fetchWeken(logbook.weekNummer);
+      await fetchWeken(startDatum);
       setSubmitted(true);
+      setIngediendWeekNr(weekNrIngediend);
     } catch (err) {
       const backendMsg = err.response?.data?.message;
       if (backendMsg?.toLowerCase().includes("stagedossier")) {
@@ -653,9 +812,10 @@ export default function StudentLogbookPage() {
       } else if (backendMsg?.includes("afgesloten")) {
         setError("Deze week is afgesloten en kan niet meer aangepast worden.");
       } else {
-        setError(backendMsg || "Week indienen mislukt. Controleer je gegevens en probeer opnieuw.");
+        const detail = err.response?.data?.error || "";
+        setError((backendMsg || "Week indienen mislukt") + (detail ? ` — ${detail}` : ""));
       }
-      console.error(err);
+      console.error("Indienen fout:", err.response?.data || err.message);
     } finally {
       setSaving(false);
     }
@@ -677,7 +837,7 @@ export default function StudentLogbookPage() {
     setError(null);
     const maxWeek =
       weken.length > 0 ? Math.max(...weken.map((w) => w.week_nummer)) : 0;
-    setLogbook(defaultLogbook(maxWeek + 1));
+    setLogbook(defaultLogbook(maxWeek + 1, startDatum));
   }
 
   /* Nieuwe week starten */
@@ -687,7 +847,7 @@ export default function StudentLogbookPage() {
     setError(null);
     const maxWeek =
       weken.length > 0 ? Math.max(...weken.map((w) => w.week_nummer)) : 0;
-    setLogbook(defaultLogbook(maxWeek + 1));
+    setLogbook(defaultLogbook(maxWeek + 1, startDatum));
   }
 
   /* ---------- Render ---------- */
@@ -829,6 +989,7 @@ export default function StudentLogbookPage() {
             onSubmit={handleWeekIndienen}
             saving={saving}
             isBewerken={true}
+            aantalWeken={aantalWeken}
           />
         </>
       )}
@@ -906,10 +1067,30 @@ export default function StudentLogbookPage() {
               onSubmit={handleWeekIndienen}
               saving={saving}
               isBewerken={false}
+              aantalWeken={aantalWeken}
             />
           )}
         </>
       )}
+
+      {/* Modal: week succesvol ingediend */}
+      <Modal
+        open={!!ingediendWeekNr}
+        onClose={() => setIngediendWeekNr(null)}
+        icon="ti-send"
+        titel={`Week ${ingediendWeekNr} ingediend`}
+        sub="Je mentor krijgt een melding."
+        footer={
+          <button className="btn primary" onClick={() => setIngediendWeekNr(null)}>
+            <i className="ti ti-check"></i> Begrepen
+          </button>
+        }
+      >
+        <p>
+          Je logboek voor week {ingediendWeekNr} is verstuurd. Je mentor ontvangt
+          een melding en controleert je uren en activiteiten.
+        </p>
+      </Modal>
     </div>
   );
 }

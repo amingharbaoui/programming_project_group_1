@@ -1,12 +1,15 @@
-.notif {
+/* Buitenste wrapper (relatief voor absolute positionering paneel) */
+.notif-wrap {
   position: relative;
   display: inline-flex;
 }
 
+/* Belknop */
 .notif-btn {
   position: relative;
 }
 
+/* Ongelezen-teller op de bel */
 .notif-badge {
   position: absolute;
   top: -4px;
@@ -15,7 +18,7 @@
   height: 16px;
   padding: 0 4px;
   border-radius: 8px;
-  background: #e5484d;
+  background: var(--red);
   color: #fff;
   font-size: 10px;
   line-height: 16px;
@@ -23,74 +26,143 @@
   font-weight: 700;
 }
 
+/* Dropdown-paneel */
 .notif-panel {
   position: absolute;
   top: calc(100% + 8px);
   right: 0;
-  width: 320px;
-  max-height: 420px;
-  overflow-y: auto;
-  background: #fff;
-  border: 1px solid #e3e3e3;
+  width: 330px;
+  background: var(--white);
+  border: 0.5px solid var(--border);
   border-radius: 10px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
-  z-index: 50;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.09);
+  z-index: 60;
+  overflow: hidden;
 }
 
-.notif-head {
+/* Kop van het paneel */
+.np-head {
+  padding: 11px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-bottom: 0.5px solid var(--border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
-  border-bottom: 1px solid #eee;
-  font-weight: 600;
 }
 
-.notif-mark {
+/* "Alles gelezen" knop */
+.notif-mark-all {
   border: none;
   background: none;
-  color: #2563eb;
+  color: var(--blue);
   cursor: pointer;
-  font-size: 12px;
-}
-
-.notif-empty {
-  padding: 18px 14px;
-  color: #888;
-  font-size: 14px;
-  text-align: center;
-}
-
-.notif-list {
-  list-style: none;
-  margin: 0;
+  font-size: 11.5px;
+  font-family: var(--font);
   padding: 0;
 }
 
-.notif-item {
-  padding: 10px 14px;
-  border-bottom: 1px solid #f2f2f2;
-  cursor: pointer;
+/* Scrollbaar lijstgebied */
+.np-body {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 4px 8px;
 }
 
-.notif-item:hover {
-  background: #f7f8fa;
-}
-
-.notif-item.unread {
-  background: #eef4ff;
-}
-
-.notif-item.unread .notif-titel {
-  font-weight: 700;
-}
-
-.notif-titel {
+/* Lege toestand */
+.notif-empty {
+  padding: 18px 6px;
+  color: var(--faint);
   font-size: 13px;
-  margin-bottom: 2px;
+  text-align: center;
 }
 
-.notif-bericht {
-  font-size: 12px;
-  color: #555;
+/* Individuele melding */
+.notif-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 6px;
+  border-bottom: 0.5px solid var(--border);
+  align-items: flex-start;
+  cursor: pointer;
+  border-radius: 8px;
+  border: 1.5px solid transparent;
+}
+
+.notif-item:last-child {
+  border-bottom: none;
+}
+
+/* Ongelezen melding: prominente rand + schaduw */
+.notif-item.sel {
+  border: 1.5px solid #0a0a0a;
+  background: var(--white);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+  margin: 4px 0;
+}
+
+.notif-item.sel .nt,
+.notif-item.sel .ts {
+  font-weight: 700;
+  color: var(--dark);
+}
+
+/* Icoon-blokje links */
+.notif-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.ni-red   { background: var(--red-light);  color: var(--red); }
+.ni-amber { background: var(--amber-bg);   color: var(--amber); }
+.ni-gray  { background: var(--muted);      color: var(--sub); }
+.ni-green { background: var(--green-bg);   color: var(--green); }
+
+/* Tekst-gedeelte */
+.notif-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.notif-body .nt {
+  font-size: 12.5px;
+  color: var(--gray);
+  line-height: 1.45;
+}
+
+.notif-body .nt strong {
+  color: var(--dark);
+  font-weight: 500;
+}
+
+.notif-body .ts {
+  font-size: 11px;
+  color: var(--faint);
+  margin-top: 2px;
+}
+
+/* Sluit-knop per melding */
+.notif-x {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--faint);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 2px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+}
+
+.notif-x:hover {
+  background: var(--muted);
+  color: var(--dark);
 }
