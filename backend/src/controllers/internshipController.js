@@ -734,6 +734,7 @@ async function decideApplication(req, res) {
 
   const rawDecision = req.body.beslissing || req.body.decision;
   const feedback = req.body.feedback || null;
+  const onderdeel = req.body.onderdeel || null;
   const motivering = req.body.motivering || null;
   const uitzonderingMotivering = req.body.uitzonderingMotivering || req.body.uitzondering_motivering || null;
 
@@ -820,11 +821,12 @@ async function decideApplication(req, res) {
         beslist_door_id,
         beslissing,
         feedback,
+        onderdeel,
         motivering,
         uitzondering_motivering,
         beslist_op
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
       `,
       [
         stagevoorstelId,
@@ -832,6 +834,7 @@ async function decideApplication(req, res) {
         beslistDoorId,
         beslissing,
         feedback,
+        onderdeel,
         motivering,
         uitzonderingMotivering
       ]

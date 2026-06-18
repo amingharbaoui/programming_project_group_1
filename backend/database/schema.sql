@@ -493,6 +493,7 @@ CREATE TABLE `voorstel_beslissingen` (
   `beslist_door_id` int NOT NULL,
   `beslissing` varchar(255) NOT NULL COMMENT 'goedgekeurd, afgekeurd, aanpassingen_gevraagd, goedgekeurd_met_uitzondering',
   `feedback` text COMMENT 'Voor aanpassingen vereist',
+  `onderdeel` varchar(255) DEFAULT NULL COMMENT 'Onderdeel van het voorstel waarop de aanpassing slaat',
   `motivering` text COMMENT 'Voor afkeuring of beslissing',
   `uitzondering_motivering` text,
   `beslist_op` timestamp NOT NULL,
