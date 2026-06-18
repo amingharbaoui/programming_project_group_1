@@ -116,7 +116,7 @@ export default function Sidebar({ collapsed }) {
             const verschil = Math.floor((vandaag - startdatum) / (1000 * 60 * 60 * 24));
             const huidigeWeek = Math.max(1, Math.ceil((verschil + 1) / 7));
             const alIngediend = weken.some(
-              (w) => w.week_nummer === huidigeWeek && w.status !== "ontbreekt"
+              (w) => Number(w.week_nummer) === huidigeWeek && w.status !== "ontbreekt"
             );
             if (alIngediend) showLogboekDot = false;
           }
