@@ -29,7 +29,13 @@ async function getDocentStudents(req, res) {
           WHERE lw.stagedossier_id = sd.id
           ORDER BY lw.week_nummer DESC
           LIMIT 1
-        ) AS logboek_status
+        ) AS logboek_status,
+        (SELECT COUNT(*) FROM logboek_weken lw
+          WHERE lw.stagedossier_id = sd.id AND lw.status = 'afgecheckt_door_mentor') AS te_review_weken,
+        (SELECT COUNT(*) FROM evaluaties e
+          WHERE e.stagedossier_id = sd.id AND e.status = 'klaar_voor_docent') AS eval_te_registreren,
+        (SELECT COUNT(*) FROM evaluaties e
+          WHERE e.stagedossier_id = sd.id AND e.status = 'klaar_voor_vrijgave') AS eval_te_vrijgeven
       FROM stagedossiers sd
       JOIN studenten   st ON st.gebruiker_id = sd.student_id
       JOIN gebruikers   g ON g.id             = st.gebruiker_id
@@ -41,7 +47,17 @@ async function getDocentStudents(req, res) {
       [docentId]
     );
 
-    return ok(res, rows, "Docent studenten opgehaald");
+    // Volgende actie per student afleiden (prioriteit: vrijgeven > registreren > logboek nalezen).
+    const volgendeActie = (r) => {
+      if (Number(r.eval_te_vrijgeven) > 0) return "Eindresultaat vrijgeven";
+      if (Number(r.eval_te_registreren) > 0) return "Evaluatie registreren";
+      if (Number(r.te_review_weken) > 0) return "Logboekweek nalezen";
+      if (r.dossier_status === "resultaat_vrijgegeven" || r.dossier_status === "afgerond") return "Afgerond";
+      return "—";
+    };
+    const out = rows.map((r) => ({ ...r, volgende_actie: volgendeActie(r) }));
+
+    return ok(res, out, "Docent studenten opgehaald");
   } catch (err) {
     console.error("getDocentStudents error:", err);
     return fail(res, 500, "Studenten ophalen mislukt");

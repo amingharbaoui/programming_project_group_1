@@ -838,6 +838,86 @@ async function getMissingLogbooksForDocent(req, res) {
   }
 }
 
+// Mentor-variant: ontbrekende logboekweken van de EIGEN stagiairs (Story 31 — detectie/aanduiding voor mentor).
+async function getMissingLogbooksForMentor(req, res) {
+  const mentorId = getUserId(req);
+
+  try {
+    const [dossiers] = await db.query(
+      `
+      SELECT
+        d.id AS stagedossier_id,
+        d.dossiernummer,
+        d.student_id,
+        d.aantal_weken,
+        d.startdatum,
+        d.einddatum,
+        g.voornaam,
+        g.achternaam,
+        g.email,
+        s.studentennummer,
+        b.naam AS bedrijf_naam
+      FROM stagedossiers d
+      JOIN gebruikers g ON g.id = d.student_id
+      JOIN studenten s ON s.gebruiker_id = d.student_id
+      JOIN bedrijven b ON b.id = d.bedrijf_id
+      WHERE d.mentor_id = ?
+      ORDER BY g.achternaam, g.voornaam
+      `,
+      [mentorId]
+    );
+
+    if (dossiers.length === 0) {
+      return ok(res, [], "Geen gekoppelde dossiers gevonden");
+    }
+
+    const dossierIds = dossiers.map((d) => d.stagedossier_id);
+    const [weeks] = await db.query(
+      `
+      SELECT id, stagedossier_id, week_nummer, status, week_start, week_einde, ingediend_op
+      FROM logboek_weken
+      WHERE stagedossier_id IN (?)
+      `,
+      [dossierIds]
+    );
+
+    const weeksByDossier = new Map();
+    for (const week of weeks) {
+      if (!weeksByDossier.has(week.stagedossier_id)) weeksByDossier.set(week.stagedossier_id, new Map());
+      weeksByDossier.get(week.stagedossier_id).set(Number(week.week_nummer), week);
+    }
+
+    const result = dossiers.map((dossier) => {
+      const totalWeeks = Math.max(0, Number(dossier.aantal_weken || 0));
+      const existing = weeksByDossier.get(dossier.stagedossier_id) || new Map();
+      const ontbrekendeWeken = [];
+
+      for (let weekNummer = 1; weekNummer <= totalWeeks; weekNummer += 1) {
+        const week = existing.get(weekNummer);
+        if (!week || week.status === "ontbreekt") {
+          ontbrekendeWeken.push({
+            weekNummer,
+            status: week?.status || "ontbreekt",
+            logboekWeekId: week?.id || null
+          });
+        }
+      }
+
+      return {
+        ...dossier,
+        totaalWeken: totalWeeks,
+        ingediendeWeken: totalWeeks - ontbrekendeWeken.length,
+        ontbrekendeWeken,
+        ontbrekendeAantal: ontbrekendeWeken.length
+      };
+    });
+
+    return ok(res, result, "Ontbrekende logboeken berekend");
+  } catch (error) {
+    return fail(res, 500, "Ontbrekende logboeken ophalen mislukt", error.message);
+  }
+}
+
 async function sendMissingLogbookReminder(req, res) {
   const docentId = getUserId(req);
   const studentId = Number(req.params.studentId || req.body.studentId || req.body.student_id);
@@ -1119,5 +1199,6 @@ module.exports = {
   docentReviewLogbookWeek,
   studentAntwoordFeedback,
   getMissingLogbooksForDocent,
+  getMissingLogbooksForMentor,
   sendMissingLogbookReminder
 };

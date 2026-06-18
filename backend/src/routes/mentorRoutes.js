@@ -12,6 +12,7 @@ const {
   getLogbooksByStudent,
   mentorCheckLogbookWeek,
   mentorConfirmLogbookDay,
+  getMissingLogbooksForMentor,
 } = require("../controllers/logbookController");
 const {
   listMentorPlanning,
@@ -32,6 +33,7 @@ router.use(authenticateDemoUser, requireRole("mentor"));
 router.get("/students", getMentorStudents);
 
 // Logboeken
+router.get("/logbooks/missing", getMissingLogbooksForMentor);
 router.get("/logbooks/:studentId", getLogbooksByStudent);
 router.patch("/logbooks/days/:dayId/confirm", mentorConfirmLogbookDay);
 router.patch("/logbooks/days/:dayId/bevestig", mentorConfirmLogbookDay);
