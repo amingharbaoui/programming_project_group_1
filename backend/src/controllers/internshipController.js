@@ -958,7 +958,7 @@ async function createDossierAfterApproval(connection, stagevoorstelId) {
       aangemaakt_op,
       aangepast_op
     )
-    VALUES (?, ?, ?, ?, ?, ?, 'contract_pending', ?, ?, ?, ?, ?, ?, ?, 0, NOW(), NOW())
+    VALUES (?, ?, ?, ?, ?, ?, 'wacht_op_student', ?, ?, ?, ?, ?, ?, ?, 0, NOW(), NOW())
     `,
     [
       dossiernummer,
@@ -1231,14 +1231,25 @@ async function updateAdminDossierStatus(req, res) {
   const dossierId = Number(req.params.id);
   const { status, verzekeringInOrde, praktischeAfspraken } = req.body;
 
-  const allowedStatuses = [
-    "contract_pending",
-    "documents_pending",
-    "active",
-    "completed"
-  ];
+  // Status gelijkgetrokken naar de NL-enum van het schema. Engelse waarden worden voor de
+  // zekerheid nog vertaald, zodat een oudere frontend niet stuk gaat.
+  const statusMap = {
+    contract_pending: "wacht_op_student",
+    documents_pending: "in_controle_bij_administratie",
+    active: "geregistreerd",
+    completed: "afgerond",
+    wacht_op_student: "wacht_op_student",
+    wacht_op_bedrijf: "wacht_op_bedrijf",
+    in_controle_bij_administratie: "in_controle_bij_administratie",
+    document_afgekeurd: "document_afgekeurd",
+    geregistreerd: "geregistreerd",
+    stage_loopt: "stage_loopt",
+    resultaat_vrijgegeven: "resultaat_vrijgegeven",
+    afgerond: "afgerond"
+  };
 
-  if (!allowedStatuses.includes(status)) {
+  const nieuweStatus = statusMap[status];
+  if (!nieuweStatus) {
     return fail(res, 400, "Ongeldige dossierstatus");
   }
 
@@ -1267,7 +1278,7 @@ async function updateAdminDossierStatus(req, res) {
       WHERE id = ?
       `,
       [
-        status,
+        nieuweStatus,
         typeof verzekeringInOrde === "boolean" ? verzekeringInOrde : null,
         praktischeAfspraken || null,
         praktischeAfspraken || null,
@@ -1355,7 +1366,7 @@ async function registerDossierStartklaar(req, res) {
       return fail(res, 400, `Dossier nog niet startklaar: ${ontbrekend.join("; ")}`);
     }
 
-    await db.query("UPDATE stagedossiers SET status = 'active', aangepast_op = NOW() WHERE id = ?", [dossierId]);
+    await db.query("UPDATE stagedossiers SET status = 'geregistreerd', aangepast_op = NOW() WHERE id = ?", [dossierId]);
 
     try {
       const door = Number(req.user?.id);
@@ -1366,7 +1377,7 @@ async function registerDossierStartklaar(req, res) {
       console.error("Melding startklaar mislukt:", notifyError.message);
     }
 
-    return ok(res, { id: dossierId, status: "active" }, "Dossier geregistreerd als startklaar");
+    return ok(res, { id: dossierId, status: "geregistreerd" }, "Dossier geregistreerd als startklaar");
   } catch (error) {
     return fail(res, 500, "Registreren mislukt", error.message);
   }
