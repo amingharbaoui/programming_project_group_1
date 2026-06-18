@@ -313,6 +313,28 @@ async function calculateResult(req, res) {
       return fail(res, 400, "Docent heeft nog niet alle competenties gescoord");
     }
 
+    // Story 43: de finale beoordeling vereist finale mentorinput en een gegeven eindpresentatie.
+    if (evaluatie.type === "finaal") {
+      const ontbreekt = [];
+
+      const [mentorScores] = await conn.query(
+        "SELECT COUNT(*) AS aantal FROM competentie_scores WHERE evaluatie_id = ? AND rol = 'mentor' AND ingediend = 1",
+        [evaluationId]
+      );
+      if (Number(mentorScores[0].aantal) === 0) ontbreekt.push("de finale mentorinput");
+
+      const [pres] = await conn.query(
+        "SELECT status FROM planning_momenten WHERE stagedossier_id = ? AND type = 'eindpresentatie' ORDER BY id DESC LIMIT 1",
+        [evaluatie.stagedossier_id]
+      );
+      if (pres.length === 0 || !["gegeven", "geweest"].includes(pres[0].status)) ontbreekt.push("een gegeven eindpresentatie");
+
+      if (ontbreekt.length > 0) {
+        await conn.rollback();
+        return fail(res, 409, `Het eindresultaat kan nog niet berekend worden — ontbrekend: ${ontbreekt.join(" en ")}.`);
+      }
+    }
+
     const totaalGewicht = gescoord.reduce((s, r) => s + Number(r.gewicht_percentage || 0), 0);
     if (totaalGewicht <= 0) { await conn.rollback(); return fail(res, 400, "Gewichten ontbreken op de competenties"); }
 
