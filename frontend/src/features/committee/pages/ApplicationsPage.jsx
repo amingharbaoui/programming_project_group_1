@@ -69,15 +69,14 @@ function stappenIndex(status) {
 }
 
 function stappenSubs(status, aanvraag) {
-  const ingDatum  = formatDate(aanvraag?.ingediend_op);
-  const v = aanvraag?.huidige_versie_nummer || 1;
+  const ingDatum = formatDate(aanvraag?.ingediend_op);
   return {
-    ingediend:             [`Versie ${v} · ${ingDatum}`, "Commissievergadering", "", ""],
-    aanpassingen_gevraagd: [`Versie ${v} · ${ingDatum}`, "Feedback verstuurd", "Aanpassingen vereist", ""],
-    heringediend:          [`Versie ${v} · ${ingDatum}`, "Herbeoordeling", "", ""],
-    goedgekeurd:           [`Versie ${v} · ${ingDatum}`, "Afgerond", "Goedgekeurd", "Dossier opstarten"],
-    afgekeurd:             [`Versie ${v} · ${ingDatum}`, "Afgerond", "Afgekeurd", "Geen dossier"],
-    ingetrokken:           [`Versie ${v} · ${ingDatum}`, "Gestopt", "Ingetrokken door student", "Geen dossier"],
+    ingediend:             [ingDatum, "Commissievergadering", "", ""],
+    aanpassingen_gevraagd: [ingDatum, "Feedback verstuurd", "Aanpassingen vereist", ""],
+    heringediend:          [ingDatum, "Herbeoordeling", "", ""],
+    goedgekeurd:           [ingDatum, "Afgerond", "Goedgekeurd", "Dossier opstarten"],
+    afgekeurd:             [ingDatum, "Afgerond", "Afgekeurd", "Geen dossier"],
+    ingetrokken:           [ingDatum, "Gestopt", "Ingetrokken door student", "Geen dossier"],
   }[status] || ["", "", "", ""];
 }
 
@@ -160,24 +159,11 @@ function VoorstelKaart({ aanvraag, versie }) {
       <div className="card_title">
         <i className="ti ti-file-text" />
         Voorstel
-        {versienr && (
-          <span style={{ fontWeight: 400, color: "var(--faint)" }}>
-            · versie {versienr}
-          </span>
-        )}
-        <span
-          className={`status ${statusKlasse(aanvraag.status)}`}
-          style={{ marginLeft: 6 }}
-        >
-          <i className={`ti ${statusIconKlasse(aanvraag.status)}`} />
-          {statusLabel(aanvraag.status)}
-        </span>
       </div>
 
       <div className="kv"><span className="k">Student</span><span className="v">{aanvraag.student_voornaam} {aanvraag.student_achternaam}</span></div>
       <div className="kv"><span className="k">Bedrijf</span><span className="v">{aanvraag.bedrijf_naam || "–"}{aanvraag.bedrijfsafdeling ? ` · ${aanvraag.bedrijfsafdeling}` : ""}</span></div>
       {aanvraag.bedrijfsadres && <div className="kv"><span className="k">Adres</span><span className="v">{aanvraag.bedrijfsadres}</span></div>}
-      <div className="kv"><span className="k">Stagefunctie</span><span className="v">{aanvraag.stagefunctie || "–"}</span></div>
       <div className="kv">
         <span className="k">Mentor</span>
         <span className="v">
@@ -213,12 +199,6 @@ function VoorstelKaart({ aanvraag, versie }) {
         </div>
       )}
 
-      {isV1probleem && (
-        <div className="comm-alert-rood" style={{ marginTop: 10 }}>
-          <i className="ti ti-alert-triangle" />
-          Versie {versienr} bevat aandachtspunten — controleer de checklist.
-        </div>
-      )}
 
       {aanvraag.laatste_feedback && (
         <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--red-light)", borderRadius: 8, fontSize: 12.5, color: "var(--red)" }}>
@@ -656,7 +636,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
   const paginaTitel = {
     ingediend:             "Aanvraag beoordelen",
     aanpassingen_gevraagd: "Aanpassingen gevraagd",
-    heringediend:          "Versie 2 — herbeoordelen",
+    heringediend:          "Aanvraag herbeoordelen",
     goedgekeurd:           "Stagevoorstel goedgekeurd",
     afgekeurd:             "Stagevoorstel afgekeurd",
     ingetrokken:           "Voorstel ingetrokken door student",
@@ -867,7 +847,6 @@ function OverzichtView({ aanvragen, loading, fout, onVernieuwen, onOpen }) {
       <div className="page-header">
         <div>
           <h1>Aanvragen</h1>
-          <p>Beoordeel ingediende stagevoorstellen van studenten.</p>
         </div>
         <button className="btn sm" onClick={onVernieuwen}>
           <i className="ti ti-refresh" /> Vernieuwen
@@ -903,7 +882,6 @@ function OverzichtView({ aanvragen, loading, fout, onVernieuwen, onOpen }) {
                 <tr>
                   <th>Student</th>
                   <th>Stagebedrijf</th>
-                  <th>Versie</th>
                   <th>Ingediend</th>
                   <th>Status</th>
                   <th className="right">Actie</th>
@@ -928,11 +906,6 @@ function OverzichtView({ aanvragen, loading, fout, onVernieuwen, onOpen }) {
                       </td>
                       <td>
                         <span style={{ fontWeight: 600 }}>{a.bedrijf_naam || "–"}</span>
-                        <br />
-                        <span className="muted">{a.stagefunctie || "–"}</span>
-                      </td>
-                      <td>
-                        <span className="muted">versie {a.huidige_versie_nummer || 1}</span>
                       </td>
                       <td>
                         <span className="muted">{formatDate(a.ingediend_op)}</span>
