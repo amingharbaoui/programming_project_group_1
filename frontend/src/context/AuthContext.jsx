@@ -1,74 +1,41 @@
 import { createContext, useContext, useState } from "react";
-import { ROLES } from "../constants/roles";
-import { setApiUserId } from "../services/api";
+import { setAuthToken } from "../services/api";
 
 const AuthContext = createContext(null);
+const USER_KEY = "stagify_user";
 
-const demoUsers = {
-  student: {
-    id: 1,
-    name: "Demo Student",
-    role: ROLES.STUDENT,
-  },
-  student2: {
-    id: 6,
-    name: "Demo Student 2",
-    role: ROLES.STUDENT,
-  },
-  student3: {
-    id: 7,
-    name: "Demo Student 3",
-    role: ROLES.STUDENT,
-  },
-  student4: {
-    id: 8,
-    name: "Demo Student 4",
-    role: ROLES.STUDENT,
-  },
-  stagecommissie: {
-    id: 2,
-    name: "Demo Stagecommissie",
-    role: ROLES.COMMITTEE,
-  },
-  administratie: {
-    id: 4,
-    name: "Demo Administratie",
-    role: ROLES.ADMIN,
-  },
-  mentor: {
-    id: 5,
-    name: "Demo Mentor",
-    role: ROLES.MENTOR,
-  },
-  docent: {
-    id: 3,
-    name: "Demo Docent",
-    role: ROLES.DOCENT,
-  },
-};
+function loadStoredUser() {
+  try {
+    const raw = typeof localStorage !== "undefined" && localStorage.getItem(USER_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(demoUsers.student);
-
-  function switchRole(roleOrUserKey) {
-    const nextUser = demoUsers[roleOrUserKey] || demoUsers.student;
-    setApiUserId(nextUser.id)
-    setUser(nextUser);
-  }
+  // Geen auto-login meer: bij het opstarten enkel ingelogd als er een opgeslagen sessie is.
+  const [user, setUser] = useState(loadStoredUser());
 
   function loginUser(apiUser) {
-    const nextUser = {
+    if (apiUser?.token) setAuthToken(apiUser.token);
+    const next = {
       id: apiUser.id,
-      name: `${apiUser.voornaam} ${apiUser.achternaam}`.trim(),
+      name: `${apiUser.voornaam || ""} ${apiUser.achternaam || ""}`.trim(),
       role: apiUser.hoofdrol,
     };
+    try { localStorage.setItem(USER_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+    setUser(next);
+  }
 
-    setApiUserId(nextUser.id);
-    setUser(nextUser);
+  function logout() {
+    setAuthToken(null);
+    try { localStorage.removeItem(USER_KEY); } catch { /* ignore */ }
+    setUser(null);
   }
 
   return (
-    <AuthContext.Provider value={{ user, switchRole, loginUser }}>
+    <AuthContext.Provider value={{ user, loginUser, logout }}>
       {children}
     </AuthContext.Provider>
   );
@@ -77,4 +44,3 @@ export function AuthProvider({ children }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
-

@@ -2,12 +2,11 @@ import "./Navbar.css";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { ROLES } from "../../constants/roles";
 import { NAVIGATION } from "../../constants/navigation";
 import NotificationBell from "./NotificationBell";
 
 export default function Navbar({ onToggle }) {
-  const { user, switchRole } = useAuth();
+  const { user, logout } = useAuth();
   const location  = useLocation();
   const navigate  = useNavigate();
   const [profielOpen, setProfielOpen] = useState(false);
@@ -21,9 +20,6 @@ export default function Navbar({ onToggle }) {
     ? user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()
     : "?";
 
-  const selectedUserKey =
-    user.role === ROLES.STUDENT && user.id !== 1 ? `student${user.id - 4}` : user.role;
-
   // Sluit paneel bij klik buiten
   useEffect(() => {
     function onDocClick(e) {
@@ -36,6 +32,7 @@ export default function Navbar({ onToggle }) {
   }, []);
 
   function handleLogout() {
+    logout();
     navigate("/login");
   }
 
@@ -46,20 +43,6 @@ export default function Navbar({ onToggle }) {
       </button>
 
       <span className="topbar-title">{pageTitle}</span>
-
-      <span className="demo-switch">
-        Demo&nbsp;
-        <select value={selectedUserKey} onChange={(e) => switchRole(e.target.value)}>
-          <option value={ROLES.STUDENT}>Student 1</option>
-          <option value="student2">Student 2</option>
-          <option value="student3">Student 3</option>
-          <option value="student4">Student 4</option>
-          <option value={ROLES.COMMITTEE}>Stagecommissie</option>
-          <option value={ROLES.ADMIN}>Administratie</option>
-          <option value={ROLES.MENTOR}>Mentor</option>
-          <option value={ROLES.DOCENT}>Docent</option>
-        </select>
-      </span>
 
       <NotificationBell />
 

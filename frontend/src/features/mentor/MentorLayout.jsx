@@ -1,8 +1,7 @@
 import "./MentorLayout.css";
 import { useState } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { Outlet, useLocation, useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { ROLES } from "../../constants/roles";
 
 const NAV = [
   { to: "/mentor/students", icon: "ti-users", label: "Mijn stagiairs" },
@@ -24,13 +23,17 @@ const TITELS = [
 
 export default function MentorLayout() {
   const [collapsed, setCollapsed] = useState(false);
-  const { user, switchRole } = useAuth();
+  const { user, logout } = useAuth();
   const loc = useLocation();
   const navigate = useNavigate();
 
+  // Beveiliging: zonder ingelogde gebruiker geen toegang.
+  if (!user) return <Navigate to="/login" replace />;
+
   const pageTitle = (TITELS.find(([p]) => loc.pathname.startsWith(p)) || ["", "Mentor"])[1];
   const initials = (user.name || "").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase() || "?";
-  const selectedKey = user.role === ROLES.STUDENT && user.id !== 1 ? `student${user.id - 4}` : user.role;
+
+  function handleLogout() { logout(); navigate("/login"); }
 
   return (
     <div className="mtr-shell">
@@ -67,20 +70,6 @@ export default function MentorLayout() {
           </button>
           <span className="topbar-title">{pageTitle}</span>
 
-          <span className="demo-switch">
-            Demo
-            <select value={selectedKey} onChange={(e) => switchRole(e.target.value)}>
-              <option value={ROLES.STUDENT}>Student 1</option>
-              <option value="student2">Student 2</option>
-              <option value="student3">Student 3</option>
-              <option value="student4">Student 4</option>
-              <option value={ROLES.COMMITTEE}>Stagecommissie</option>
-              <option value={ROLES.ADMIN}>Administratie</option>
-              <option value={ROLES.MENTOR}>Mentor</option>
-              <option value={ROLES.DOCENT}>Docent</option>
-            </select>
-          </span>
-
           <button className="icon-btn" aria-label="Meldingen"><i className="ti ti-bell" /><span className="bell-dot" /></button>
 
           <div className="topbar-user">
@@ -89,8 +78,10 @@ export default function MentorLayout() {
               <div className="name">{user.name}</div>
               <div className="role">{user.role}</div>
             </div>
-            <i className="ti ti-chevron-down" style={{ fontSize: 15, color: "var(--faint)" }} />
           </div>
+          <button className="icon-btn" aria-label="Uitloggen" title="Uitloggen" onClick={handleLogout}>
+            <i className="ti ti-logout" />
+          </button>
         </header>
 
         <main className="page-scroll"><Outlet /></main>
