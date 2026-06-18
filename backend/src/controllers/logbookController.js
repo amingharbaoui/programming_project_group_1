@@ -436,9 +436,28 @@ async function getLogbooksByStudent(req, res) {
       [weekIds]
     );
 
+    // Gekoppelde competenties per dag ophalen (story 7).
+    const dayIds = days.map((day) => day.id);
+    const compsByDay = {};
+    if (dayIds.length > 0) {
+      const [compRows] = await db.query(
+        `SELECT ldc.logboek_dag_id, c.id, c.code, c.naam
+         FROM logboek_dag_competenties ldc
+         JOIN competenties c ON c.id = ldc.competentie_id
+         WHERE ldc.logboek_dag_id IN (?)
+         ORDER BY c.volgorde ASC, c.id ASC`,
+        [dayIds]
+      );
+      for (const r of compRows) {
+        if (!compsByDay[r.logboek_dag_id]) compsByDay[r.logboek_dag_id] = [];
+        compsByDay[r.logboek_dag_id].push({ id: r.id, code: r.code, naam: r.naam });
+      }
+    }
+
     const daysByWeek = {};
 
     for (const day of days) {
+      day.competenties = compsByDay[day.id] || [];
       if (!daysByWeek[day.logboek_week_id]) {
         daysByWeek[day.logboek_week_id] = [];
       }
@@ -800,6 +819,10 @@ async function saveLogbookDay(req, res) {
   const status = req.body.status === "geen_stagedag" ? "geen_stagedag" : "ingevuld";
   const { titel, uitgevoerdeTaken, reflectie, problemen, leerpunten } = req.body;
   const aantalUren = status === "geen_stagedag" ? 0 : Number(req.body.aantalUren ?? req.body.aantal_uren ?? 0);
+  // Optioneel: competenties die de student aan deze dag koppelt (array van competentie-id's).
+  const competenties = Array.isArray(req.body.competenties)
+    ? req.body.competenties.map(Number).filter((id) => Number.isInteger(id) && id > 0)
+    : null;
 
   if (!weekNummer || !datum) return fail(res, 400, "weekNummer en datum zijn verplicht");
 
@@ -842,17 +865,31 @@ async function saveLogbookDay(req, res) {
       "SELECT id FROM logboek_dagen WHERE logboek_week_id = ? AND datum = ? LIMIT 1",
       [weekId, datum]
     );
+    let dagId;
     if (bestaand.length > 0) {
+      dagId = bestaand[0].id;
       await conn.query(
         `UPDATE logboek_dagen SET status = ?, titel = ?, uitgevoerde_taken = ?, reflectie = ?, problemen = ?, leerpunten = ?, aantal_uren = ?, aangepast_op = NOW() WHERE id = ?`,
-        [status, titel || null, uitgevoerdeTaken || null, reflectie || null, problemen || null, leerpunten || null, aantalUren, bestaand[0].id]
+        [status, titel || null, uitgevoerdeTaken || null, reflectie || null, problemen || null, leerpunten || null, aantalUren, dagId]
       );
     } else {
-      await conn.query(
+      const [ins] = await conn.query(
         `INSERT INTO logboek_dagen (logboek_week_id, datum, status, titel, uitgevoerde_taken, reflectie, problemen, leerpunten, aantal_uren, aangemaakt_op, aangepast_op)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
         [weekId, datum, status, titel || null, uitgevoerdeTaken || null, reflectie || null, problemen || null, leerpunten || null, aantalUren]
       );
+      dagId = ins.insertId;
+    }
+
+    // Gekoppelde competenties van deze dag bijwerken (enkel als het veld is meegestuurd).
+    if (competenties !== null) {
+      await conn.query("DELETE FROM logboek_dag_competenties WHERE logboek_dag_id = ?", [dagId]);
+      for (const competentieId of competenties) {
+        await conn.query(
+          "INSERT IGNORE INTO logboek_dag_competenties (logboek_dag_id, competentie_id, aangemaakt_op) VALUES (?, ?, NOW())",
+          [dagId, competentieId]
+        );
+      }
     }
 
     // Weektotaal herberekenen.
