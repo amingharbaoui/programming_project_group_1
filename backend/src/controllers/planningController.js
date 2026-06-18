@@ -144,7 +144,7 @@ async function updateDocentPlanning(req, res) {
 
   if (!planningId) return fail(res, 400, "Ongeldig planning-id");
 
-  const allowedStatuses = ["voorgesteld", "bevestigd", "alternatief_gevraagd", "gepland", "gegeven", "geannuleerd"];
+  const allowedStatuses = ["voorgesteld", "bevestigd", "alternatief_gevraagd", "gepland", "gegeven", "geweest", "geannuleerd"];
   if (status && !allowedStatuses.includes(status)) return fail(res, 400, "Ongeldige planningstatus");
 
   const fields = [];
@@ -181,6 +181,31 @@ async function updateDocentPlanning(req, res) {
     );
 
     if (result.affectedRows === 0) return fail(res, 404, "Planningmoment niet gevonden");
+
+    // Student en mentor verwittigen van de wijziging.
+    try {
+      const [info] = await db.query(
+        `SELECT pm.type, pm.stagedossier_id, sd.student_id, sd.mentor_id
+         FROM planning_momenten pm JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
+         WHERE pm.id = ? LIMIT 1`,
+        [planningId]
+      );
+      const moment = info[0];
+      if (moment) {
+        const label = moment.type === "eindpresentatie" ? "de eindpresentatie" : "het bedrijfsbezoek";
+        for (const ontvangerId of [moment.student_id, moment.mentor_id].filter(Boolean)) {
+          await meld(ontvangerId, {
+            titel: "Planning bijgewerkt",
+            bericht: `De docent heeft ${label} bijgewerkt.`,
+            aangemaaktDoorId: docentId,
+            stagedossierId: moment.stagedossier_id
+          });
+        }
+      }
+    } catch (notifyError) {
+      console.error("Melding planning bijwerken mislukt:", notifyError.message);
+    }
+
     return ok(res, { id: planningId }, "Planningmoment bijgewerkt");
   } catch (error) {
     console.error("updateDocentPlanning error:", error);
