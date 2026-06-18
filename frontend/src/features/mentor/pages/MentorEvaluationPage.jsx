@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 
@@ -6,6 +7,7 @@ function getEvalStatusClass(status) {
   if (status === "open") return "s_amber";
   if (status === "student_ingediend") return "s_info";
   if (status === "mentor_ingediend") return "s_ok";
+  if (status === "klaar_voor_docent") return "s_ok";
   if (status === "geregistreerd") return "s_ok";
   if (status === "klaar_voor_vrijgave") return "s_ok";
   if (status === "vrijgegeven") return "s_ok";
@@ -17,6 +19,7 @@ function getEvalStatusLabel(status) {
   if (status === "open") return "Open";
   if (status === "student_ingediend") return "Student ingediend";
   if (status === "mentor_ingediend") return "Ingediend";
+  if (status === "klaar_voor_docent") return "Klaar voor docent";
   if (status === "geregistreerd") return "Geregistreerd";
   if (status === "klaar_voor_vrijgave") return "Klaar voor vrijgave";
   if (status === "vrijgegeven") return "Vrijgegeven";
@@ -45,6 +48,7 @@ function ScoreKnoppen({ waarde, onChange, leesOnly }) {
 
 export default function MentorEvaluationPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
 
   const [studenten, setStudenten]               = useState([]);
   const [geselecteerdStudent, setGeselecteerdStudent] = useState(null);
@@ -68,7 +72,10 @@ export default function MentorEvaluationPage() {
         const res = await api.get("/mentor/students");
         const data = res.data.data || [];
         setStudenten(data);
-        if (data.length > 0) setGeselecteerdStudent(data[0]);
+        if (data.length > 0) {
+          const vooraf = Number(searchParams.get("student")) || null;
+          setGeselecteerdStudent(data.find((s) => s.id === vooraf) || data[0]);
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -120,7 +127,7 @@ export default function MentorEvaluationPage() {
 
   const kanInvullen =
     huidigeEval &&
-    !["niet_open", "mentor_ingediend", "geregistreerd", "klaar_voor_vrijgave", "vrijgegeven"].includes(
+    !["niet_open", "mentor_ingediend", "klaar_voor_docent", "geregistreerd", "klaar_voor_vrijgave", "vrijgegeven"].includes(
       huidigeEval.status
     );
 

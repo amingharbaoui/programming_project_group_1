@@ -2,25 +2,15 @@ import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiRequest } from "../../../services/api";
 import "./MyInternshipPage.css";
+import Modal from "../../../components/ui/Modal";
 import {
   IconSend, IconX, IconCheck, IconBriefcase, IconPlus,
-  IconInfoCircle, IconUsers, IconFileDescription, IconChevronUp,
-  IconChevronDown, IconBuilding, IconCalendar, IconUserCheck,
+  IconInfoCircle, IconUsers, IconFileDescription, IconChevronRight,
+  IconBuilding, IconCalendar, IconUserCheck,
   IconClipboardText, IconArrowBackUp, IconNotebook, IconArrowRight,
   IconHourglass, IconPencil, IconAlertCircle, IconDeviceFloppy, IconTrophy,
+  IconHistory, IconSignature, IconUpload, IconListCheck, IconCircleCheck,
 } from "@tabler/icons-react";
-
-const STATUS_CONFIG = {
-  concept:               { cls: "s_grijs",  icon: <IconDeviceFloppy size={14} />,  label: "Concept — nog niet ingediend" },
-  ingediend:             { cls: "s_grijs",  icon: <IconHourglass size={14} />,      label: "In behandeling" },
-  heringediend:          { cls: "s_grijs",  icon: <IconHourglass size={14} />,      label: "Heringediend — in behandeling" },
-  aanpassingen_gevraagd: { cls: "s_amber",  icon: <IconPencil size={14} />,         label: "Aanpassingen gevraagd" },
-  goedgekeurd:              { cls: "s_ok",    icon: <IconCheck size={14} />,    label: "Goedgekeurd" },
-  afgekeurd:                { cls: "s_rood",  icon: <IconX size={14} />,        label: "Afgekeurd" },
-  ingetrokken:              { cls: "s_grijs", icon: <IconArrowBackUp size={14} />, label: "Ingetrokken" },
-  resultaat_vrijgegeven:    { cls: "s_ok",    icon: <IconTrophy size={14} />,   label: "Eindresultaat vrijgegeven" },
-  afgerond:                 { cls: "s_ok",    icon: <IconTrophy size={14} />,   label: "Stage afgerond" },
-};
 
 const FASES = ["Voorstel", "Beoordeling", "Contract", "Stage", "Evaluatie"];
 
@@ -55,7 +45,6 @@ function getSubs(status, contractGetekend) {
 function ProgressBar({ status, contractGetekend }) {
   const idx  = getFaseIdx(status, contractGetekend);
   const subs = getSubs(status, contractGetekend);
-
   return (
     <div className="steps">
       {FASES.map((fase, i) => {
@@ -86,18 +75,137 @@ function ProgressBar({ status, contractGetekend }) {
   );
 }
 
+function DossierKaart({ titel, data, formatDatum }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="dossier">
+      <button className={`dossier-kop${open ? " open" : ""}`} onClick={() => setOpen(o => !o)}>
+        <i className="ti ti-chevron-right"></i>
+        {titel}
+      </button>
+      <div className={`dossier-body${open ? " open" : ""}`}>
+        <div className="grid_2">
+          <div className="card">
+            <div className="card_title"><IconBuilding size={16} />Bedrijf</div>
+            <div className="kv"><span className="k">Bedrijf</span><span className="v">{data?.bedrijf_naam || "—"}</span></div>
+            <div className="kv"><span className="k">Functie</span><span className="v">{data?.stagefunctie || "—"}</span></div>
+            <div className="kv"><span className="k">Afdeling</span><span className="v">{data?.bedrijfsafdeling || "—"}</span></div>
+          </div>
+          <div className="card">
+            <div className="card_title"><IconCalendar size={16} />Periode</div>
+            <div className="kv"><span className="k">Start</span><span className="v">{formatDatum(data?.startdatum)}</span></div>
+            <div className="kv"><span className="k">Einde</span><span className="v">{formatDatum(data?.einddatum)}</span></div>
+            <div className="kv"><span className="k">Uren/week</span><span className="v">{data?.uren_per_week ? `${data.uren_per_week}u` : "—"}</span></div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card_title"><IconFileDescription size={16} />Opdracht</div>
+          <p style={{ fontSize: 13.5, lineHeight: 1.65, color: "var(--sub)", margin: 0 }}>{data?.opdrachtomschrijving || "—"}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BegeleidingKaart({ data, wacht }) {
+  return (
+    <div className="card">
+      <div className="card_title"><IconUsers size={16} />Begeleiding</div>
+      {data?.mentor_naam && (
+        <div className="prof">
+          <div className="prof-av">{data.mentor_naam.split(" ").map(w => w[0]).slice(0,2).join("").toUpperCase()}</div>
+          <div>
+            <div className="p-naam">{data.mentor_naam}</div>
+            <div className="p-rol">{data.bedrijf_naam}{wacht ? " (voorgesteld)" : ""}</div>
+            {data.mentor_email && <div className="p-mail">{data.mentor_email}</div>}
+          </div>
+        </div>
+      )}
+      <div className="prof">
+        <div className="prof-av grijs"><i className="ti ti-user-question" style={{ fontSize: 16 }}></i></div>
+        <div>
+          <div className="p-naam">Stagebegeleider wordt toegewezen</div>
+          <div className="p-rol">{wacht ? "Definitief na goedkeuring" : "Erasmushogeschool Brussel"}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const VERBERG_DOC = new Set(["reflectiebijlage", "eindoverzicht", "stageovereenkomst"]);
+const DOC_ACTIE_STATUS = new Set(["ontbreekt", "afgekeurd"]);
+
+function TaakKaart({ status, contractStudentGekend, docsOk, navigate }) {
+  if (status !== "goedgekeurd") {
+    // Stage loopt of andere fase — geen taken meer van toepassing
+    return null;
+  }
+
+  const contractOk = !!contractStudentGekend;
+  const alleOk = contractOk && docsOk;
+
+  return (
+    <div className="taak-kaart">
+      <div className="card_title">
+        <i className="ti ti-list-check"></i>
+        Wat moet je nu doen
+      </div>
+
+      {alleOk ? (
+        <div className="taak-rij">
+          <div className="taak-icon groen"><i className="ti ti-circle-check"></i></div>
+          <div className="taak-info">Alles in orde — je stage start binnenkort.</div>
+        </div>
+      ) : (
+        <>
+          {/* Contract taak */}
+          <div className="taak-rij">
+            <div className={`taak-icon ${contractOk ? "groen" : "amber"}`}>
+              <i className={`ti ${contractOk ? "ti-circle-check" : "ti-signature"}`}></i>
+            </div>
+            <div className="taak-info">
+              {contractOk ? "Stageovereenkomst ondertekend." : "Onderteken je stageovereenkomst digitaal."}
+            </div>
+            {!contractOk && (
+              <button className="btn primary sm" onClick={() => navigate("/student/contract")}>
+                Ga <IconArrowRight size={13} />
+              </button>
+            )}
+          </div>
+
+          {/* Documenten taak */}
+          <div className="taak-rij">
+            <div className={`taak-icon ${docsOk ? "groen" : "amber"}`}>
+              <i className={`ti ${docsOk ? "ti-circle-check" : "ti-upload"}`}></i>
+            </div>
+            <div className="taak-info">
+              {docsOk ? "Verplichte documenten geüpload." : "Upload je verplichte stagedocumenten."}
+            </div>
+            {!docsOk && (
+              <button className="btn primary sm" onClick={() => navigate("/student/documents")}>
+                Ga <IconArrowRight size={13} />
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function MyInternshipPage() {
   const navigate  = useNavigate();
   const location  = useLocation();
 
   const [showPopup,        setShowPopup]        = useState(location.state?.ingediend || false);
-  const [voorstelOpen,     setVoorstelOpen]     = useState(false);
   const [internship,       setInternship]       = useState(null);
   const [loading,          setLoading]          = useState(true);
   const [intrekModal,      setIntrekModal]      = useState(false);
   const [intrekken,        setIntrekken]        = useState(false);
   const [intrekFout,       setIntrekFout]       = useState(null);
-  const [contractGetekend, setContractGetekend] = useState(false);
+  const [contractStudentGekend, setContractStudentGekend] = useState(false);
+  const [volledigGetekend, setVolledigGetekend] = useState(false);
+  const [docsOk, setDocsOk] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -109,23 +217,42 @@ export default function MyInternshipPage() {
       } finally {
         setLoading(false);
       }
-      // Contract ophalen (los van voorstel — fout is ok)
       try {
         const res = await apiRequest("GET", "/contracts/my");
         const c = res.data;
-        // Pas "getekend" als alle drie partijen getekend hebben
-        if (c?.student_getekend_op && c?.bedrijf_getekend_op && c?.opleiding_getekend_op) {
-          setContractGetekend(true);
-        }
+        setContractStudentGekend(!!c?.student_getekend_op);
+        // Volledig getekend = student + bedrijf (mentor) beide getekend; opleiding_getekend_op wordt niet gebruikt
+        setVolledigGetekend(!!(c?.student_getekend_op && c?.bedrijf_getekend_op));
       } catch {
         // geen contract — ok
+      }
+      try {
+        const [docsRes, soortenRes] = await Promise.all([
+          apiRequest("GET", "/documents/my"),
+          apiRequest("GET", "/documents/soorten"),
+        ]);
+        const docs = docsRes.data ?? [];
+        const soorten = (soortenRes.data ?? []).filter((s) => {
+          const t = (s.type ?? "").toLowerCase();
+          const n = (s.naam ?? "").toLowerCase();
+          return !VERBERG_DOC.has(t) && !VERBERG_DOC.has(n);
+        });
+        const alleGoed = soorten.length > 0 && soorten.every((s) => {
+          const actief = docs
+            .filter((d) => d.document_soort_id === s.id)
+            .sort((a, b) => (b.versie_nummer ?? 0) - (a.versie_nummer ?? 0))[0];
+          return actief && !DOC_ACTIE_STATUS.has(actief.status);
+        });
+        setDocsOk(alleGoed);
+      } catch {
+        // docs niet beschikbaar
       }
     }
     fetchData();
   }, []);
 
   function formatDatum(datum) {
-    if (!datum) return "-";
+    if (!datum) return "—";
     return new Date(datum).toLocaleDateString("nl-BE");
   }
 
@@ -135,7 +262,6 @@ export default function MyInternshipPage() {
     try {
       await apiRequest("PATCH", "/internships/my/intrekken");
       setIntrekModal(false);
-      // Herlaad pagina data
       const res = await apiRequest("GET", "/internships/my");
       setInternship(res.data || null);
     } catch (err) {
@@ -155,299 +281,253 @@ export default function MyInternshipPage() {
   }
 
   const currentStatus = internship?.status || (location.state?.ingediend ? "ingediend" : null);
-  const statusInfo    = STATUS_CONFIG[currentStatus] || STATUS_CONFIG["ingediend"];
   const heeftVoorstel = !!internship || location.state?.ingediend;
   const isConcept     = currentStatus === "concept";
   const isAfgesloten  = ["afgekeurd", "ingetrokken"].includes(currentStatus);
-  const isActief      = heeftVoorstel && !isConcept && !isAfgesloten;
+  const isIngediend   = currentStatus === "ingediend";
+  const isAanpassingen = currentStatus === "aanpassingen_gevraagd";
+  const isHeringediend = currentStatus === "heringediend";
+  const isGoedgekeurd = ["goedgekeurd", "teruggestuurd", "validatie"].includes(currentStatus);
+  const kanIntrekken  = ["ingediend", "heringediend", "aanpassingen_gevraagd"].includes(currentStatus);
+  const data          = internship;
+  const decisionMessage = data?.laatste_feedback || data?.laatste_motivering || data?.feedback || data?.motivering;
 
-  const data             = internship;
-  const hasDecision      = ["goedgekeurd", "afgekeurd", "aanpassingen_gevraagd"].includes(currentStatus);
-  const decisionMessage  = data?.laatste_feedback || data?.laatste_motivering || data?.feedback || data?.motivering;
-  const kanIntrekken     = ["ingediend", "heringediend", "aanpassingen_gevraagd"].includes(currentStatus);
+  const pageTitle = (isGoedgekeurd && data?.stagefunctie && data?.bedrijf_naam)
+    ? `${data.stagefunctie} bij ${data.bedrijf_naam}`
+    : "Mijn stage";
 
   return (
+    <>
     <div className="page-inner">
 
-      {/* Popup na indienen */}
-      {showPopup && (
-        <div className="popup-overlay">
-          <div className="popup">
-            <div className="popup-header">
-              <div className="card_title">
-                <IconSend size={16} />
-                Stagevoorstel ingediend
-              </div>
-              <button className="btn" onClick={() => setShowPopup(false)}>
-                <IconX size={16} />
-              </button>
-            </div>
-            <div className="popup-body">
-              <p>Je stagevoorstel werd ingediend bij de stagecommissie. Je krijgt een melding na de beoordeling.</p>
-            </div>
-            <div className="actions">
-              <button className="btn primary" onClick={() => setShowPopup(false)}>
-                <IconCheck size={16} />
-                Begrepen
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Bevestigingsmodal intrekken */}
-      {intrekModal && (
-        <div className="popup-overlay">
-          <div className="popup">
-            <div className="popup-header">
-              <div className="card_title">
-                <IconAlertCircle size={16} />
-                Voorstel intrekken
-              </div>
-              <button className="btn" onClick={() => setIntrekModal(false)}>
-                <IconX size={16} />
-              </button>
-            </div>
-            <div className="popup-body">
-              <p>Ben je zeker dat je je stagevoorstel wil intrekken? Het voorstel wordt niet meer beoordeeld door de stagecommissie.</p>
-              {intrekFout && <p className="status s_rood" style={{ marginTop: 8 }}>{intrekFout}</p>}
-            </div>
-            <div className="actions">
-              <button className="btn" onClick={() => setIntrekModal(false)} disabled={intrekken}>
-                Annuleren
-              </button>
-              <button className="btn primary" style={{ background: "var(--red)" }} onClick={handleIntrekken} disabled={intrekken}>
-                <IconArrowBackUp size={16} />
-                {intrekken ? "Bezig..." : "Ja, intrekken"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="page-header">
-        <h1>Mijn stage</h1>
+        <h1>{pageTitle}</h1>
         <p>Academiejaar 2025-2026</p>
       </div>
 
-      {/* Geen voorstel */}
+      {/* ── GEEN VOORSTEL ── */}
       {!heeftVoorstel && (
-        <div className="card">
-          <div className="card_title">
-            <IconBriefcase size={16} />
-            Stageaanvraag
+        <>
+          <ProgressBar status={null} contractGetekend={false} />
+          <div className="card">
+            <div className="empty-hero">
+              <div className="eh-icon"><i className="ti ti-briefcase"></i></div>
+              <h2>Je hebt nog geen stage</h2>
+              <p>Alles start met je stagevoorstel: bedrijf, mentor, opdracht en periode. Na indiening bekijkt de stagecommissie je voorstel.</p>
+              <button className="btn primary" onClick={() => navigate("/student/application")}>
+                <IconPlus size={16} />Stagevoorstel indienen
+              </button>
+            </div>
           </div>
-          <p>Je hebt nog geen stage. Alles start met je stagevoorstel: bedrijf, mentor, opdracht en periode. Na indiening bekijkt de stagecommissie je voorstel.</p>
-          <div className="actions">
-            <button className="btn primary" onClick={() => navigate("/student/application")}>
-              <IconPlus size={16} />
-              Stagevoorstel indienen
-            </button>
-          </div>
-        </div>
+        </>
       )}
 
-      {/* Concept — nog niet ingediend */}
+      {/* ── CONCEPT ── */}
       {isConcept && (
         <>
-          <div className="card">
-            <div className="card_title">
-              <IconDeviceFloppy size={16} />
-              Concept opgeslagen
-            </div>
-            <span className={`status ${statusInfo.cls}`}>
-              {statusInfo.icon}
-              {statusInfo.label}
-            </span>
-            <p style={{ marginTop: 10, fontSize: 13, color: "var(--sub)" }}>
-              Je hebt een onvolledig concept bewaard. Werk het af en dien in om de stagecommissie te bereiken.
-            </p>
-            <div className="actions">
-              <button className="btn primary" onClick={() => navigate("/student/application")}>
-                <IconPencil size={16} />
-                Concept afwerken
-              </button>
-              <button className="btn" onClick={() => setIntrekModal(true)}>
-                <IconArrowBackUp size={16} />
-                Concept verwijderen
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* Afgekeurd of ingetrokken — nieuw starten */}
-      {isAfgesloten && (
-        <>
-          <div className="card">
-            <div className="card_title">
-              <IconInfoCircle size={16} />
-              Status
-            </div>
-            <span className={`status ${statusInfo.cls}`}>
-              {statusInfo.icon}
-              {statusInfo.label}
-            </span>
-            {hasDecision && decisionMessage && (
-              <p style={{ marginTop: 10, fontSize: 13, color: "var(--sub)" }}>{decisionMessage}</p>
-            )}
-            <p style={{ marginTop: 10, fontSize: 13, color: "var(--sub)" }}>
-              Je kan een nieuw stagevoorstel indienen.
-            </p>
-            <div className="actions">
-              <button className="btn primary" onClick={() => navigate("/student/application")}>
-                <IconPlus size={16} />
-                Nieuw voorstel starten
-              </button>
-            </div>
-          </div>
-
-          {/* Historiek van ingetrokken/afgekeurd voorstel */}
-          {data && (
-            <div className="card" onClick={() => setVoorstelOpen(!voorstelOpen)} style={{ cursor: "pointer" }}>
-              <div className="card_title">
-                <IconFileDescription size={16} />
-                Vorig voorstel bekijken
-                {voorstelOpen ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
-              </div>
-            </div>
-          )}
-          {voorstelOpen && data && (
-            <div className="grid_2">
-              <div className="card">
-                <div className="card_title"><IconBuilding size={16} />Bedrijf</div>
-                <div className="kv"><span className="k">Naam</span><span className="v">{data.bedrijf_naam || "-"}</span></div>
-              </div>
-              <div className="card">
-                <div className="card_title"><IconCalendar size={16} />Periode</div>
-                <div className="kv"><span className="k">Start</span><span className="v">{formatDatum(data.startdatum)}</span></div>
-                <div className="kv"><span className="k">Einde</span><span className="v">{formatDatum(data.einddatum)}</span></div>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Actief voorstel — ingediend / aanpassingen / goedgekeurd */}
-      {isActief && (
-        <>
-          {/* Progressbar */}
-          <div className="card">
-            <ProgressBar status={currentStatus} contractGetekend={contractGetekend} />
-          </div>
-
-          {/* Status */}
-          <div className="card">
-            <div className="card_title">
-              <IconInfoCircle size={16} />
-              Status
-            </div>
-            <span className={`status ${statusInfo.cls}`}>
-              {statusInfo.icon}
-              {statusInfo.label}
-            </span>
-          </div>
-
-          {/* Commissiebeslissing */}
-          {hasDecision && (
-            <div className="card">
-              <div className="card_title">
-                <IconPencil size={16} />
-                Beslissing van de commissie
-              </div>
-              <p>{decisionMessage || "De stagecommissie heeft je voorstel beoordeeld."}</p>
-              {currentStatus === "aanpassingen_gevraagd" && (
-                <div className="actions">
-                  <button className="btn primary" onClick={() => navigate("/student/application")}>
-                    <IconPencil size={16} />
-                    Aanvraag aanpassen
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Begeleiding */}
-          <div className="card">
-            <div className="card_title">
-              <IconUsers size={16} />
-              Begeleiding
-            </div>
-            <div className="kv"><span className="k">Naam</span><span className="v">{data?.mentor_naam || "-"}</span></div>
-            <div className="kv"><span className="k">Bedrijf</span><span className="v">{data?.bedrijf_naam || "-"}</span></div>
-            <div className="kv"><span className="k">E-mail</span><span className="v">{data?.mentor_email || "-"}</span></div>
-            <div className="kv"><span className="k">Stagebegeleider</span><span className="v">-</span></div>
-          </div>
-
-          {/* Uitklapbaar voorsteldetail */}
-          <div className="card" onClick={() => setVoorstelOpen(!voorstelOpen)} style={{ cursor: "pointer" }}>
-            <div className="card_title">
-              <IconFileDescription size={16} />
-              Volledig voorstel bekijken
-              {voorstelOpen ? <IconChevronUp size={16} /> : <IconChevronDown size={16} />}
-            </div>
-          </div>
-
-          {voorstelOpen && (
-            <>
-              <div className="grid_2">
-                <div className="card">
-                  <div className="card_title"><IconBuilding size={16} />Bedrijf</div>
-                  <div className="kv"><span className="k">Naam</span><span className="v">{data?.bedrijf_naam || "-"}</span></div>
-                  <div className="kv"><span className="k">Afdeling</span><span className="v">{data?.bedrijfsafdeling || "-"}</span></div>
-                </div>
-                <div className="card">
-                  <div className="card_title"><IconCalendar size={16} />Periode</div>
-                  <div className="kv"><span className="k">Start</span><span className="v">{formatDatum(data?.startdatum)}</span></div>
-                  <div className="kv"><span className="k">Einde</span><span className="v">{formatDatum(data?.einddatum)}</span></div>
-                  <div className="kv"><span className="k">Uren/week</span><span className="v">{data?.uren_per_week ? `${data.uren_per_week}u` : "-"}</span></div>
-                </div>
-              </div>
-
-              <div className="card">
-                <div className="card_title"><IconUserCheck size={16} />Mentor</div>
-                <div className="kv"><span className="k">Naam</span><span className="v">{data?.mentor_naam || "-"}</span></div>
-                <div className="kv"><span className="k">Functie</span><span className="v">{data?.mentor_functie || "-"}</span></div>
-                <div className="kv"><span className="k">E-mail</span><span className="v">{data?.mentor_email || "-"}</span></div>
-              </div>
-
-              <div className="card">
-                <div className="card_title"><IconClipboardText size={16} />Opdracht</div>
-                <div className="kv"><span className="k">Titel</span><span className="v">{data?.stagefunctie || "-"}</span></div>
-                <p>{data?.opdrachtomschrijving || "-"}</p>
-              </div>
-
-              {/* Intrekken knop — alleen tonen als nog intrekbaar */}
-              {kanIntrekken && (
-                <div className="card">
-                  <button className="btn" onClick={() => setIntrekModal(true)}>
-                    <IconArrowBackUp size={16} />
-                    Voorstel intrekken
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* Logboek — alleen bij goedgekeurd */}
-          {currentStatus === "goedgekeurd" && (
-            <div className="card">
-              <div className="card_title">
-                <IconNotebook size={16} />
-                Logboek
-              </div>
-              <p>Je stage is goedgekeurd. Je kan nu je logboek invullen.</p>
-              <div className="actions">
-                <button className="btn primary" onClick={() => navigate("/student/logbook")}>
-                  <IconArrowRight size={16} />
-                  Naar logboek
+          <ProgressBar status={currentStatus} contractGetekend={false} />
+          <div className="banner blauw">
+            <i className="ti ti-device-floppy"></i>
+            <div>
+              <div className="b-title">Dit is nog maar een concept</div>
+              <div className="b-text">Je voorstel is bewaard maar nog níet ingediend — de stagecommissie ziet het dus nog niet. Werk de ontbrekende velden af en klik op "Indienen".</div>
+              <div style={{ marginTop: 10 }}>
+                <button className="btn primary sm" onClick={() => navigate("/student/application")}>
+                  <IconPencil size={13} /> Concept afwerken
                 </button>
               </div>
             </div>
-          )}
+          </div>
+        </>
+      )}
+
+      {/* ── AFGEKEURD ── */}
+      {currentStatus === "afgekeurd" && (
+        <>
+          <ProgressBar status={currentStatus} contractGetekend={false} />
+          <div className="banner rood">
+            <i className="ti ti-x"></i>
+            <div>
+              <div className="b-title">Voorstel afgekeurd</div>
+              {decisionMessage && <div className="b-text">"{decisionMessage}"</div>}
+              <div style={{ marginTop: 10 }}>
+                <button className="btn primary sm" onClick={() => navigate("/student/application")}>
+                  <IconPlus size={13} /> Nieuw voorstel starten
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card_title"><IconHistory size={16} />Historiek</div>
+            <div className="versie actief"><span className="v-dot"></span><span className="v-wat"><b>Afgekeurd</b></span><span className="v-tijd">—</span></div>
+            <div className="versie"><span className="v-dot"></span><span className="v-wat"><b>Voorstel ingediend</b></span><span className="v-tijd">—</span></div>
+          </div>
+        </>
+      )}
+
+      {/* ── INGETROKKEN ── */}
+      {currentStatus === "ingetrokken" && (
+        <>
+          <ProgressBar status={currentStatus} contractGetekend={false} />
+          <div className="banner rood">
+            <i className="ti ti-arrow-back-up"></i>
+            <div>
+              <div className="b-title">Voorstel ingetrokken</div>
+              <div className="b-text">Je stagevoorstel werd ingetrokken. De stagecommissie behandelt dit voorstel niet meer. Je kan een nieuw voorstel starten.</div>
+              <div style={{ marginTop: 10 }}>
+                <button className="btn primary sm" onClick={() => navigate("/student/application")}>
+                  <IconPlus size={13} /> Nieuw voorstel starten
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card_title"><IconHistory size={16} />Historiek</div>
+            <div className="versie actief"><span className="v-dot"></span><span className="v-wat"><b>Voorstel ingetrokken</b> door jou</span><span className="v-tijd">—</span></div>
+            <div className="versie"><span className="v-dot"></span><span className="v-wat"><b>Versie 1 ingediend</b></span><span className="v-tijd">—</span></div>
+          </div>
+        </>
+      )}
+
+      {/* ── INGEDIEND ── */}
+      {isIngediend && (
+        <>
+          <ProgressBar status={currentStatus} contractGetekend={false} />
+          <div className="banner blauw">
+            <i className="ti ti-clock"></i>
+            <div>
+              <div className="b-title">Stagevoorstel ingediend — beslissing volgt</div>
+              <div className="b-text">Je stagevoorstel wordt behandeld door de stagecommissie. Je krijgt een melding zodra er een beslissing is.</div>
+            </div>
+          </div>
+          <div style={{ borderTop: "1px solid var(--border)", marginTop: 6, paddingTop: 14 }}>
+            <div className="grid_2">
+              <div>
+                <DossierKaart titel="Je voorstel zoals ingediend — nog niet goedgekeurd" data={data} formatDatum={formatDatum} />
+                {kanIntrekken && (
+                  <button className="btn" style={{ marginTop: 10 }} onClick={() => setIntrekModal(true)}>
+                    <IconArrowBackUp size={14} /> Voorstel intrekken
+                  </button>
+                )}
+              </div>
+              <BegeleidingKaart data={data} wacht={true} />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── HERINGEDIEND ── */}
+      {isHeringediend && (
+        <>
+          <ProgressBar status={currentStatus} contractGetekend={false} />
+          <div className="banner blauw">
+            <i className="ti ti-send"></i>
+            <div>
+              <div className="b-title">Aangepast voorstel heringediend</div>
+              <div className="b-text">Je hebt versie 2 van je stagevoorstel ingediend. De stagecommissie herbeoordeelt je aanvraag. Je krijgt een melding zodra er een beslissing is.</div>
+            </div>
+          </div>
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div className="card_title"><IconHistory size={16} />Historiek</div>
+            <div className="versie actief"><span className="v-dot"></span><span className="v-wat"><b>Versie 2 heringediend</b></span><span className="v-tijd">—</span></div>
+            <div className="versie"><span className="v-dot"></span><span className="v-wat"><b>Aanpassingen gevraagd</b> door de stagecommissie</span><span className="v-tijd">—</span></div>
+            <div className="versie"><span className="v-dot"></span><span className="v-wat"><b>Versie 1 ingediend</b></span><span className="v-tijd">—</span></div>
+          </div>
+          <div style={{ borderTop: "1px solid var(--border)", marginTop: 6, paddingTop: 14 }}>
+            <div className="grid_2">
+              <div>
+                <DossierKaart titel="Je voorstel zoals ingediend" data={data} formatDatum={formatDatum} />
+                <button className="btn" style={{ marginTop: 10 }} onClick={() => setIntrekModal(true)}>
+                  <IconArrowBackUp size={14} /> Voorstel intrekken
+                </button>
+              </div>
+              <BegeleidingKaart data={data} wacht={true} />
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── AANPASSINGEN GEVRAAGD ── */}
+      {isAanpassingen && (
+        <>
+          <ProgressBar status={currentStatus} contractGetekend={false} />
+          <div className="card" style={{ marginBottom: 16, border: "1.5px solid #0a0a0a", boxShadow: "0 4px 14px rgba(0,0,0,.10)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 11, flexWrap: "wrap" }}>
+              <div className="taak-icon amber" style={{ width: 34, height: 34, fontSize: 17, borderRadius: 8, flexShrink: 0 }}>
+                <i className="ti ti-message-circle"></i>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 600 }}>Feedback van de stagecommissie</div>
+                {decisionMessage && <div style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 3, lineHeight: 1.5 }}>{decisionMessage}</div>}
+              </div>
+              <button className="btn primary sm" onClick={() => navigate("/student/application")}>
+                <IconPencil size={13} /> Aanpassen
+              </button>
+            </div>
+          </div>
+          <div className="card" style={{ marginTop: 16 }}>
+            <div className="card_title"><IconHistory size={16} />Historiek</div>
+            <div className="versie actief"><span className="v-dot"></span><span className="v-wat"><b>Feedback ontvangen</b></span><span className="v-tijd">—</span></div>
+            <div className="versie"><span className="v-dot"></span><span className="v-wat"><b>Versie 1 ingediend</b></span><span className="v-tijd">—</span></div>
+          </div>
+        </>
+      )}
+
+      {/* ── GOEDGEKEURD / TERUGGESTUURD / VALIDATIE ── */}
+      {isGoedgekeurd && (
+        <>
+          <ProgressBar status={currentStatus} contractGetekend={volledigGetekend} />
+          <TaakKaart status={currentStatus} contractStudentGekend={contractStudentGekend} docsOk={docsOk} navigate={navigate} />
+          <div style={{ borderTop: "1px solid var(--border)", marginTop: 16, paddingTop: 14 }}>
+            <div className="grid_2">
+              <DossierKaart
+                titel={`Je stagedossier — goedgekeurd${data?.stagefunctie ? ` · ${data.stagefunctie}` : ""}`}
+                data={data}
+                formatDatum={formatDatum}
+              />
+              <BegeleidingKaart data={data} wacht={false} />
+            </div>
+          </div>
         </>
       )}
 
     </div>
+
+    {/* Modal: stagevoorstel ingediend */}
+    <Modal
+      open={showPopup}
+      onClose={() => setShowPopup(false)}
+      icon="ti-send"
+      titel="Stagevoorstel ingediend"
+      footer={
+        <button className="btn primary" onClick={() => setShowPopup(false)}>
+          <i className="ti ti-check"></i> Begrepen
+        </button>
+      }
+    >
+      <p>Je stagevoorstel werd ingediend bij de stagecommissie. Je krijgt een melding na de beoordeling.</p>
+    </Modal>
+
+    {/* Modal: voorstel intrekken bevestiging */}
+    <Modal
+      open={intrekModal}
+      onClose={() => { if (!intrekken) setIntrekModal(false); }}
+      icon="ti-arrow-back-up"
+      titel="Voorstel intrekken"
+      sub="Ben je zeker?"
+      footer={
+        <>
+          <button className="btn" onClick={() => setIntrekModal(false)} disabled={intrekken}>Annuleren</button>
+          <button className="btn primary" style={{ background: "var(--red)" }} onClick={handleIntrekken} disabled={intrekken}>
+            <i className="ti ti-arrow-back-up"></i>
+            {intrekken ? "Bezig..." : "Ja, intrekken"}
+          </button>
+        </>
+      }
+    >
+      <p>Ben je zeker dat je je stagevoorstel wil intrekken? Het voorstel wordt niet meer beoordeeld door de stagecommissie.</p>
+      {intrekFout && <p className="status s_rood" style={{ marginTop: 8 }}>{intrekFout}</p>}
+    </Modal>
+    </>
   );
 }

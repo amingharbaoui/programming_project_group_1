@@ -1,6 +1,8 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const path = require("path");
+const fs = require("fs");
 
 const healthRoutes = require("./routes/healthRoutes");
 const authRoutes = require("./routes/authRoutes");
@@ -16,6 +18,7 @@ const evaluationRoutes = require("./routes/evaluationRoutes");
 const contractRoutes = require("./routes/contractRoutes");
 const documentRoutes = require("./routes/documentRoutes");
 const notificationRoutes = require("./routes/notificationRoutes");
+const planningRoutes = require("./routes/planningRoutes");
 
 dotenv.config();
 
@@ -28,7 +31,14 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "x-user-id"]
 }));
 app.use(express.json());
-app.use("/uploads", express.static(require("path").join(__dirname, "../uploads")));
+const UPLOADS_DIR = path.join(__dirname, "../uploads");
+app.use("/uploads", (req, res, next) => {
+  const rel = req.path.replace(/^\/+/, "");
+  if (!rel || rel.includes("..") || rel.includes("/")) return next();
+  const filePath = path.join(UPLOADS_DIR, rel);
+  if (!fs.existsSync(filePath)) return next();
+  res.sendFile(filePath);
+});
 
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
@@ -44,6 +54,7 @@ app.use("/api/evaluations", evaluationRoutes);
 app.use("/api/contracts", contractRoutes);
 app.use("/api/documents", documentRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/planning", planningRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

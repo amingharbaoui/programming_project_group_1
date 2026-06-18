@@ -15,7 +15,8 @@ async function meld(ontvangerId, opts = {}) {
     stagevoorstelId = null,
     stagedossierId = null,
     documentId = null,
-    logboekWeekId = null
+    logboekWeekId = null,
+    status = "nieuw"
   } = opts;
 
   try {
@@ -24,7 +25,7 @@ async function meld(ontvangerId, opts = {}) {
       INSERT INTO systeem_meldingen
         (ontvanger_id, aangemaakt_door_id, stagevoorstel_id, stagedossier_id, document_id, logboek_week_id,
          type, ernst, titel, bericht, status, kanaal, aangemaakt_op)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'nieuw', ?, NOW())
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
       `,
       [
         ontvangerId,
@@ -37,6 +38,7 @@ async function meld(ontvangerId, opts = {}) {
         ernst,
         titel || "Melding",
         bericht || "",
+        status,
         kanaal
       ]
     );
@@ -47,4 +49,12 @@ async function meld(ontvangerId, opts = {}) {
   }
 }
 
-module.exports = { meld };
+async function emailMelding(ontvangerId, opts = {}) {
+  return meld(ontvangerId, {
+    ...opts,
+    kanaal: "email",
+    status: "verzonden"
+  });
+}
+
+module.exports = { meld, emailMelding };

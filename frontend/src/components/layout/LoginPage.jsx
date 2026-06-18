@@ -1,34 +1,67 @@
-import React from "react";
+import React, { useState } from "react";
 import { IconLogin2 } from "@tabler/icons-react";
 import "./LoginPage.css";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
+import { apiRequest } from "../../services/api";
 import logoWide from "../../assets/stageify-logo/stageify_logo_wide.png";
+
+const ROLE_ROUTES = {
+  student: "/student/internship",
+  stagecommissie: "/committee/applications",
+  administratie: "/admin/dossiers",
+  docent: "/docent/students",
+  mentor: "/mentor/students",
+};
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { loginUser } = useAuth();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fout, setFout] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // Na inloggen gaat de student naar zijn stage pagina
-  function handleLogin(e) {
-    e.preventDefault();
-    navigate("/student/internship");
+  async function login(emailWaarde) {
+    setFout(null);
+    setLoading(true);
+
+    try {
+      const response = await apiRequest("POST", "/auth/login", {
+        email: emailWaarde.toLowerCase().trim(),
+        password,
+      });
+      const apiUser = response.data;
+
+      loginUser(apiUser);
+      navigate(ROLE_ROUTES[apiUser.hoofdrol] || "/student/internship");
+    } catch (error) {
+      setFout(error.response?.data?.message || "Aanmelden mislukt.");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  // EhB SSO knop doet hetzelfde voor nu
+  function handleLogin(e) {
+    e.preventDefault();
+    login(email);
+  }
+
   function handleEhbLogin() {
-    navigate("/student/internship");
+    login(email);
   }
 
   return (
     <div className="login_page">
       <div className="login_card">
 
-        {/* Logo en ondertitel */}
+        {/* Logo */}
         <div className="login_header">
           <div className="login_wrapper">
             <img
-                className="login_logo"
-                src={logoWide}
-                alt="Stageify logo"
+              className="login_logo"
+              src={logoWide}
+              alt="Stageify logo"
             />
           </div>
         </div>
@@ -46,6 +79,8 @@ export default function LoginPage() {
               type="email"
               className="form_input login_input"
               placeholder="voornaam.naam@student.ehb.be"
+              value={email}
+              onChange={(e) => { setEmail(e.target.value); setFout(null); }}
               required
             />
           </div>
@@ -60,28 +95,33 @@ export default function LoginPage() {
               type="password"
               className="form_input login_input"
               placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               required
             />
           </div>
 
+          {/* Foutmelding */}
+          {fout && (
+            <p style={{ fontSize: 12.5, color: "var(--red)", margin: "0 0 8px" }}>{fout}</p>
+          )}
+
           {/* Aanmelden knop */}
-          <button type="submit" className="btn primary login_btn">
+          <button type="submit" className="btn primary login_btn" disabled={loading}>
             <IconLogin2 size={16} stroke={2} style={{ marginRight: 6 }} />
-            Aanmelden
+            {loading ? "Aanmelden..." : "Aanmelden"}
           </button>
 
           <div className="login_divider">
             <span>of</span>
           </div>
 
-          {/* EhB SSO knop - wordt later gekoppeld aan de echte SSO */}
-          <button type="button" className="btn login_secondary_btn" onClick={handleEhbLogin}>
+          {/* EhB SSO knop */}
+          <button type="button" className="btn login_secondary_btn" onClick={handleEhbLogin} disabled={loading}>
             Aanmelden met je EhB-account
           </button>
 
         </form>
-
-        <p className="login_footer">Stagify · versie 1.0</p>
       </div>
     </div>
   );

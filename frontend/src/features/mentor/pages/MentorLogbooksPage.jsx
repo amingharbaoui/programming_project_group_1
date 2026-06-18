@@ -1,15 +1,7 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
-
-// Demo studenten die gekoppeld kunnen zijn aan een mentor.
-// De backend beslist zelf of de ingelogde mentor toegang heeft.
-const DEMO_STUDENTEN = [
-  { id: 1, naam: "Demo Student" },
-  { id: 6, naam: "Demo Student 2" },
-  { id: 7, naam: "Demo Student 3" },
-  { id: 8, naam: "Demo Student 4" },
-];
 
 function getStatusClass(status) {
   if (status === "ingediend") return "s_info";
@@ -26,8 +18,11 @@ function formatDate(value) {
 
 export default function MentorLogbooksPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const vooraf = Number(searchParams.get("student")) || null;
 
-  const [studentId, setStudentId] = useState(1);
+  const [studenten, setStudenten] = useState([]);
+  const [studentId, setStudentId] = useState(vooraf);
   const [weeks, setWeeks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -52,7 +47,22 @@ export default function MentorLogbooksPage() {
   }
 
   useEffect(() => {
-    loadLogbooks(studentId);
+    async function init() {
+      try {
+        const res = await api.get("/mentor/students", {
+          headers: { "x-user-id": String(user.id) },
+        });
+        const lijst = res.data.data || [];
+        setStudenten(lijst);
+        const start = vooraf && lijst.some((s) => s.id === vooraf) ? vooraf : (lijst[0]?.id ?? null);
+        setStudentId(start);
+        if (start) loadLogbooks(start);
+      } catch (err) {
+        setError(err.response?.data?.message || "Stagiairs ophalen mislukt");
+      }
+    }
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleStudentChange(e) {
@@ -83,8 +93,6 @@ export default function MentorLogbooksPage() {
     }
   }
 
-  const geselecteerdeStudent = DEMO_STUDENTEN.find((s) => s.id === studentId);
-
   return (
     <div className="page_inner">
       <div className="page_header">
@@ -104,12 +112,13 @@ export default function MentorLogbooksPage() {
           <label className="form_label">Stagiair</label>
           <select
             className="form_input"
-            value={studentId}
+            value={studentId ?? ""}
             onChange={handleStudentChange}
           >
-            {DEMO_STUDENTEN.map((s) => (
+            {studenten.length === 0 && <option value="">Geen stagiairs</option>}
+            {studenten.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.naam} (ID {s.id})
+                {s.voornaam} {s.achternaam}
               </option>
             ))}
           </select>

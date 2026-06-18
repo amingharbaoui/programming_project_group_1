@@ -1,6 +1,8 @@
+const fs = require("fs");
+const path = require("path");
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
-const { meld } = require("../utils/notify");
+const { meld, emailMelding } = require("../utils/notify");
 
 function getUserId(req, fallbackId) {
   return Number(req.user?.id || fallbackId);
@@ -12,6 +14,56 @@ function calculateWeeks(startdatum, einddatum) {
   const diffMs = end - start;
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1;
   return Math.max(1, Math.ceil(diffDays / 7));
+}
+
+function pdfEscape(value) {
+  return String(value ?? "")
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)")
+    .replace(/\r?\n/g, " ");
+}
+
+function buildSimplePdf(lines) {
+  const text = lines
+    .map((line, index) => `BT /F1 11 Tf 50 ${760 - index * 18} Td (${pdfEscape(line)}) Tj ET`)
+    .join("\n");
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${Buffer.byteLength(text, "utf8")} >>\nstream\n${text}\nendstream`
+  ];
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  objects.forEach((object, index) => {
+    offsets.push(Buffer.byteLength(pdf, "utf8"));
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
+  });
+  const xref = Buffer.byteLength(pdf, "utf8");
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (let i = 1; i < offsets.length; i += 1) {
+    pdf += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(pdf, "utf8");
+}
+
+async function ensureDocumentType(connection, type, naam) {
+  const [rows] = await connection.query(
+    "SELECT id FROM document_soorten WHERE type = ? AND status = 'actief' ORDER BY id LIMIT 1",
+    [type]
+  );
+  if (rows[0]?.id) return rows[0].id;
+
+  const [result] = await connection.query(
+    `INSERT INTO document_soorten (naam, type, is_verplicht, is_vast, status, aangemaakt_op, aangepast_op)
+     VALUES (?, ?, 0, 1, 'actief', NOW(), NOW())`,
+    [naam, type]
+  );
+  return result.insertId;
 }
 
 async function getStudentData(connection, studentId) {
@@ -365,10 +417,10 @@ async function saveDraft(req, res) {
         [
           stagevoorstelId, bedrijfId,
           finalBedrijfNaam || null, bedrijfsafdeling || null, bedrijfsadres || null,
-          mentorNaam || null, mentorEmail || null, mentorTelefoon || null, mentorFunctie || null,
-          stagefunctie || null, opdrachtomschrijving || null,
-          startdatum || null, einddatum || null,
-          aantalWeken, finalUrenPerWeek, totaalUren,
+          mentorNaam || "", mentorEmail || "", mentorTelefoon || null, mentorFunctie || null,
+          stagefunctie || "", opdrachtomschrijving || "",
+          startdatum || stageRegel.stagevenster_start, einddatum || stageRegel.stagevenster_einde,
+          aantalWeken ?? 0, finalUrenPerWeek, totaalUren ?? 0,
           studentId
         ]
       );
@@ -543,6 +595,7 @@ async function getMyInternship(req, res) {
         sp.heringediend_op,
         sp.goedgekeurd_op,
         sp.afgekeurd_op,
+        d.status AS dossier_status,
 
         v.id AS versie_id,
         v.bedrijf_naam,
@@ -576,6 +629,7 @@ async function getMyInternship(req, res) {
           ORDER BY vb.beslist_op DESC
           LIMIT 1
         )
+      LEFT JOIN stagedossiers d ON d.stagevoorstel_id = sp.id
       WHERE sp.student_id = ?
       ORDER BY sp.aangemaakt_op DESC
       LIMIT 1
@@ -1085,6 +1139,7 @@ async function getAdminDossierById(req, res) {
         doc.id,
         doc.status,
         doc.versie_nummer,
+        doc.bestand_url,
         doc.bestand_naam,
         doc.opgeladen_op,
         doc.gecontroleerd_op,
@@ -1093,7 +1148,7 @@ async function getAdminDossierById(req, res) {
         ds.type,
         ds.is_verplicht
       FROM documenten doc
-      JOIN document_soorten ds ON ds.id = doc.document_soort_id
+      LEFT JOIN document_soorten ds ON ds.id = doc.document_soort_id
       WHERE doc.stagedossier_id = ?
       ORDER BY ds.is_verplicht DESC, ds.id ASC
       `,
@@ -1283,30 +1338,108 @@ async function generateEindoverzicht(req, res) {
   const dossierId = Number(req.params.id);
   if (!dossierId) return fail(res, 400, "Ongeldig dossier-id");
 
+  const conn = await db.getConnection();
   try {
-    const [d] = await db.query(
+    await conn.beginTransaction();
+
+    const [d] = await conn.query(
       `SELECT d.id, d.dossiernummer, d.eindresultaat, d.eindresultaat_vrijgegeven_op,
-              d.startdatum, d.einddatum, d.opleiding, d.academiejaar,
+              d.startdatum, d.einddatum, d.opleiding, d.academiejaar, d.totaal_uren,
               sg.voornaam AS student_voornaam, sg.achternaam AS student_achternaam, s.studentennummer,
-              b.naam AS bedrijf_naam
+              b.naam AS bedrijf_naam,
+              mg.voornaam AS mentor_voornaam, mg.achternaam AS mentor_achternaam,
+              dg.voornaam AS docent_voornaam, dg.achternaam AS docent_achternaam
        FROM stagedossiers d
        JOIN studenten s ON s.gebruiker_id = d.student_id
        JOIN gebruikers sg ON sg.id = s.gebruiker_id
        JOIN bedrijven b ON b.id = d.bedrijf_id
+       LEFT JOIN gebruikers mg ON mg.id = d.mentor_id
+       LEFT JOIN gebruikers dg ON dg.id = d.stagebegeleider_id
        WHERE d.id = ? LIMIT 1`,
       [dossierId]
     );
-    if (d.length === 0) return fail(res, 404, "Dossier niet gevonden");
-    if (d[0].eindresultaat_vrijgegeven_op == null) return fail(res, 400, "Eindresultaat is nog niet vrijgegeven");
+    if (d.length === 0) {
+      await conn.rollback();
+      return fail(res, 404, "Dossier niet gevonden");
+    }
+    if (d[0].eindresultaat_vrijgegeven_op == null) {
+      await conn.rollback();
+      return fail(res, 400, "Eindresultaat is nog niet vrijgegeven");
+    }
 
-    await db.query(
+    const dossier = d[0];
+    const uploadsDir = path.join(__dirname, "../../uploads/eindoverzichten");
+    fs.mkdirSync(uploadsDir, { recursive: true });
+
+    const safeDossiernummer = String(dossier.dossiernummer || dossier.id).replace(/[^a-zA-Z0-9_-]/g, "-");
+    const bestandsnaam = `eindoverzicht-${safeDossiernummer}.pdf`;
+    const filePath = path.join(uploadsDir, bestandsnaam);
+    const bestandUrl = `/uploads/eindoverzichten/${bestandsnaam}`;
+
+    const mentorNaam = [dossier.mentor_voornaam, dossier.mentor_achternaam].filter(Boolean).join(" ") || "-";
+    const docentNaam = [dossier.docent_voornaam, dossier.docent_achternaam].filter(Boolean).join(" ") || "-";
+    const lines = [
+      "Eindoverzicht stage",
+      `Dossier: ${dossier.dossiernummer}`,
+      `Student: ${dossier.student_voornaam} ${dossier.student_achternaam} (${dossier.studentennummer})`,
+      `Opleiding: ${dossier.opleiding || "-"}`,
+      `Academiejaar: ${dossier.academiejaar || "-"}`,
+      `Bedrijf: ${dossier.bedrijf_naam || "-"}`,
+      `Mentor: ${mentorNaam}`,
+      `Stagebegeleider: ${docentNaam}`,
+      `Periode: ${dossier.startdatum || "-"} tot ${dossier.einddatum || "-"}`,
+      `Totaal uren: ${dossier.totaal_uren || "-"}`,
+      `Eindresultaat: ${dossier.eindresultaat}`,
+      `Vrijgegeven op: ${dossier.eindresultaat_vrijgegeven_op}`,
+      `Gegenereerd op: ${new Date().toISOString().slice(0, 10)}`
+    ];
+
+    fs.writeFileSync(filePath, buildSimplePdf(lines));
+
+    const documentSoortId = await ensureDocumentType(conn, "eindoverzicht", "Eindoverzicht");
+    const [docResult] = await conn.query(
+      `INSERT INTO documenten
+        (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam,
+         opgeladen_op, gecontroleerd_op, zichtbaar_voor_student, zichtbaar_voor_docent, zichtbaar_voor_mentor,
+         aangemaakt_op, aangepast_op)
+       VALUES (?, ?, 'geregistreerd', 1, ?, ?, NOW(), NOW(), 1, 1, 1, NOW(), NOW())
+       ON DUPLICATE KEY UPDATE
+         status = 'geregistreerd',
+         versie_nummer = versie_nummer + 1,
+         bestand_url = VALUES(bestand_url),
+         bestand_naam = VALUES(bestand_naam),
+         opgeladen_op = NOW(),
+         gecontroleerd_op = NOW(),
+         zichtbaar_voor_student = 1,
+         zichtbaar_voor_docent = 1,
+         zichtbaar_voor_mentor = 1,
+         aangepast_op = NOW()`,
+      [dossierId, documentSoortId, bestandUrl, bestandsnaam]
+    );
+
+    await conn.query(
       "UPDATE stagedossiers SET eindoverzicht_gegenereerd_op = NOW(), status = 'afgerond', aangepast_op = NOW() WHERE id = ?",
       [dossierId]
     );
 
-    return ok(res, { dossier: d[0], gegenereerd: true }, "Eindoverzicht gegenereerd");
+    await conn.commit();
+
+    return ok(
+      res,
+      {
+        dossier,
+        documentId: docResult.insertId || null,
+        bestandUrl,
+        bestandsnaam,
+        gegenereerd: true
+      },
+      "Eindoverzicht gegenereerd"
+    );
   } catch (error) {
+    await conn.rollback();
     return fail(res, 500, "Eindoverzicht genereren mislukt", error.message);
+  } finally {
+    conn.release();
   }
 }
 
@@ -1370,8 +1503,16 @@ async function sendContractReminder(req, res) {
       aangemaaktDoorId: Number(req.user?.id),
       stagedossierId: dossierId
     });
+    await emailMelding(ontvangerId, {
+      titel: "Herinnering: handtekening stageovereenkomst",
+      bericht: "Gelieve de stageovereenkomst te ondertekenen zodat de stage kan starten.",
+      type: "herinnering",
+      ernst: "medium",
+      aangemaaktDoorId: Number(req.user?.id),
+      stagedossierId: dossierId
+    });
 
-    return ok(res, { dossierId, herinnerd: wie }, `Herinnering verstuurd naar ${wie}`);
+    return ok(res, { dossierId, herinnerd: wie, emailStatus: "geregistreerd" }, `Herinnering verstuurd naar ${wie}`);
   } catch (error) {
     return fail(res, 500, "Herinnering sturen mislukt", error.message);
   }

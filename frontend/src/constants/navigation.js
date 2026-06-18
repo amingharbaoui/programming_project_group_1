@@ -2,12 +2,12 @@ import { ROLES } from "./roles";
 
 export const NAVIGATION = {
   [ROLES.STUDENT]: [
-    { label: "Stageaanvraag", path: "/student/application", icon: "ti-file-plus" },
-    { label: "Mijn stage",    path: "/student/internship",  icon: "ti-briefcase" },
-    { label: "Logboek",       path: "/student/logbook",     icon: "ti-notebook" },
-    { label: "Evaluatie",     path: "/student/evaluation",  icon: "ti-clipboard-check" },
-    { label: "Stageovereenkomst", path: "/student/contract", icon: "ti-writing" },
-    { label: "Documenten",    path: "/student/documents",   icon: "ti-files" },
+    { label: "Stageaanvraag",     path: "/student/application", icon: "ti-file-plus" },
+    { label: "Mijn stage",        path: "/student/internship",  icon: "ti-briefcase" },
+    { label: "Logboek",           path: "/student/logbook",     icon: "ti-notebook",        lockGroup: "logboek_eval" },
+    { label: "Evaluatie",         path: "/student/evaluation",  icon: "ti-clipboard-check", lockGroup: "logboek_eval" },
+    { label: "Stageovereenkomst", path: "/student/contract",    icon: "ti-writing",         lockGroup: "contract_docs" },
+    { label: "Documenten",        path: "/student/documents",   icon: "ti-files",           lockGroup: "contract_docs" },
   ],
 
   [ROLES.COMMITTEE]: [
@@ -26,12 +26,14 @@ export const NAVIGATION = {
     { label: "Evaluatie",  path: "/mentor/evaluation", icon: "ti-clipboard-check" },
     { label: "Contract",   path: "/mentor/contract",   icon: "ti-writing" },
     { label: "Afspraken",  path: "/mentor/afspraken",  icon: "ti-calendar" },
+    { label: "Planning",   path: "/mentor/planning",   icon: "ti-calendar-event" },
   ],
 
   [ROLES.DOCENT]: [
     { label: "Studenten",  path: "/docent/students",    icon: "ti-users" },
+    { label: "Voorstellen",path: "/docent/proposals",   icon: "ti-file-text" },
     { label: "Logboeken",  path: "/docent/logbooks",    icon: "ti-notebook" },
     { label: "Evaluaties", path: "/docent/evaluations", icon: "ti-clipboard-check" },
+    { label: "Planning",   path: "/docent/planning",    icon: "ti-calendar-event" },
   ],
 };
-

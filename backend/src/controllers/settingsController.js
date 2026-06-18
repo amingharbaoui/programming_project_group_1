@@ -74,4 +74,43 @@ async function updateDocumentType(req, res) {
   }
 }
 
-module.exports = { getSettings, updateStageRule, updateDocumentType };
+async function createDocumentType(req, res) {
+  const { naam, type, isVerplicht, is_verplicht, opleiding, academiejaar } = req.body;
+  const adminId = Number(req.user?.id);
+
+  if (!naam) return fail(res, 400, "Naam is verplicht");
+
+  try {
+    const [result] = await db.query(
+      `
+      INSERT INTO document_soorten
+        (naam, type, is_verplicht, is_vast, opleiding, academiejaar, status, aangemaakt_door_id, aangemaakt_op, aangepast_op)
+      VALUES (?, ?, ?, 0, ?, ?, 'actief', ?, NOW(), NOW())
+      `,
+      [
+        naam,
+        type || "stage",
+        isVerplicht ?? is_verplicht ? 1 : 0,
+        opleiding || null,
+        academiejaar || null,
+        adminId || null
+      ]
+    );
+
+    return ok(
+      res,
+      {
+        id: result.insertId,
+        naam,
+        type: type || "stage",
+        is_verplicht: isVerplicht ?? is_verplicht ? 1 : 0,
+        status: "actief"
+      },
+      "Documenttype aangemaakt"
+    );
+  } catch (error) {
+    return fail(res, 500, "Documenttype aanmaken mislukt", error.message);
+  }
+}
+
+module.exports = { getSettings, updateStageRule, updateDocumentType, createDocumentType };
