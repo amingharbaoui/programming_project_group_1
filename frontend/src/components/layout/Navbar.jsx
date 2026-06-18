@@ -83,13 +83,9 @@ export default function Navbar({ onToggle }) {
                 <div className="profiel-rol">{user.role}</div>
               </div>
             </div>
-            <div className="pp-rij">
-              <i className="ti ti-bell-cog"></i>Meldingsvoorkeuren
-            </div>
-            <div className="pp-rij">
+            <div className="pp-rij pp-rij--static">
               <i className="ti ti-info-circle"></i>Stagify · versie 1.0
             </div>
-            <div className="profiel-divider" />
             <button className="profiel-logout" onClick={handleLogout}>
               <i className="ti ti-logout"></i>
               Uitloggen
