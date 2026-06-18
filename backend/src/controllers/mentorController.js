@@ -91,15 +91,15 @@ async function tekenContract(req, res) {
 
     // Haal huidige status op
     const [[contract]] = await db.query(
-      "SELECT id, status, bedrijf_getekend_op FROM stageovereenkomsten WHERE stagedossier_id = ? LIMIT 1",
+      "SELECT id, status, student_getekend_op, bedrijf_getekend_op FROM stageovereenkomsten WHERE stagedossier_id = ? LIMIT 1",
       [dossierId]
     );
     if (!contract) return fail(res, 404, "Geen stageovereenkomst gevonden");
     if (contract.bedrijf_getekend_op) return fail(res, 409, "Contract is al getekend door mentor");
+    if (!contract.student_getekend_op) return fail(res, 409, "De student moet de stageovereenkomst eerst tekenen");
 
-    // Nieuwe status bepalen
-    const nieuweStatus =
-      contract.status === "getekend_door_student" ? "volledig_ondertekend" : "wacht_op_bedrijf";
+    // Student tekende al, dus na de mentor is de overeenkomst volledig ondertekend.
+    const nieuweStatus = "volledig_ondertekend";
 
     await db.query(
       `UPDATE stageovereenkomsten
