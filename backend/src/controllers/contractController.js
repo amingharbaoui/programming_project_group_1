@@ -1,6 +1,7 @@
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 const { meld } = require("../utils/notify");
+const { buildSimplePdf } = require("../utils/pdf");
 
 function getUserId(req) {
   return Number(req.user?.id || 1);
@@ -217,4 +218,61 @@ async function registerOvereenkomst(req, res) {
   }
 }
 
-module.exports = { getContract, signContract, registerOvereenkomst };
+/* GET /api/contracts/my/pdf
+   Student downloadt de stageovereenkomst als pdf (story 5) */
+async function downloadContractPdf(req, res) {
+  const studentId = getUserId(req);
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT
+        so.status, so.student_getekend_op, so.bedrijf_getekend_op, so.opleiding_getekend_op,
+        d.dossiernummer, d.startdatum, d.einddatum,
+        CONCAT(gs.voornaam, ' ', gs.achternaam) AS student_naam,
+        b.naam AS bedrijf_naam,
+        CONCAT(gm.voornaam, ' ', gm.achternaam) AS mentor_naam,
+        CONCAT(gdoc.voornaam, ' ', gdoc.achternaam) AS docent_naam
+      FROM stageovereenkomsten so
+      JOIN stagedossiers d ON d.id = so.stagedossier_id
+      JOIN gebruikers gs ON gs.id = d.student_id
+      JOIN bedrijven b ON b.id = d.bedrijf_id
+      LEFT JOIN gebruikers gm ON gm.id = d.mentor_id
+      LEFT JOIN gebruikers gdoc ON gdoc.id = d.stagebegeleider_id
+      WHERE d.student_id = ?
+      ORDER BY so.aangemaakt_op DESC
+      LIMIT 1
+      `,
+      [studentId]
+    );
+
+    if (rows.length === 0) return fail(res, 404, "Geen stageovereenkomst gevonden");
+
+    const c = rows[0];
+    const tekenStatus = (datum) => (datum ? `getekend op ${new Date(datum).toISOString().slice(0, 10)}` : "nog niet getekend");
+    const lines = [
+      "Stageovereenkomst",
+      `Dossier: ${c.dossiernummer || "-"}`,
+      "",
+      `Student: ${c.student_naam}`,
+      `Stagebedrijf: ${c.bedrijf_naam || "-"}`,
+      `Stagementor: ${c.mentor_naam || "-"}`,
+      `Stagebegeleider: ${c.docent_naam || "-"}`,
+      `Periode: ${c.startdatum || "-"} tot ${c.einddatum || "-"}`,
+      "",
+      `Status: ${c.status}`,
+      `Handtekening student: ${tekenStatus(c.student_getekend_op)}`,
+      `Handtekening stagebedrijf: ${tekenStatus(c.bedrijf_getekend_op)}`,
+      `Handtekening opleiding: ${tekenStatus(c.opleiding_getekend_op)}`
+    ];
+
+    const pdf = buildSimplePdf(lines);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", 'attachment; filename="stageovereenkomst.pdf"');
+    return res.send(pdf);
+  } catch (error) {
+    return fail(res, 500, "Stageovereenkomst-pdf genereren mislukt", error.message);
+  }
+}
+
+module.exports = { getContract, signContract, registerOvereenkomst, downloadContractPdf };
