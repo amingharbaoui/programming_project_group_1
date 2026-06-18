@@ -117,43 +117,46 @@ async function uploadDocument(req, res) {
 
     const dossier_id = dossiers[0].id;
 
-    const [versieRows] = await connection.query(
-      `
-      SELECT COALESCE(MAX(versie_nummer), 0) AS max_versie
-      FROM documenten
-      WHERE stagedossier_id = ? AND document_soort_id = ?
-      `,
-      [dossier_id, document_soort_id]
-    );
-
-    const nieuw_versie = versieRows[0].max_versie + 1;
     const bestandUrl = `/uploads/${req.file.filename}`;
 
-    /* Zet vorige actieve versie op afgekeurd */
-    await connection.query(
-      `
-      UPDATE documenten
-      SET status = 'afgekeurd', aangepast_op = NOW()
-      WHERE stagedossier_id = ? AND document_soort_id = ? AND status NOT IN ('afgekeurd', 'geregistreerd')
-      `,
+    /* Controleer of er al een rij bestaat voor deze soort in dit dossier */
+    const [bestaand] = await connection.query(
+      `SELECT id, versie_nummer FROM documenten WHERE stagedossier_id = ? AND document_soort_id = ? LIMIT 1`,
       [dossier_id, document_soort_id]
     );
 
-    const [result] = await connection.query(
-      `
-      INSERT INTO documenten
-        (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam, opgeladen_door_id, aangemaakt_op, aangepast_op)
-      VALUES (?, ?, 'ingediend', ?, ?, ?, ?, NOW(), NOW())
-      `,
-      [dossier_id, document_soort_id, nieuw_versie, bestandUrl, req.file.originalname, studentId]
-    );
+    let resultId;
+    let nieuw_versie;
+
+    if (bestaand.length > 0) {
+      /* Bestaand document: versie ophogen en updaten (UNIQUE constraint staat geen tweede rij toe) */
+      resultId = bestaand[0].id;
+      nieuw_versie = bestaand[0].versie_nummer + 1;
+      await connection.query(
+        `UPDATE documenten
+         SET status = 'ingediend', versie_nummer = ?, bestand_url = ?, bestand_naam = ?,
+             opgeladen_door_id = ?, afkeurreden = NULL, aangepast_op = NOW()
+         WHERE id = ?`,
+        [nieuw_versie, bestandUrl, req.file.originalname, studentId, resultId]
+      );
+    } else {
+      /* Eerste upload: nieuwe rij aanmaken */
+      nieuw_versie = 1;
+      const [ins] = await connection.query(
+        `INSERT INTO documenten
+           (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam, opgeladen_door_id, aangemaakt_op, aangepast_op)
+         VALUES (?, ?, 'ingediend', 1, ?, ?, ?, NOW(), NOW())`,
+        [dossier_id, document_soort_id, bestandUrl, req.file.originalname, studentId]
+      );
+      resultId = ins.insertId;
+    }
 
     await connection.commit();
 
     return ok(
       res,
       {
-        id: result.insertId,
+        id: resultId,
         bestand_url: bestandUrl,
         bestand_naam: req.file.originalname,
         versie_nummer: nieuw_versie,
@@ -277,4 +280,20 @@ async function rejectDocument(req, res) {
   }
 }
 
-module.exports = { getDocuments, uploadDocument, uploadEigenDocument, uploadMiddleware, getSoorten, approveDocument, rejectDocument };
+/* GET /api/documents/bestand/:filename — bestand serveren */
+const fs = require("fs");
+const UPLOADS_DIR = path.join(__dirname, "../../uploads");
+
+function serveBestand(req, res) {
+  const filename = req.params.filename;
+  if (!filename || filename.includes("..") || filename.includes("/") || filename.includes("\\")) {
+    return res.status(400).json({ success: false, message: "Ongeldige bestandsnaam" });
+  }
+  const filePath = path.join(UPLOADS_DIR, filename);
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({ success: false, message: "Bestand niet gevonden" });
+  }
+  res.sendFile(filePath);
+}
+
+module.exports = { getDocuments, uploadDocument, uploadEigenDocument, uploadMiddleware, getSoorten, approveDocument, rejectDocument, serveBestand };

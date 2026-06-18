@@ -306,7 +306,16 @@ async function calculateResult(req, res) {
     const competentieScore = Math.round(gewogen * 100) / 100;
 
     const isFinaal = evaluatie.type === "finaal";
-    const eindcijfer = isFinaal ? Math.round(competentieScore * 4 * 100) / 100 : null;
+    let eindcijfer = null;
+    if (isFinaal) {
+      const epScore = eindpresentatieScore !== null ? Number(eindpresentatieScore) : null;
+      if (epScore !== null) {
+        // (competenties 80%) + (eindpresentatie 20%) schaal /5 -> *4 -> /20
+        eindcijfer = Math.round(((competentieScore * 0.8) + (epScore * 0.2)) * 4);
+      } else {
+        eindcijfer = Math.round(competentieScore * 4);
+      }
+    }
     const nieuweStatus = isFinaal ? "klaar_voor_vrijgave" : "geregistreerd";
 
     await conn.query(

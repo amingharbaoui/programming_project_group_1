@@ -1,26 +1,12 @@
 import { useState, useEffect } from "react";
 import { apiRequest } from "../../../services/api";
 import "./StudentContractPage.css";
+import Modal from "../../../components/ui/Modal";
 import {
   IconFileCheck,
-  IconUser,
-  IconBuilding,
-  IconCalendar,
   IconWriting,
-  IconCircleCheck,
-  IconClock,
   IconAlertCircle,
-  IconPrinter,
 } from "@tabler/icons-react";
-
-function formatDatum(d) {
-  if (!d) return "–";
-  return new Date(d).toLocaleDateString("nl-BE", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  });
-}
 
 function formatDatumTijd(d) {
   if (!d) return null;
@@ -33,44 +19,58 @@ function formatDatumTijd(d) {
   });
 }
 
-const STATUS_MAP = {
-  klaar_voor_student:            ["s_blauw", "Klaar voor ondertekening"],
-  getekend_door_student:         ["s_ok",    "Getekend door jou"],
-  wacht_op_bedrijf:              ["s_amber", "Wacht op bedrijf"],
-  volledig_ondertekend:          ["s_ok",    "Volledig ondertekend"],
-  in_controle_bij_administratie: ["s_blauw", "Bij administratie"],
-  afgekeurd:                     ["s_rood",  "Afgekeurd"],
-  geregistreerd:                 ["s_ok",    "Geregistreerd"],
-};
-
-function ContractBadge({ status }) {
-  const [cls, label] = STATUS_MAP[status] ?? ["s_grijs", status ?? "Onbekend"];
-  return <span className={`status ${cls}`}>{label}</span>;
+function formatDatumKort(d) {
+  if (!d) return "–";
+  return new Date(d).toLocaleDateString("nl-BE", { day: "numeric", month: "long" });
 }
 
-function HandtekeningBadge({ getekendOp }) {
+function formatPeriode(start, einde) {
+  if (!start && !einde) return "–";
+  const fmt = (d) => d ? new Date(d).toLocaleDateString("nl-BE") : "–";
+  return `${fmt(start)} – ${fmt(einde)}`;
+}
+
+function HandtekeningBadge({ getekendOp, wachtLabel = "Wacht" }) {
   if (getekendOp) {
     return (
-      <span className="hb-getekend">
-        <IconCircleCheck size={13} />
-        {formatDatumTijd(getekendOp)}
+      <span className="contract-pill ok">
+        <i className="ti ti-check"></i>
+        Getekend
       </span>
     );
   }
   return (
-    <span className="hb-wacht">
-      <IconClock size={13} />
-      Wacht op ondertekening
+    <span className="contract-pill wait">
+      <i className="ti ti-hourglass"></i>
+      {wachtLabel}
     </span>
   );
 }
 
-function Partij({ titel, naam, getekendOp }) {
+function ContractStatusTekst({ contract }) {
+  if (!contract.student_getekend_op) {
+    return <>Je stageovereenkomst staat klaar. Lees ze na en onderteken digitaal om verder te gaan.</>;
+  }
+  if (!contract.bedrijf_getekend_op) {
+    return <>Jij tekende op {formatDatumKort(contract.student_getekend_op)}. {contract.bedrijf_naam || "Het stagebedrijf"} kreeg een uitnodiging om de stageovereenkomst te ondertekenen — jij hoeft niets te doen.</>;
+  }
+  if (!contract.opleiding_getekend_op && contract.status !== "geregistreerd") {
+    return <>Alle handtekeningen van student en bedrijf zijn binnen. De overeenkomst is in controle bij de opleiding.</>;
+  }
+  return <>De stageovereenkomst is volledig ondertekend en geregistreerd. Je verzekering is in orde voor de stageperiode.</>;
+}
+
+function HandtekeningRij({ type, titel, naam, detail, getekendOp, wachtLabel }) {
   return (
-    <div className="partij">
-      <div className="partij-titel">{titel}</div>
-      <div className="partij-naam">{naam || "–"}</div>
-      <HandtekeningBadge getekendOp={getekendOp} />
+    <div className="contract-sign-row">
+      <div className="contract-sign-icon">
+        <i className={`ti ${getekendOp ? "ti-check" : type}`}></i>
+      </div>
+      <div className="contract-sign-main">
+        <div className="contract-sign-title">{titel}</div>
+        <div className="contract-sign-sub">{naam || "–"}{detail ? ` · ${detail}` : ""}</div>
+      </div>
+      <HandtekeningBadge getekendOp={getekendOp} wachtLabel={wachtLabel} />
     </div>
   );
 }
@@ -82,6 +82,8 @@ export default function StudentContractPage() {
   const [akkoord, setAkkoord]   = useState(false);
   const [bezig, setBezig]       = useState(false);
   const [succesmelding, setSuccesmelding] = useState(null);
+  const [overeenkomstOpen, setOvereenkomstOpen] = useState(false);
+  const [herinneringOpen, setHerinneringOpen] = useState(false);
 
   useEffect(() => { laadContract(); }, []);
 
@@ -104,9 +106,9 @@ export default function StudentContractPage() {
     setFout(null);
     try {
       const res = await apiRequest("POST", "/contracts/sign");
-      setSuccesmelding(`Ondertekend op ${formatDatumTijd(res.data.getekendOp)}`);
       await laadContract();
       setAkkoord(false);
+      setSuccesmelding(formatDatumTijd(res.data.getekendOp));
     } catch (err) {
       setFout(err.response?.data?.message || "Ondertekenen mislukt.");
     } finally {
@@ -137,18 +139,14 @@ export default function StudentContractPage() {
 
   const alGetekend      = !!contract.student_getekend_op;
   const kanOndertekenen = !alGetekend && (contract.status === "klaar_voor_student" || !contract.status);
+  const wachtOpBedrijf  = !!contract.student_getekend_op && !contract.bedrijf_getekend_op;
 
   return (
     <div className="page-inner">
 
       <div className="page-header">
-        <div>
-          <h1>Stageovereenkomst</h1>
-          <p>Dossier {contract.dossiernummer}</p>
-        </div>
-        <button className="btn sm" onClick={() => window.print()}>
-          <IconPrinter size={14} /> Afdrukken / PDF
-        </button>
+        <h1>Stageovereenkomst</h1>
+        <p>Opgesteld door de stagecoördinator · digitaal ondertekend in de tool · regelt ook je verzekering</p>
       </div>
 
       {fout && (
@@ -157,51 +155,139 @@ export default function StudentContractPage() {
         </div>
       )}
 
-      {succesmelding && (
-        <div className="card">
-          <span className="status s_ok"><IconCircleCheck size={14} /> {succesmelding}</span>
-        </div>
+      {/* Succesmodal na ondertekenen */}
+      <Modal
+        open={!!succesmelding}
+        onClose={() => setSuccesmelding(null)}
+        icon="ti-signature"
+        titel="Stageovereenkomst ondertekend"
+        sub={succesmelding ? `Ondertekend op ${succesmelding}` : ""}
+        footer={
+          <button className="btn primary" onClick={() => setSuccesmelding(null)}>
+            <i className="ti ti-check"></i> Begrepen
+          </button>
+        }
+      >
+        <p>Je handtekening is geregistreerd. De overeenkomst wordt nu doorgezonden naar het bedrijf voor hun handtekening.</p>
+      </Modal>
+
+      <Modal
+        open={overeenkomstOpen}
+        onClose={() => setOvereenkomstOpen(false)}
+        icon="ti-file-certificate"
+        titel="Stageovereenkomst"
+        sub="Automatisch opgesteld uit je goedgekeurde voorstel"
+        footer={
+          <button className="btn primary" onClick={() => setOvereenkomstOpen(false)}>
+            <i className="ti ti-check"></i> Sluiten
+          </button>
+        }
+      >
+        <p>
+          <strong>Student:</strong> {contract.student_naam || "–"}<br />
+          <strong>Stagebedrijf:</strong> {contract.bedrijf_naam || "–"}<br />
+          <strong>Mentor:</strong> {contract.mentor_naam || "–"}<br />
+          <strong>Begeleidend docent:</strong> {contract.docent_naam || "–"}<br />
+          <strong>Periode:</strong> {formatPeriode(contract.startdatum, contract.einddatum)}<br /><br />
+          De partijen verklaren akkoord te gaan met de stageafspraken, begeleiding, evaluatie en verzekeringsvoorwaarden zoals vastgelegd door de opleiding.
+        </p>
+      </Modal>
+
+      <Modal
+        open={herinneringOpen}
+        onClose={() => setHerinneringOpen(false)}
+        icon="ti-bell"
+        titel="Herinnering klaar"
+        sub="Wacht op handtekening van het bedrijf"
+        footer={
+          <button className="btn primary" onClick={() => setHerinneringOpen(false)}>
+            <i className="ti ti-check"></i> Begrepen
+          </button>
+        }
+      >
+        <p>De stagecoördinator of administratie kan het bedrijf herinneren om de stageovereenkomst digitaal te ondertekenen.</p>
+      </Modal>
+
+      <div className="contract-status-line">
+        <i className="ti ti-hourglass-empty"></i>
+        <span><ContractStatusTekst contract={contract} /></span>
+      </div>
+
+      {wachtOpBedrijf && (
+        <button className="btn contract-reminder" onClick={() => setHerinneringOpen(true)}>
+          <i className="ti ti-bell-ringing"></i>
+          Herinnering sturen naar het bedrijf
+        </button>
       )}
 
-      {/* Status */}
-      <div className="card">
-        <div className="card_title">
-          <IconFileCheck size={16} />
-          Status
-        </div>
-        <ContractBadge status={contract.status} />
-      </div>
+      <div className="contract-grid">
+        <div className="card contract-card">
+          <div className="card_title contract-card-title">
+            <i className="ti ti-signature"></i>
+            Handtekeningen
+          </div>
 
-      {/* Stagegegevens */}
-      <div className="card">
-        <div className="card_title">
-          <IconBuilding size={16} />
-          Stagegegevens
-        </div>
-        <div className="kv"><span className="k">Student</span><span className="v">{contract.student_naam || "–"}</span></div>
-        <div className="kv"><span className="k">Bedrijf</span><span className="v">{contract.bedrijf_naam || "–"}</span></div>
-        <div className="kv"><span className="k">Mentor</span><span className="v">{contract.mentor_naam || "–"}</span></div>
-        <div className="kv"><span className="k">Docent</span><span className="v">{contract.docent_naam || "–"}</span></div>
-        <div className="kv"><span className="k">Startdatum</span><span className="v">{formatDatum(contract.startdatum)}</span></div>
-        <div className="kv"><span className="k">Einddatum</span><span className="v">{formatDatum(contract.einddatum)}</span></div>
-      </div>
+          <div className="contract-sign-list">
+            <HandtekeningRij
+              type="ti-user"
+              titel="Jij (student)"
+              naam={contract.student_naam}
+              detail={contract.student_getekend_op ? `getekend op ${formatDatumKort(contract.student_getekend_op)}` : "nog te ondertekenen"}
+              getekendOp={contract.student_getekend_op}
+              wachtLabel="Te tekenen"
+            />
+            <HandtekeningRij
+              type="ti-building"
+              titel="Het stagebedrijf"
+              naam={contract.bedrijf_naam}
+              detail={contract.mentor_naam}
+              getekendOp={contract.bedrijf_getekend_op}
+              wachtLabel="Wacht"
+            />
+            <HandtekeningRij
+              type="ti-school"
+              titel="De opleiding"
+              naam="Erasmushogeschool Brussel"
+              detail={contract.opleiding_getekend_op ? `getekend op ${formatDatumKort(contract.opleiding_getekend_op)}` : contract.docent_naam}
+              getekendOp={contract.opleiding_getekend_op || contract.status === "geregistreerd"}
+              wachtLabel="Controle"
+            />
+          </div>
 
-      {/* Handtekeningen */}
-      <div className="card">
-        <div className="card_title">
-          <IconWriting size={16} />
-          Handtekeningen
+          <p className="contract-help">
+            Iedereen tekent digitaal in de tool, in deze volgorde. Zodra alle handtekeningen binnen zijn, controleert en registreert de administratie de stageovereenkomst. Na registratie is je verzekering in orde.
+          </p>
         </div>
-        <div className="partijen">
-          <Partij titel="Student"          naam={contract.student_naam}  getekendOp={contract.student_getekend_op} />
-          <Partij titel="Bedrijf / Mentor" naam={contract.mentor_naam}   getekendOp={contract.bedrijf_getekend_op} />
-          <Partij titel="Opleiding"        naam={contract.docent_naam}   getekendOp={contract.opleiding_getekend_op} />
+
+        <div className="card contract-card">
+          <div className="card_title contract-card-title">
+            <i className="ti ti-file-certificate"></i>
+            Wat er in je stageovereenkomst staat
+          </div>
+
+          <div className="contract-kv">
+            <div><span>Student</span><strong>{contract.student_naam || "–"}</strong></div>
+            <div><span>Stagebedrijf</span><strong>{contract.bedrijf_naam || "–"}</strong></div>
+            <div><span>Mentor</span><strong>{contract.mentor_naam || "–"}</strong></div>
+            <div><span>Begeleidend docent</span><strong>{contract.docent_naam || "–"}</strong></div>
+            <div><span>Periode</span><strong>{formatPeriode(contract.startdatum, contract.einddatum)}</strong></div>
+            <div><span>Verzekering</span><strong>Via EhB tijdens de stage</strong></div>
+          </div>
+
+          <p className="contract-help compact">
+            Alles wordt automatisch overgenomen uit je goedgekeurde voorstel. Klopt er iets niet? Onderteken dan niet en contacteer de stagecoördinator.
+          </p>
+
+          <button className="btn sm" onClick={() => setOvereenkomstOpen(true)}>
+            <i className="ti ti-eye"></i>
+            Volledige overeenkomst lezen
+          </button>
         </div>
       </div>
 
       {/* Ondertekenen */}
       {kanOndertekenen && (
-        <div className="card">
+        <div className="card contract-sign-action">
           <div className="card_title">
             <IconWriting size={16} />
             Ondertekenen
@@ -219,20 +305,6 @@ export default function StudentContractPage() {
               {bezig ? "Bezig…" : "Digitaal ondertekenen"}
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Al getekend */}
-      {alGetekend && (
-        <div className="card">
-          <div className="card_title">
-            <IconCircleCheck size={16} />
-            Ondertekend
-          </div>
-          <span className="status s_ok">
-            <IconCircleCheck size={13} />
-            Je hebt ondertekend op <strong>{formatDatumTijd(contract.student_getekend_op)}</strong>
-          </span>
         </div>
       )}
 

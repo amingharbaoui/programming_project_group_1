@@ -70,7 +70,7 @@ VALUES
 (3, 'Stageplan', 'stageplan', true, true, 'Toegepaste Informatica', '2025-2026', 'actief', 3, NOW(), NOW()),
 (4, 'Eindoverzicht', 'eindoverzicht', false, true, 'Toegepaste Informatica', '2025-2026', 'actief', 3, NOW(), NOW());
 
--- Demo stagevoorstel + stagedossier (student 1, mentor 5, docent 3, bedrijf 1)
+-- Demo stagevoorstel + stagedossier (student 1, mentor 5, docent 3, bedrijf 1) zodat documenten-upload werkt na verse seed
 INSERT INTO stagevoorstellen
 (id, student_id, bedrijf_id, stage_regel_id, voorlopige_stagebegeleider_id, status, huidige_versie_nummer, ingediend_op, goedgekeurd_op, aangemaakt_op, aangepast_op)
 VALUES
