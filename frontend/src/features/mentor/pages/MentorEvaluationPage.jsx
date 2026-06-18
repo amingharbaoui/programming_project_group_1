@@ -2,321 +2,320 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import "../mentor.css";
 
-function getEvalStatusClass(status) {
-  if (status === "open") return "s_amber";
-  if (status === "student_ingediend") return "s_info";
-  if (status === "mentor_ingediend") return "s_ok";
-  if (status === "klaar_voor_docent") return "s_ok";
-  if (status === "geregistreerd") return "s_ok";
-  if (status === "klaar_voor_vrijgave") return "s_ok";
-  if (status === "vrijgegeven") return "s_ok";
-  if (status === "niet_open") return "s_grijs";
-  return "s_grijs";
+const SCORE_LBL = ["", "Onvoldoende", "Matig", "Voldoende", "Goed", "Uitstekend"];
+const KLAAR = ["mentor_ingediend", "klaar_voor_docent", "geregistreerd", "klaar_voor_vrijgave", "vrijgegeven"];
+
+function initialen(s) {
+  return ((s.voornaam || "").charAt(0) + (s.achternaam || "").charAt(0)).toUpperCase() || "?";
 }
-
-function getEvalStatusLabel(status) {
-  if (status === "open") return "Open";
-  if (status === "student_ingediend") return "Student ingediend";
-  if (status === "mentor_ingediend") return "Ingediend";
-  if (status === "klaar_voor_docent") return "Klaar voor docent";
-  if (status === "geregistreerd") return "Geregistreerd";
-  if (status === "klaar_voor_vrijgave") return "Klaar voor vrijgave";
-  if (status === "vrijgegeven") return "Vrijgegeven";
-  if (status === "niet_open") return "Niet beschikbaar";
-  return status || "-";
+function stapStatus(ev) {
+  if (!ev || ev.status === "niet_open") return "locked";
+  if (KLAAR.includes(ev.status)) return "done";
+  return "actief";
 }
-
-function ScoreKnoppen({ waarde, onChange, leesOnly }) {
-  return (
-    <div className="score_knoppen">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button
-          key={n}
-          type="button"
-          className={`score_knop${waarde === n ? " geselecteerd" : ""}`}
-          onClick={() => !leesOnly && onChange && onChange(n)}
-          disabled={leesOnly}
-          style={leesOnly ? { cursor: "default", opacity: waarde === n ? 1 : 0.35 } : {}}
-        >
-          {n}
-        </button>
-      ))}
-    </div>
-  );
+function stapIcon(st) {
+  return st === "done" ? "ti-check" : st === "actief" ? "ti-pencil" : "ti-lock";
 }
 
 export default function MentorEvaluationPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
+  const vooraf = Number(searchParams.get("student")) || null;
 
-  const [studenten, setStudenten]               = useState([]);
-  const [geselecteerdStudent, setGeselecteerdStudent] = useState(null);
-  const [loadingStudenten, setLoadingStudenten] = useState(true);
-
-  const [evalData, setEvalData]       = useState(null);
+  const [studenten, setStudenten] = useState([]);
+  const [detailId, setDetailId] = useState(vooraf);
+  const [evalData, setEvalData] = useState(null);
   const [loadingEval, setLoadingEval] = useState(false);
+  const [error, setError] = useState("");
 
-  const [activeTab, setActiveTab]               = useState("tussentijds");
-  const [scoresTussentijds, setScoresTussentijds] = useState({});
-  const [scoresFinaal, setScoresFinaal]           = useState({});
-
-  const [bezig, setBezig]     = useState(false);
+  const [activeTab, setActiveTab] = useState("tussentijds");
+  const [scores, setScores] = useState({ tussentijds: {}, finaal: {} });
+  const [motiv, setMotiv] = useState({ tussentijds: {}, finaal: {} });
+  const [modalCompId, setModalCompId] = useState(null);
+  const [bezig, setBezig] = useState(false);
   const [melding, setMelding] = useState({ tekst: "", type: "" });
 
-  // Laad studenten
   useEffect(() => {
-    async function load() {
+    async function init() {
       try {
-        setLoadingStudenten(true);
-        const res = await api.get("/mentor/students");
-        const data = res.data.data || [];
-        setStudenten(data);
-        if (data.length > 0) {
-          const vooraf = Number(searchParams.get("student")) || null;
-          setGeselecteerdStudent(data.find((s) => s.id === vooraf) || data[0]);
-        }
+        const res = await api.get("/mentor/students", { headers: { "x-user-id": String(user.id) } });
+        setStudenten(res.data.data || []);
       } catch (err) {
-        console.error(err);
-      } finally {
-        setLoadingStudenten(false);
+        setError(err.response?.data?.message || "Stagiairs ophalen mislukt");
       }
     }
-    load();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user.id]);
+    init();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Laad evaluatiedata wanneer student verandert
   useEffect(() => {
-    if (!geselecteerdStudent) return;
+    if (!detailId) return;
     async function load() {
       try {
         setLoadingEval(true);
-        setEvalData(null);
+        setError("");
         setMelding({ tekst: "", type: "" });
-        const res = await api.get(`/evaluations/${geselecteerdStudent.id}`);
+        const res = await api.get(`/evaluations/${detailId}`, { headers: { "x-user-id": String(user.id) } });
         const data = res.data.data;
         setEvalData(data);
-
-        // Vul bestaande mentorscores in
-        const newTussentijds = {};
-        const newFinaal = {};
+        const ns = { tussentijds: {}, finaal: {} };
+        const nm = { tussentijds: {}, finaal: {} };
         for (const ev of data.evaluaties || []) {
-          const mentorScores = (ev.scores || []).filter((s) => s.rol === "mentor");
-          const obj = {};
-          for (const s of mentorScores) {
-            obj[s.competentie_id] = s.score;
+          const key = ev.type === "finaal" ? "finaal" : "tussentijds";
+          for (const s of (ev.scores || []).filter((x) => x.rol === "mentor")) {
+            ns[key][s.competentie_id] = s.score;
+            nm[key][s.competentie_id] = s.motivering || "";
           }
-          if (ev.type === "tussentijds") Object.assign(newTussentijds, obj);
-          if (ev.type === "finaal") Object.assign(newFinaal, obj);
         }
-        setScoresTussentijds(newTussentijds);
-        setScoresFinaal(newFinaal);
+        setScores(ns);
+        setMotiv(nm);
       } catch (err) {
-        console.error(err);
+        setError(err.response?.data?.message || "Evaluaties ophalen mislukt");
       } finally {
         setLoadingEval(false);
       }
     }
     load();
-  }, [geselecteerdStudent]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailId]);
 
+  const detailStudent = studenten.find((s) => s.id === detailId);
+  const competenties = evalData?.competenties || [];
   const huidigeEval = evalData?.evaluaties?.find((e) => e.type === activeTab) || null;
-  const huidigScores = activeTab === "tussentijds" ? scoresTussentijds : scoresFinaal;
-  const setHuidigScores = activeTab === "tussentijds" ? setScoresTussentijds : setScoresFinaal;
+  const tussentijdsEval = evalData?.evaluaties?.find((e) => e.type === "tussentijds") || null;
+  const finaalEval = evalData?.evaluaties?.find((e) => e.type === "finaal") || null;
+  const kanInvullen = huidigeEval && !["niet_open", ...KLAAR].includes(huidigeEval.status);
 
-  const kanInvullen =
-    huidigeEval &&
-    !["niet_open", "mentor_ingediend", "klaar_voor_docent", "geregistreerd", "klaar_voor_vrijgave", "vrijgegeven"].includes(
-      huidigeEval.status
-    );
+  function studentScore(compId) {
+    const sc = (huidigeEval?.scores || []).find((s) => s.rol === "student" && s.competentie_id === compId);
+    return sc || null;
+  }
+  function zetScore(compId, n) {
+    setScores((prev) => ({ ...prev, [activeTab]: { ...prev[activeTab], [compId]: n } }));
+  }
+  function zetMotiv(compId, txt) {
+    setMotiv((prev) => ({ ...prev, [activeTab]: { ...prev[activeTab], [compId]: txt } }));
+  }
 
-  async function handleOpslaan(ingediend) {
+  async function dienIn(ingediend) {
     if (!huidigeEval) return;
-    const competenties = evalData.competenties || [];
-
     if (ingediend) {
-      const missing = competenties.filter((c) => !huidigScores[c.id]);
+      const missing = competenties.filter((c) => !scores[activeTab][c.id]);
       if (missing.length > 0) {
-        setMelding({ tekst: "Geef voor elke competentie een score in.", type: "s_amber" });
+        setMelding({ tekst: "Geef voor elke competentie een score in.", type: "s-amber" });
         return;
       }
     }
-
     const scoresArr = competenties.map((c) => ({
       competentieId: c.id,
-      score: huidigScores[c.id] || null,
-      motivering: "",
+      score: scores[activeTab][c.id] || null,
+      motivering: motiv[activeTab][c.id] || "",
     }));
-
     try {
       setBezig(true);
       setMelding({ tekst: "", type: "" });
-      await api.post(
-        `/evaluations/${huidigeEval.id}/scores`,
-        { scores: scoresArr, ingediend }
-      );
-      setMelding({
-        tekst: ingediend ? "Evaluatie ingediend!" : "Scores opgeslagen als concept.",
-        type: "s_ok",
-      });
-      // Herlaad evaldata
-      const res = await api.get(`/evaluations/${geselecteerdStudent.id}`);
+      await api.post(`/evaluations/${huidigeEval.id}/scores`, { scores: scoresArr, ingediend }, { headers: { "x-user-id": String(user.id) } });
+      setMelding({ tekst: ingediend ? "Mentorinput ingediend!" : "Opgeslagen als concept.", type: "s-ok" });
+      const res = await api.get(`/evaluations/${detailId}`, { headers: { "x-user-id": String(user.id) } });
       setEvalData(res.data.data);
     } catch (err) {
-      setMelding({
-        tekst: err.response?.data?.message || "Opslaan mislukt",
-        type: "s_rood",
-      });
+      setMelding({ tekst: err.response?.data?.message || "Opslaan mislukt", type: "s-rood" });
     } finally {
       setBezig(false);
     }
   }
 
-  return (
-    <div className="page_inner">
-      <div className="page_header">
-        <div>
-          <h1>Evaluatie invullen</h1>
-          <p>Beoordeel de competenties van je stagiair.</p>
-        </div>
-      </div>
-
-      {/* Student selector */}
-      {!loadingStudenten && studenten.length > 0 && (
-        <div className="card" style={{ marginBottom: "12px" }}>
-          <div className="card_title">Stagiair kiezen</div>
-          <div className="form_group" style={{ marginBottom: 0 }}>
-            <label className="form_label">Stagiair</label>
-            <select
-              className="form_input"
-              value={geselecteerdStudent?.id || ""}
-              onChange={(e) => {
-                const s = studenten.find((x) => x.id === Number(e.target.value));
-                setGeselecteerdStudent(s || null);
-              }}
-            >
-              {studenten.map((s) => (
-                <option key={s.dossier_id} value={s.id}>
-                  {s.voornaam} {s.achternaam} — {s.bedrijf}
-                </option>
-              ))}
-            </select>
+  // ─── TABEL ───
+  if (!detailId) {
+    return (
+      <div className="mtr">
+        <div className="page-inner">
+          <div className="page-header">
+            <h1>Evaluaties</h1>
+            <p>Competentieprofiel: Toegepaste Informatica 2025–2026 — de student motiveert, jij scoort als advies</p>
           </div>
-        </div>
-      )}
-
-      {loadingStudenten && (
-        <div className="card">
-          <p className="muted">Studenten laden...</p>
-        </div>
-      )}
-
-      {!loadingStudenten && studenten.length === 0 && (
-        <div className="empty_state">Geen stagiairs gevonden.</div>
-      )}
-
-      {/* Type tabs */}
-      {!loadingStudenten && studenten.length > 0 && (
-        <div className="chips" style={{ marginBottom: "12px" }}>
-          <button
-            className={`chip${activeTab === "tussentijds" ? " actief" : ""}`}
-            onClick={() => { setActiveTab("tussentijds"); setMelding({ tekst: "", type: "" }); }}
-          >
-            Tussentijds
-          </button>
-          <button
-            className={`chip${activeTab === "finaal" ? " actief" : ""}`}
-            onClick={() => { setActiveTab("finaal"); setMelding({ tekst: "", type: "" }); }}
-          >
-            Finaal
-          </button>
-        </div>
-      )}
-
-      {loadingEval && (
-        <div className="card">
-          <p className="muted">Evaluatie laden...</p>
-        </div>
-      )}
-
-      {/* Eval card */}
-      {!loadingEval && evalData && (
-        <div className="card">
-          <div className="card_title">
-            {activeTab === "tussentijds" ? "Tussentijdse evaluatie" : "Finale evaluatie"}
-            {huidigeEval && (
-              <span className={`status ${getEvalStatusClass(huidigeEval.status)}`}>
-                {getEvalStatusLabel(huidigeEval.status)}
-              </span>
-            )}
-          </div>
-
-          {!huidigeEval || huidigeEval.status === "niet_open" ? (
-            <p className="muted">Deze evaluatie is nog niet beschikbaar.</p>
-          ) : (
-            <>
+          {error && <div className="card"><span className="status s-rood">{error}</span></div>}
+          {!error && studenten.length === 0 && <div className="card"><p style={{ color: "var(--sub)", fontSize: 13 }}>Geen stagiairs gevonden.</p></div>}
+          {studenten.length > 0 && (
+            <div className="card" style={{ padding: "6px 14px" }}>
               <table className="tbl">
-                <thead>
-                  <tr>
-                    <th style={{ width: "70px" }}>Code</th>
-                    <th>Competentie</th>
-                    <th style={{ width: "200px" }}>Score (1–5)</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>Student</th><th>Bedrijf</th><th></th></tr></thead>
                 <tbody>
-                  {(evalData.competenties || []).map((c) => (
-                    <tr key={c.id}>
+                  {studenten.map((s) => (
+                    <tr key={s.dossier_id ?? s.id}>
                       <td>
-                        <span className="status s_info">{c.code}</span>
+                        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                          <div className="prof-av" style={{ width: 30, height: 30, fontSize: 11 }}>{initialen(s)}</div>
+                          <div style={{ fontSize: 13.5, fontWeight: 600, cursor: "pointer" }} onClick={() => setDetailId(s.id)}>{s.voornaam} {s.achternaam}</div>
+                        </div>
                       </td>
-                      <td>{c.naam}</td>
-                      <td>
-                        <ScoreKnoppen
-                          waarde={huidigScores[c.id] || null}
-                          leesOnly={!kanInvullen}
-                          onChange={(val) =>
-                            setHuidigScores((prev) => ({ ...prev, [c.id]: val }))
-                          }
-                        />
+                      <td style={{ fontSize: 12.5, color: "var(--sub)" }}>{s.bedrijf || "-"}</td>
+                      <td style={{ textAlign: "right" }}>
+                        <button className="btn sm" onClick={() => setDetailId(s.id)}><i className="ti ti-eye" />Open</button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-
-              {melding.tekst && (
-                <div style={{ marginTop: "12px" }}>
-                  <span className={`status ${melding.type}`}>{melding.tekst}</span>
-                </div>
-              )}
-
-              {kanInvullen && (
-                <div className="actions" style={{ marginTop: "16px" }}>
-                  <button
-                    className="btn primary"
-                    disabled={bezig}
-                    onClick={() => handleOpslaan(true)}
-                  >
-                    {bezig ? "Bezig..." : "Indienen"}
-                  </button>
-                  <button
-                    className="btn"
-                    disabled={bezig}
-                    onClick={() => handleOpslaan(false)}
-                  >
-                    Opslaan als concept
-                  </button>
-                </div>
-              )}
-
-              {!kanInvullen && huidigeEval.status !== "niet_open" && (
-                <p className="muted" style={{ marginTop: "12px", fontSize: "13px" }}>
-                  Evaluatie is ingediend en kan niet meer gewijzigd worden.
-                </p>
-              )}
-            </>
+            </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── DETAIL ───
+  const t1 = stapStatus(tussentijdsEval);
+  const t2 = stapStatus(finaalEval);
+  const t3 = finaalEval?.status === "vrijgegeven" ? "done" : "locked";
+  const modalComp = competenties.find((c) => c.id === modalCompId) || null;
+  const modalStudent = modalComp ? studentScore(modalComp.id) : null;
+
+  return (
+    <div className="mtr">
+      <div className="page-inner">
+        <div style={{ marginBottom: 12 }}>
+          <button className="btn" onClick={() => setDetailId(null)}><i className="ti ti-arrow-left" />Alle evaluaties</button>
+        </div>
+        <div className="page-header">
+          <h1>{detailStudent ? `${detailStudent.voornaam} ${detailStudent.achternaam}` : "Evaluatie"}</h1>
+          <p>Competentieprofiel: Toegepaste Informatica 2025–2026 · versie 1.0</p>
+        </div>
+
+        {/* stepper */}
+        <div className="card" style={{ padding: "20px 14px" }}>
+          <div className="ev-track">
+            <div className={`ev-stap ${t1}`}>
+              <div className="ev-circle"><i className={`ti ${stapIcon(t1)}`} /></div>
+              <div className="ev-label">Evaluatie 1 · Tussentijds</div>
+              <div className="ev-sub">{t1 === "done" ? "Verwerkt" : t1 === "actief" ? "Jouw input gevraagd" : "Opent na de zelfevaluatie"}</div>
+            </div>
+            <div className="ev-lijn" />
+            <div className={`ev-stap ${t2}`}>
+              <div className="ev-circle"><i className={`ti ${stapIcon(t2)}`} /></div>
+              <div className="ev-label">Evaluatie 2 · Finale</div>
+              <div className="ev-sub">{t2 === "done" ? "Ingediend" : t2 === "actief" ? "Jouw input gevraagd" : "Na de finale zelfevaluatie"}</div>
+            </div>
+            <div className="ev-lijn" />
+            <div className={`ev-stap ${t3}`}>
+              <div className="ev-circle"><i className={`ti ${stapIcon(t3)}`} /></div>
+              <div className="ev-label">Afronding</div>
+              <div className="ev-sub">{t3 === "done" ? "Vrijgegeven aan de student" : "Door de docent, na de eindpresentatie"}</div>
+            </div>
+          </div>
+        </div>
+
+        {loadingEval && <div className="card"><p style={{ color: "var(--sub)", fontSize: 13 }}>Evaluatie laden…</p></div>}
+
+        {!loadingEval && evalData && (
+          <>
+            <div className="chips" style={{ marginTop: 14 }}>
+              <button className={`chip ${activeTab === "tussentijds" ? "actief" : ""}`} onClick={() => { setActiveTab("tussentijds"); setMelding({ tekst: "", type: "" }); }}>Tussentijds</button>
+              <button className={`chip ${activeTab === "finaal" ? "actief" : ""}`} onClick={() => { setActiveTab("finaal"); setMelding({ tekst: "", type: "" }); }}>Finaal</button>
+            </div>
+
+            {!huidigeEval || huidigeEval.status === "niet_open" ? (
+              <div className="zone-act leeg"><i className="ti ti-lock" style={{ color: "var(--sub)" }} /><span>Deze evaluatie is nog niet beschikbaar — je krijgt een melding zodra de student zijn zelfevaluatie indient.</span></div>
+            ) : (
+              <>
+                <div className="mtx mtx2">
+                  <div className="mtx-row mtx-head">
+                    <span />
+                    <span>Competentie</span>
+                    <span style={{ textAlign: "center" }}>student</span>
+                    <span style={{ textAlign: "center" }}>jij</span>
+                    <span />
+                  </div>
+                  {competenties.map((c) => {
+                    const ss = studentScore(c.id);
+                    const ms = scores[activeTab][c.id];
+                    return (
+                      <div className="mtx-row klik" key={c.id} onClick={() => setModalCompId(c.id)}>
+                        <span className="m-code">{c.code}</span>
+                        <span className="m-naam">{c.naam}</span>
+                        <span className="m-sc">{ss?.score ? <span className="pil">{ss.score}<span style={{ color: "var(--faint)", fontWeight: 400 }}>/5</span></span> : <span style={{ color: "#d4d4d4" }}>—</span>}</span>
+                        <span className="m-sc">{ms ? <span className="pil jij">{ms}<span style={{ color: "var(--faint)", fontWeight: 400 }}>/5</span></span> : <span style={{ color: "#d4d4d4" }}>—</span>}</span>
+                        <span className="m-chev"><i className="ti ti-chevron-right" /></span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="card" style={{ marginTop: 12 }}>
+                  <div className="card-title"><i className="ti ti-message" style={{ color: "var(--red)" }} />Algemene praktijkfeedback</div>
+                  <textarea
+                    className="form-input"
+                    style={{ minHeight: 60, fontSize: 12.5 }}
+                    placeholder="Hoe draait je stagiair mee op de werkvloer?"
+                    value={motiv[activeTab].algemeen || ""}
+                    onChange={(e) => zetMotiv("algemeen", e.target.value)}
+                    disabled={!kanInvullen}
+                  />
+                </div>
+
+                {melding.tekst && <div style={{ marginTop: 12 }}><span className={`status ${melding.type}`}>{melding.tekst}</span></div>}
+
+                {kanInvullen ? (
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
+                    <button className="btn" disabled={bezig} onClick={() => dienIn(false)}>Opslaan als concept</button>
+                    <button className="btn primary" disabled={bezig} onClick={() => dienIn(true)}><i className="ti ti-send" />Mentorinput indienen</button>
+                  </div>
+                ) : (
+                  <p style={{ marginTop: 12, fontSize: 13, color: "var(--sub)" }}>Je mentorinput is ingediend en staat read-only.</p>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* score-modal */}
+      {modalComp && (
+        <div className="modal-overlay" onClick={() => setModalCompId(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <div className="mh-icon"><i className="ti ti-clipboard-check" /></div>
+              <div>
+                <div className="mh-t">{modalComp.code} · {modalComp.naam}</div>
+                <div className="mh-s">{activeTab === "finaal" ? "Finale evaluatie" : "Tussentijdse evaluatie"}</div>
+              </div>
+              <button className="icon-btn mh-x btn sm" onClick={() => setModalCompId(null)}><i className="ti ti-x" /></button>
+            </div>
+            <div className="modal-body">
+              {modalComp.beschrijving && <div style={{ marginBottom: 12 }}>{modalComp.beschrijving}</div>}
+              <div className="fb-blok">
+                <div className="fb-wie">{detailStudent ? `${detailStudent.voornaam} ${detailStudent.achternaam}` : "Student"} <span style={{ marginLeft: "auto", fontSize: 12.5, fontWeight: 700 }}>{modalStudent?.score ? `${modalStudent.score}/5` : "—"}</span></div>
+                <div className="fb-wat">{modalStudent?.motivering || "Geen motivering."}</div>
+              </div>
+
+              {kanInvullen ? (
+                <>
+                  <div className="form-label" style={{ margin: "12px 0 6px" }}>Jouw advies-score<span className="req">*</span></div>
+                  <div className="scale" style={{ marginBottom: 6 }}>
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <button key={n} className={`scale-btn ${scores[activeTab][modalComp.id] === n ? "selected" : ""}`} onClick={() => zetScore(modalComp.id, n)}>{n}</button>
+                    ))}
+                    <span className="scale-lbl">{scores[activeTab][modalComp.id] ? SCORE_LBL[scores[activeTab][modalComp.id]] : ""}</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: "var(--faint)" }}>1 onvoldoende · 3 voldoende · 5 uitstekend</div>
+                  <div className="form-group" style={{ marginTop: 12 }}>
+                    <label className="form-label">Praktijkfeedback (optioneel)</label>
+                    <textarea className="form-input" style={{ minHeight: 48, fontSize: 12.5 }} value={motiv[activeTab][modalComp.id] || ""} onChange={(e) => zetMotiv(modalComp.id, e.target.value)} />
+                  </div>
+                </>
+              ) : (
+                <div className="fb-blok">
+                  <div className="fb-wie">Jouw score <span style={{ marginLeft: "auto", fontSize: 12.5, fontWeight: 700 }}>{scores[activeTab][modalComp.id] ? `${scores[activeTab][modalComp.id]}/5` : "—"}</span></div>
+                  <div className="fb-wat">{motiv[activeTab][modalComp.id] || "Geen opmerking bij deze competentie."}</div>
+                </div>
+              )}
+            </div>
+            <div className="modal-foot">
+              <button className="btn primary" onClick={() => setModalCompId(null)}><i className="ti ti-check" />{kanInvullen ? "Bewaar" : "Sluiten"}</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

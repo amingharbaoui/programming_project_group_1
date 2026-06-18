@@ -1,0 +1,49 @@
+/* Mentor-shell (sidebar + topbar) 1:1 uit de mockup — gescopet onder .mtr-shell. */
+.mtr-shell {
+  --red:#E2001A; --red-dark:#b80015; --red-light:#fdedef; --dark:#0a0a0a;
+  --gray:#374151; --sub:#374151; --faint:#9ca3af; --muted:#f7f7f7;
+  --border:#e9e9e9; --white:#ffffff; --font:'DM Sans',sans-serif;
+  display:flex; height:100vh; overflow:hidden; font-family:var(--font);
+  color:var(--dark); background:var(--muted);
+}
+.mtr-shell *{box-sizing:border-box;}
+
+/* sidebar */
+.mtr-shell .sidebar{width:252px;flex-shrink:0;background:var(--white);border-right:1px solid var(--border);display:flex;flex-direction:column;height:100vh;overflow:hidden;transition:width .22s ease;}
+.mtr-shell .sidebar.collapsed{width:60px;}
+.mtr-shell .brand{padding:18px 16px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:10px;min-height:68px;overflow:hidden;}
+.mtr-shell .brand-full{display:flex;align-items:center;gap:10px;white-space:nowrap;min-width:0;}
+.mtr-shell .sidebar.collapsed .brand-full{display:none;}
+.mtr-shell .ehb-badge{width:40px;height:28px;background:var(--red);border-radius:4px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.mtr-shell .ehb-badge span{color:#fff;font-weight:700;font-size:13px;letter-spacing:-0.3px;}
+.mtr-shell .brand-text .app-name{font-size:16px;font-weight:600;letter-spacing:-0.3px;}
+.mtr-shell .brand-text .inst{font-size:10px;color:var(--sub);letter-spacing:0.5px;text-transform:uppercase;margin-top:1px;}
+.mtr-shell .sidebar.collapsed .brand-text{display:none;}
+
+.mtr-shell .nav{flex:1;padding:12px 0 6px;overflow-y:auto;}
+.mtr-shell .nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;font-size:13.5px;color:var(--gray);cursor:pointer;border-left:3px solid transparent;transition:background .12s,color .12s;white-space:nowrap;}
+.mtr-shell .nav-item:hover{background:var(--muted);color:var(--dark);}
+.mtr-shell .nav-item.active{color:var(--red);background:var(--red-light);border-left-color:var(--red);font-weight:500;}
+.mtr-shell .nav-item i{font-size:18px;flex-shrink:0;width:18px;}
+.mtr-shell .sidebar.collapsed .nav-item{justify-content:center;padding:11px 0;border-left:none;}
+.mtr-shell .sidebar.collapsed .nav-item .label{display:none;}
+
+.mtr-shell .sidebar-footer{padding:14px 16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:11px;color:var(--faint);overflow:hidden;white-space:nowrap;}
+.mtr-shell .sidebar.collapsed .sidebar-footer{justify-content:center;}
+.mtr-shell .sidebar.collapsed .sidebar-footer span{display:none;}
+
+/* main */
+.mtr-shell .content-wrap{flex:1;display:flex;flex-direction:column;height:100vh;overflow:hidden;min-width:0;}
+.mtr-shell .topbar{height:68px;background:var(--white);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;gap:14px;flex-shrink:0;}
+.mtr-shell .topbar-title{font-size:17px;font-weight:600;flex:1;letter-spacing:-0.2px;}
+.mtr-shell .icon-btn{width:40px;height:40px;border-radius:8px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--gray);transition:background .12s;position:relative;}
+.mtr-shell .icon-btn:hover{background:var(--muted);}
+.mtr-shell .icon-btn i{font-size:22px;}
+.mtr-shell .bell-dot{position:absolute;top:7px;right:8px;width:8px;height:8px;border-radius:50%;background:var(--red);border:1.5px solid #fff;}
+.mtr-shell .demo-switch{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--faint);}
+.mtr-shell .demo-switch select{border:0.5px solid var(--border);border-radius:7px;padding:6px 10px;font-family:var(--font);font-size:12.5px;color:var(--gray);background:var(--white);outline:none;cursor:pointer;}
+.mtr-shell .topbar-user{display:flex;align-items:center;gap:9px;padding-left:4px;cursor:pointer;}
+.mtr-shell .avatar{width:40px;height:40px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:600;color:#fff;flex-shrink:0;}
+.mtr-shell .user-info .name{font-size:14px;font-weight:600;line-height:1.2;}
+.mtr-shell .user-info .role{font-size:12px;color:var(--sub);text-transform:capitalize;}
+.mtr-shell .page-scroll{flex:1;overflow-y:auto;padding:26px 28px;}

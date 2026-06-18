@@ -116,10 +116,14 @@ async function getEvaluationsForStudent(req, res) {
       scores = scoreRows;
     }
 
-    const result = evaluaties.map((e) => ({
-      ...e,
-      scores: scores.filter((s) => s.evaluatie_id === e.id),
-    }));
+    // Student en mentor mogen het berekende resultaat pas zien nadat de docent het vrijgegeven heeft.
+    const verbergResultaat = role === "student" || role === "mentor";
+    const result = evaluaties.map((e) => {
+      const basis = verbergResultaat && e.status !== "vrijgegeven"
+        ? { ...e, eindcijfer: null, competentie_score: null, eindpresentatie_score: null }
+        : e;
+      return { ...basis, scores: scores.filter((s) => s.evaluatie_id === e.id) };
+    });
 
     return ok(res, { stagedossierId: dossier.id, competenties, evaluaties: result }, "Evaluaties opgehaald");
   } catch (error) {
@@ -158,6 +162,15 @@ async function saveScores(req, res) {
   if (!evaluationId) return fail(res, 400, "Ongeldig evaluatie-id");
   if (!["student", "mentor", "docent"].includes(role)) return fail(res, 403, "Deze rol kan geen scores invullen");
   if (scores.length === 0) return fail(res, 400, "Geen scores meegegeven");
+
+  // Een ingevulde score moet op de schaal 1-5 liggen.
+  for (const s of scores) {
+    if (s.score === null || s.score === undefined || s.score === "") continue;
+    const waarde = Number(s.score);
+    if (!Number.isFinite(waarde) || waarde < 1 || waarde > 5) {
+      return fail(res, 400, "Score moet tussen 1 en 5 liggen");
+    }
+  }
 
   const conn = await db.getConnection();
   try {
@@ -266,6 +279,7 @@ async function calculateResult(req, res) {
   const role = req.user?.hoofdrol;
   const userId = getUserId(req);
   const eindpresentatieScore = req.body?.eindpresentatieScore ?? req.body?.eindpresentatie_score ?? null;
+  const verslag = req.body?.verslag ?? null;
 
   if (!evaluationId) return fail(res, 400, "Ongeldig evaluatie-id");
   if (eindpresentatieScore !== null) {
@@ -283,6 +297,11 @@ async function calculateResult(req, res) {
     if (!evaluatie) { await conn.rollback(); return fail(res, 404, "Evaluatie niet gevonden"); }
     if (!mayActAsDocent(evaluatie, role, userId)) { await conn.rollback(); return fail(res, 403, "Alleen de gekoppelde docent of administratie kan dit doen"); }
     if (evaluatie.status === "vrijgegeven") { await conn.rollback(); return fail(res, 409, "Resultaat is al vrijgegeven"); }
+    // Berekenen kan pas nadat student en mentor hun evaluatie indienden (status klaar_voor_docent of later).
+    if (!["klaar_voor_docent", "geregistreerd", "klaar_voor_vrijgave"].includes(evaluatie.status)) {
+      await conn.rollback();
+      return fail(res, 409, "De student en de mentor moeten eerst hun evaluatie indienen");
+    }
 
     const [rows] = await conn.query(
       `SELECT cs.competentie_id, cs.score, c.gewicht_percentage
@@ -299,6 +318,28 @@ async function calculateResult(req, res) {
       return fail(res, 400, "Docent heeft nog niet alle competenties gescoord");
     }
 
+    // Story 43: de finale beoordeling vereist finale mentorinput en een gegeven eindpresentatie.
+    if (evaluatie.type === "finaal") {
+      const ontbreekt = [];
+
+      const [mentorScores] = await conn.query(
+        "SELECT COUNT(*) AS aantal FROM competentie_scores WHERE evaluatie_id = ? AND rol = 'mentor' AND ingediend = 1",
+        [evaluationId]
+      );
+      if (Number(mentorScores[0].aantal) === 0) ontbreekt.push("de finale mentorinput");
+
+      const [pres] = await conn.query(
+        "SELECT status FROM planning_momenten WHERE stagedossier_id = ? AND type = 'eindpresentatie' ORDER BY id DESC LIMIT 1",
+        [evaluatie.stagedossier_id]
+      );
+      if (pres.length === 0 || !["gegeven", "geweest"].includes(pres[0].status)) ontbreekt.push("een gegeven eindpresentatie");
+
+      if (ontbreekt.length > 0) {
+        await conn.rollback();
+        return fail(res, 409, `Het eindresultaat kan nog niet berekend worden — ontbrekend: ${ontbreekt.join(" en ")}.`);
+      }
+    }
+
     const totaalGewicht = gescoord.reduce((s, r) => s + Number(r.gewicht_percentage || 0), 0);
     if (totaalGewicht <= 0) { await conn.rollback(); return fail(res, 400, "Gewichten ontbreken op de competenties"); }
 
@@ -306,18 +347,47 @@ async function calculateResult(req, res) {
     const competentieScore = Math.round(gewogen * 100) / 100;
 
     const isFinaal = evaluatie.type === "finaal";
-    const eindcijfer = isFinaal ? Math.round(competentieScore * 4 * 100) / 100 : null;
+    // Competentiescore (1-5) omgezet naar /20.
+    const competentie20 = Math.round(competentieScore * 4 * 100) / 100;
+    // Finaal eindcijfer = 80% competenties + 20% eindpresentatie (als die gescoord is), anders enkel competenties.
+    let eindcijfer = null;
+    if (isFinaal) {
+      const presentatie = eindpresentatieScore != null
+        ? Number(eindpresentatieScore)
+        : (evaluatie.eindpresentatie_score != null ? Number(evaluatie.eindpresentatie_score) : null);
+      eindcijfer = presentatie != null
+        ? Math.round((competentie20 * 0.8 + presentatie * 0.2) * 100) / 100
+        : competentie20;
+    }
     const nieuweStatus = isFinaal ? "klaar_voor_vrijgave" : "geregistreerd";
 
     await conn.query(
       `UPDATE evaluaties
        SET competentie_score = ?, eindcijfer = ?, eindpresentatie_score = COALESCE(?, eindpresentatie_score),
+           verslag = COALESCE(?, verslag),
            status = ?, docent_geregistreerd_op = NOW(), aangepast_op = NOW()
        WHERE id = ?`,
-      [competentieScore, eindcijfer, eindpresentatieScore, nieuweStatus, evaluationId]
+      [competentieScore, eindcijfer, eindpresentatieScore, verslag, nieuweStatus, evaluationId]
     );
 
     await conn.commit();
+
+    // Tussentijds geregistreerd → student en mentor kunnen het verslag bekijken (mockup-belofte).
+    if (!isFinaal) {
+      await meld(evaluatie.student_id, {
+        titel: "Tussentijdse evaluatie geregistreerd",
+        bericht: "De docent registreerde de tussentijdse bespreking. Je kan het verslag en de feedback bekijken.",
+        aangemaaktDoorId: userId,
+        stagedossierId: evaluatie.stagedossier_id,
+      });
+      await meld(evaluatie.mentor_id, {
+        titel: "Tussentijdse evaluatie geregistreerd",
+        bericht: "De docent registreerde de tussentijdse bespreking van je stagiair.",
+        aangemaaktDoorId: userId,
+        stagedossierId: evaluatie.stagedossier_id,
+      });
+    }
+
     return ok(res, { evaluatieId: evaluationId, competentieScore, eindcijfer, status: nieuweStatus }, isFinaal ? "Eindresultaat berekend" : "Tussentijdse evaluatie geregistreerd");
   } catch (error) {
     await conn.rollback();
@@ -344,6 +414,26 @@ async function releaseResult(req, res) {
     if (!mayActAsDocent(evaluatie, role, userId)) { await conn.rollback(); return fail(res, 403, "Alleen de gekoppelde docent of administratie kan vrijgeven"); }
     if (evaluatie.status !== "klaar_voor_vrijgave") { await conn.rollback(); return fail(res, 409, "Resultaat moet eerst berekend worden voor het vrijgegeven kan worden"); }
 
+    // Finale-gating: logboek moet afgewerkt zijn en de eindpresentatie moet gegeven zijn.
+    const [openWeken] = await conn.query(
+      `SELECT COUNT(*) AS aantal FROM logboek_weken
+       WHERE stagedossier_id = ?
+         AND status IN ('ingediend', 'afgecheckt_door_mentor', 'teruggestuurd_door_mentor', 'teruggestuurd_door_docent')`,
+      [evaluatie.stagedossier_id]
+    );
+    if (openWeken[0].aantal > 0) {
+      await conn.rollback();
+      return fail(res, 409, "Er zijn nog logboekweken die niet volledig nagekeken zijn — die moeten eerst afgehandeld zijn voor je het resultaat vrijgeeft.");
+    }
+    const [pres] = await conn.query(
+      "SELECT status FROM planning_momenten WHERE stagedossier_id = ? AND type = 'eindpresentatie' ORDER BY id DESC LIMIT 1",
+      [evaluatie.stagedossier_id]
+    );
+    if (pres.length === 0 || !["gegeven", "geweest"].includes(pres[0].status)) {
+      await conn.rollback();
+      return fail(res, 409, "De eindpresentatie moet eerst gepland en gegeven zijn voor je het resultaat vrijgeeft.");
+    }
+
     await conn.query(
       "UPDATE evaluaties SET status = 'vrijgegeven', vrijgegeven_door_id = ?, vrijgegeven_op = NOW(), aangepast_op = NOW() WHERE id = ?",
       [userId, evaluationId]
@@ -364,6 +454,14 @@ async function releaseResult(req, res) {
         aangemaaktDoorId: userId,
         stagedossierId: evaluatie.stagedossier_id
       });
+      if (evaluatie.mentor_id) {
+        await meld(evaluatie.mentor_id, {
+          titel: "Eindresultaat vrijgegeven",
+          bericht: "Het eindresultaat van je stagiair is vrijgegeven.",
+          aangemaaktDoorId: userId,
+          stagedossierId: evaluatie.stagedossier_id
+        });
+      }
       const [admins] = await db.query(
         "SELECT id FROM gebruikers WHERE hoofdrol = 'administratie' AND status = 'actief'"
       );

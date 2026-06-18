@@ -3,6 +3,7 @@ const path = require("path");
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 const { meld, emailMelding } = require("../utils/notify");
+const { buildSimplePdf } = require("../utils/pdf");
 
 function getUserId(req, fallbackId) {
   return Number(req.user?.id || fallbackId);
@@ -14,41 +15,6 @@ function calculateWeeks(startdatum, einddatum) {
   const diffMs = end - start;
   const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1;
   return Math.max(1, Math.ceil(diffDays / 7));
-}
-
-function pdfEscape(value) {
-  return String(value ?? "")
-    .replace(/\\/g, "\\\\")
-    .replace(/\(/g, "\\(")
-    .replace(/\)/g, "\\)")
-    .replace(/\r?\n/g, " ");
-}
-
-function buildSimplePdf(lines) {
-  const text = lines
-    .map((line, index) => `BT /F1 11 Tf 50 ${760 - index * 18} Td (${pdfEscape(line)}) Tj ET`)
-    .join("\n");
-  const objects = [
-    "<< /Type /Catalog /Pages 2 0 R >>",
-    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-    `<< /Length ${Buffer.byteLength(text, "utf8")} >>\nstream\n${text}\nendstream`
-  ];
-
-  let pdf = "%PDF-1.4\n";
-  const offsets = [0];
-  objects.forEach((object, index) => {
-    offsets.push(Buffer.byteLength(pdf, "utf8"));
-    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`;
-  });
-  const xref = Buffer.byteLength(pdf, "utf8");
-  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
-  for (let i = 1; i < offsets.length; i += 1) {
-    pdf += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
-  }
-  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
-  return Buffer.from(pdf, "utf8");
 }
 
 async function ensureDocumentType(connection, type, naam) {
@@ -208,6 +174,16 @@ async function createInternship(req, res) {
     const aantalWeken = calculateWeeks(startdatum, einddatum);
     const totaalUren = aantalWeken * finalUrenPerWeek;
 
+    // Controle op de minimumregels van de opleiding.
+    if (stageRegel.minimum_weken && aantalWeken < Number(stageRegel.minimum_weken)) {
+      await connection.rollback();
+      return fail(res, 400, `De stageperiode moet minstens ${stageRegel.minimum_weken} weken bedragen (nu ${aantalWeken} weken).`);
+    }
+    if (stageRegel.minimum_uren && totaalUren < Number(stageRegel.minimum_uren)) {
+      await connection.rollback();
+      return fail(res, 400, `De stage moet minstens ${stageRegel.minimum_uren} uren bedragen (nu ${totaalUren} uren).`);
+    }
+
     // Als er al een concept bestaat, upgrade dat naar 'ingediend' i.p.v. nieuw aanmaken
     const [conceptRows] = await connection.query(
       "SELECT id, bedrijf_id FROM stagevoorstellen WHERE student_id = ? AND status = 'concept' ORDER BY aangemaakt_op DESC LIMIT 1",
@@ -253,6 +229,18 @@ async function createInternship(req, res) {
         [stagevoorstelId]
       );
     } else {
+      // Voorkom een tweede lopend voorstel naast een al ingediend of goedgekeurd voorstel.
+      const [actief] = await connection.query(
+        `SELECT id FROM stagevoorstellen
+         WHERE student_id = ? AND status NOT IN ('concept', 'afgekeurd', 'ingetrokken')
+         LIMIT 1`,
+        [studentId]
+      );
+      if (actief.length > 0) {
+        await connection.rollback();
+        return fail(res, 409, "Je hebt al een lopend stagevoorstel. Trek dat eerst in voor je een nieuw voorstel indient.");
+      }
+
       // Geen concept: maak alles nieuw aan
       const voorlopigeStagebegeleiderId = await getDefaultDocentId(connection);
       if (!voorlopigeStagebegeleiderId) {
@@ -616,7 +604,12 @@ async function getMyInternship(req, res) {
         b.beslissing AS laatste_beslissing,
         b.feedback AS laatste_feedback,
         b.motivering AS laatste_motivering,
-        b.beslist_op AS laatste_beslist_op
+        b.beslist_op AS laatste_beslist_op,
+
+        d.id AS dossier_id,
+        d.status AS dossier_status,
+        d.praktische_afspraken,
+        d.praktische_afspraken_gedeeld_op
       FROM stagevoorstellen sp
       JOIN stagevoorstel_versies v
         ON v.stagevoorstel_id = sp.id
@@ -691,6 +684,7 @@ async function getCommitteeApplications(req, res) {
           ORDER BY vb.beslist_op DESC
           LIMIT 1
         )
+      WHERE sp.status <> 'concept'
       ORDER BY sp.aangemaakt_op DESC
       `
     );
@@ -707,6 +701,7 @@ async function decideApplication(req, res) {
 
   const rawDecision = req.body.beslissing || req.body.decision;
   const feedback = req.body.feedback || null;
+  const onderdeel = req.body.onderdeel || null;
   const motivering = req.body.motivering || null;
   const uitzonderingMotivering = req.body.uitzonderingMotivering || req.body.uitzondering_motivering || null;
 
@@ -714,6 +709,9 @@ async function decideApplication(req, res) {
     approve: "goedgekeurd",
     approved: "goedgekeurd",
     goedgekeurd: "goedgekeurd",
+
+    goedgekeurd_met_uitzondering: "goedgekeurd_met_uitzondering",
+    approve_exception: "goedgekeurd_met_uitzondering",
 
     reject: "afgekeurd",
     rejected: "afgekeurd",
@@ -727,8 +725,21 @@ async function decideApplication(req, res) {
   const beslissing = decisionMap[rawDecision];
 
   if (!beslissing) {
-    return fail(res, 400, "Ongeldige beslissing. Gebruik goedgekeurd, afgekeurd of aanpassingen_gevraagd");
+    return fail(res, 400, "Ongeldige beslissing. Gebruik goedgekeurd, goedgekeurd_met_uitzondering, afgekeurd of aanpassingen_gevraagd");
   }
+
+  // Validaties zoals in de mockup: motivering/feedback verplicht waar nodig.
+  if (beslissing === "afgekeurd" && !motivering) {
+    return fail(res, 400, "Een motivering is verplicht bij een afkeuring");
+  }
+  if (beslissing === "goedgekeurd_met_uitzondering" && !uitzonderingMotivering) {
+    return fail(res, 400, "Een motivering is verplicht bij een goedkeuring met uitzondering");
+  }
+  if (beslissing === "aanpassingen_gevraagd" && !feedback) {
+    return fail(res, 400, "Feedback is verplicht wanneer je aanpassingen vraagt");
+  }
+
+  const isGoedkeuring = beslissing === "goedgekeurd" || beslissing === "goedgekeurd_met_uitzondering";
 
   const connection = await db.getConnection();
 
@@ -755,6 +766,25 @@ async function decideApplication(req, res) {
       return fail(res, 404, "Stagevoorstel niet gevonden");
     }
 
+    // Enkel een voorstel dat nog in beoordeling is, kan beslist worden.
+    if (!["ingediend", "heringediend"].includes(voorstel.status)) {
+      await connection.rollback();
+      return fail(res, 409, `Dit voorstel is niet meer in beoordeling (status: ${voorstel.status})`);
+    }
+
+    // Story 12/15: een gewone goedkeuring kan enkel als de checklist ingevuld is en alle verplichte criteria in orde zijn.
+    if (beslissing === "goedgekeurd") {
+      const [checklist] = await connection.query(
+        "SELECT is_verplicht, is_in_orde FROM voorstel_checklist WHERE stagevoorstel_versie_id = ?",
+        [voorstel.versie_id]
+      );
+      const verplichteNietInOrde = checklist.filter((c) => Number(c.is_verplicht) === 1 && Number(c.is_in_orde) !== 1);
+      if (checklist.length === 0 || verplichteNietInOrde.length > 0) {
+        await connection.rollback();
+        return fail(res, 400, "Vink eerst alle verplichte criteria af, of keur goed met uitzondering en motiveer waarom.");
+      }
+    }
+
     await connection.query(
       `
       INSERT INTO voorstel_beslissingen
@@ -764,11 +794,12 @@ async function decideApplication(req, res) {
         beslist_door_id,
         beslissing,
         feedback,
+        onderdeel,
         motivering,
         uitzondering_motivering,
         beslist_op
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())
       `,
       [
         stagevoorstelId,
@@ -776,6 +807,7 @@ async function decideApplication(req, res) {
         beslistDoorId,
         beslissing,
         feedback,
+        onderdeel,
         motivering,
         uitzonderingMotivering
       ]
@@ -789,7 +821,7 @@ async function decideApplication(req, res) {
 
     const updateParams = [beslissing];
 
-    if (beslissing === "goedgekeurd") {
+    if (isGoedkeuring) {
       updateSql += ", goedgekeurd_op = NOW()";
     }
 
@@ -802,7 +834,7 @@ async function decideApplication(req, res) {
 
     await connection.query(updateSql, updateParams);
 
-    if (beslissing === "goedgekeurd") {
+    if (isGoedkeuring) {
       await createDossierAfterApproval(connection, stagevoorstelId);
     }
 
@@ -812,6 +844,7 @@ async function decideApplication(req, res) {
     try {
       const berichtMap = {
         goedgekeurd: "Je stagevoorstel is goedgekeurd.",
+        goedgekeurd_met_uitzondering: "Je stagevoorstel is goedgekeurd met uitzondering.",
         afgekeurd: "Je stagevoorstel is afgekeurd.",
         aanpassingen_gevraagd: "De stagecommissie vraagt aanpassingen aan je stagevoorstel."
       };
@@ -822,6 +855,19 @@ async function decideApplication(req, res) {
         aangemaaktDoorId: beslistDoorId,
         stagevoorstelId
       });
+
+      // Bij een goedkeuring krijgt de administratie een melding zodat ze het dossier kunnen opvolgen.
+      if (isGoedkeuring) {
+        const [admins] = await db.query("SELECT id FROM gebruikers WHERE hoofdrol = 'administratie' AND status = 'actief'");
+        for (const a of admins) {
+          await meld(a.id, {
+            titel: "Nieuw goedgekeurd stagevoorstel",
+            bericht: "Een stagevoorstel is goedgekeurd; het dossier kan administratief opgevolgd worden.",
+            aangemaaktDoorId: beslistDoorId,
+            stagevoorstelId
+          });
+        }
+      }
     } catch (notifyError) {
       console.error("Melding student mislukt:", notifyError.message);
     }
@@ -919,7 +965,7 @@ async function createDossierAfterApproval(connection, stagevoorstelId) {
       aangemaakt_op,
       aangepast_op
     )
-    VALUES (?, ?, ?, ?, ?, ?, 'contract_pending', ?, ?, ?, ?, ?, ?, ?, 0, NOW(), NOW())
+    VALUES (?, ?, ?, ?, ?, ?, 'wacht_op_student', ?, ?, ?, ?, ?, ?, ?, 0, NOW(), NOW())
     `,
     [
       dossiernummer,
@@ -1192,14 +1238,25 @@ async function updateAdminDossierStatus(req, res) {
   const dossierId = Number(req.params.id);
   const { status, verzekeringInOrde, praktischeAfspraken } = req.body;
 
-  const allowedStatuses = [
-    "contract_pending",
-    "documents_pending",
-    "active",
-    "completed"
-  ];
+  // Status gelijkgetrokken naar de NL-enum van het schema. Engelse waarden worden voor de
+  // zekerheid nog vertaald, zodat een oudere frontend niet stuk gaat.
+  const statusMap = {
+    contract_pending: "wacht_op_student",
+    documents_pending: "in_controle_bij_administratie",
+    active: "geregistreerd",
+    completed: "afgerond",
+    wacht_op_student: "wacht_op_student",
+    wacht_op_bedrijf: "wacht_op_bedrijf",
+    in_controle_bij_administratie: "in_controle_bij_administratie",
+    document_afgekeurd: "document_afgekeurd",
+    geregistreerd: "geregistreerd",
+    stage_loopt: "stage_loopt",
+    resultaat_vrijgegeven: "resultaat_vrijgegeven",
+    afgerond: "afgerond"
+  };
 
-  if (!allowedStatuses.includes(status)) {
+  const nieuweStatus = statusMap[status];
+  if (!nieuweStatus) {
     return fail(res, 400, "Ongeldige dossierstatus");
   }
 
@@ -1228,7 +1285,7 @@ async function updateAdminDossierStatus(req, res) {
       WHERE id = ?
       `,
       [
-        status,
+        nieuweStatus,
         typeof verzekeringInOrde === "boolean" ? verzekeringInOrde : null,
         praktischeAfspraken || null,
         praktischeAfspraken || null,
@@ -1316,7 +1373,7 @@ async function registerDossierStartklaar(req, res) {
       return fail(res, 400, `Dossier nog niet startklaar: ${ontbrekend.join("; ")}`);
     }
 
-    await db.query("UPDATE stagedossiers SET status = 'active', aangepast_op = NOW() WHERE id = ?", [dossierId]);
+    await db.query("UPDATE stagedossiers SET status = 'geregistreerd', aangepast_op = NOW() WHERE id = ?", [dossierId]);
 
     try {
       const door = Number(req.user?.id);
@@ -1327,7 +1384,7 @@ async function registerDossierStartklaar(req, res) {
       console.error("Melding startklaar mislukt:", notifyError.message);
     }
 
-    return ok(res, { id: dossierId, status: "active" }, "Dossier geregistreerd als startklaar");
+    return ok(res, { id: dossierId, status: "geregistreerd" }, "Dossier geregistreerd als startklaar");
   } catch (error) {
     return fail(res, 500, "Registreren mislukt", error.message);
   }
@@ -1343,7 +1400,7 @@ async function generateEindoverzicht(req, res) {
     await conn.beginTransaction();
 
     const [d] = await conn.query(
-      `SELECT d.id, d.dossiernummer, d.eindresultaat, d.eindresultaat_vrijgegeven_op,
+      `SELECT d.id, d.student_id, d.stagebegeleider_id, d.dossiernummer, d.eindresultaat, d.eindresultaat_vrijgegeven_op,
               d.startdatum, d.einddatum, d.opleiding, d.academiejaar, d.totaal_uren,
               sg.voornaam AS student_voornaam, sg.achternaam AS student_achternaam, s.studentennummer,
               b.naam AS bedrijf_naam,
@@ -1423,6 +1480,17 @@ async function generateEindoverzicht(req, res) {
     );
 
     await conn.commit();
+
+    // Student en docent verwittigen dat het eindoverzicht klaarstaat.
+    try {
+      const doorId = Number(req.user?.id) || null;
+      await meld(dossier.student_id, { titel: "Eindoverzicht beschikbaar", bericht: "Het eindoverzicht van je stage staat klaar bij je documenten.", aangemaaktDoorId: doorId, stagedossierId: dossierId, documentId: docResult.insertId || null });
+      if (dossier.stagebegeleider_id) {
+        await meld(dossier.stagebegeleider_id, { titel: "Eindoverzicht gegenereerd", bericht: "Het eindoverzicht van je student is gegenereerd.", aangemaaktDoorId: doorId, stagedossierId: dossierId, documentId: docResult.insertId || null });
+      }
+    } catch (notifyError) {
+      console.error("Melding eindoverzicht mislukt:", notifyError.message);
+    }
 
     return ok(
       res,
@@ -1518,7 +1586,108 @@ async function sendContractReminder(req, res) {
   }
 }
 
+// Zoekt de id van de huidige versie van een stagevoorstel.
+async function resolveHuidigeVersieId(conn, stagevoorstelId) {
+  const [rows] = await conn.query(
+    `SELECT v.id
+     FROM stagevoorstellen sv
+     JOIN stagevoorstel_versies v
+       ON v.stagevoorstel_id = sv.id AND v.versie_nummer = sv.huidige_versie_nummer
+     WHERE sv.id = ? LIMIT 1`,
+    [stagevoorstelId]
+  );
+  return rows[0]?.id || null;
+}
+
+// GET /api/committee/applications/:id/checklist — checklist van de huidige versie ophalen.
+async function getApplicationChecklist(req, res) {
+  const voorstelId = Number(req.params.id);
+  if (!voorstelId) return fail(res, 400, "Ongeldig voorstel-id");
+
+  try {
+    const versieId = await resolveHuidigeVersieId(db, voorstelId);
+    if (!versieId) return fail(res, 404, "Voorstel of versie niet gevonden");
+
+    const [rows] = await db.query(
+      `SELECT id, criterium, is_verplicht, is_in_orde, opmerking, gecontroleerd_op
+       FROM voorstel_checklist WHERE stagevoorstel_versie_id = ? ORDER BY id ASC`,
+      [versieId]
+    );
+    return ok(res, { stagevoorstelVersieId: versieId, items: rows }, "Checklist opgehaald");
+  } catch (error) {
+    return fail(res, 500, "Checklist ophalen mislukt", error.message);
+  }
+}
+
+// PUT /api/committee/applications/:id/checklist — checklist van de huidige versie opslaan (vervangt de bestaande).
+async function saveApplicationChecklist(req, res) {
+  const voorstelId = Number(req.params.id);
+  const userId = Number(req.user?.id);
+  const items = Array.isArray(req.body?.items) ? req.body.items : [];
+
+  if (!voorstelId) return fail(res, 400, "Ongeldig voorstel-id");
+  if (items.length === 0) return fail(res, 400, "Geen checklist-items meegegeven");
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const versieId = await resolveHuidigeVersieId(conn, voorstelId);
+    if (!versieId) { await conn.rollback(); return fail(res, 404, "Voorstel of versie niet gevonden"); }
+
+    await conn.query("DELETE FROM voorstel_checklist WHERE stagevoorstel_versie_id = ?", [versieId]);
+    for (const it of items) {
+      const criterium = String(it.criterium || "").trim();
+      if (!criterium) continue;
+      await conn.query(
+        `INSERT INTO voorstel_checklist
+           (stagevoorstel_versie_id, criterium, is_verplicht, is_in_orde, opmerking, gecontroleerd_door_id, gecontroleerd_op)
+         VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+        [versieId, criterium, it.isVerplicht === false ? 0 : 1, it.isInOrde ? 1 : 0, it.opmerking || null, userId]
+      );
+    }
+
+    const [rows] = await conn.query(
+      `SELECT id, criterium, is_verplicht, is_in_orde, opmerking, gecontroleerd_op
+       FROM voorstel_checklist WHERE stagevoorstel_versie_id = ? ORDER BY id ASC`,
+      [versieId]
+    );
+    await conn.commit();
+
+    return ok(res, { stagevoorstelVersieId: versieId, items: rows }, "Checklist opgeslagen");
+  } catch (error) {
+    await conn.rollback();
+    return fail(res, 500, "Checklist opslaan mislukt", error.message);
+  } finally {
+    conn.release();
+  }
+}
+
+// GET /api/committee/applications/:id/decisions — volledige beslissingshistoriek van een voorstel.
+async function getApplicationDecisions(req, res) {
+  const voorstelId = Number(req.params.id);
+  if (!voorstelId) return fail(res, 400, "Ongeldig voorstel-id");
+
+  try {
+    const [rows] = await db.query(
+      `SELECT vb.id, vb.beslissing, vb.feedback, vb.motivering, vb.uitzondering_motivering,
+              vb.beslist_op, vb.stagevoorstel_versie_id,
+              CONCAT(g.voornaam, ' ', g.achternaam) AS beslist_door_naam
+       FROM voorstel_beslissingen vb
+       LEFT JOIN gebruikers g ON g.id = vb.beslist_door_id
+       WHERE vb.stagevoorstel_id = ?
+       ORDER BY vb.beslist_op ASC`,
+      [voorstelId]
+    );
+    return ok(res, rows, "Beslissingshistoriek opgehaald");
+  } catch (error) {
+    return fail(res, 500, "Beslissingshistoriek ophalen mislukt", error.message);
+  }
+}
+
 module.exports = {
+  getApplicationChecklist,
+  saveApplicationChecklist,
+  getApplicationDecisions,
   createInternship,
   saveDraft,
   withdrawInternship,

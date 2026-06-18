@@ -69,6 +69,7 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
   }
 
   const [docentScores, setDocentScores] = useState({ ...docentScoresBestaand });
+  const [eindpresentatieScore, setEindpresentatieScore] = useState(evaluatie?.eindpresentatie_score ?? null);
   const [bezig, setBezig]   = useState(false);
   const [melding, setMelding] = useState({ tekst: "", type: "" });
   const [vrijgaveMelding, setVrijgaveMelding] = useState({ tekst: "", type: "" });
@@ -82,6 +83,7 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
       }
     }
     setDocentScores(nieuw);
+    setEindpresentatieScore(evaluatie?.eindpresentatie_score ?? null);
     setMelding({ tekst: "", type: "" });
     setVrijgaveMelding({ tekst: "", type: "" });
   }, [evaluatie?.id]);
@@ -136,6 +138,10 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
       setMelding({ tekst: "Geef voor elke competentie een score in.", type: "s_amber" });
       return;
     }
+    if (activeType === "finaal" && !eindpresentatieScore) {
+      setMelding({ tekst: "Geef een score voor de eindpresentatie in.", type: "s_amber" });
+      return;
+    }
     // Eerst scores opslaan
     const scoresArr = competenties.map((c) => ({
       competentieId: c.id,
@@ -153,7 +159,7 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
       // Dan berekenen
       await api.post(
         `/evaluations/${evaluatie.id}/calculate`,
-        {},
+        { eindpresentatieScore: activeType === "finaal" ? eindpresentatieScore : null },
         {}
       );
       setMelding({ tekst: "Evaluatie geregistreerd!", type: "s_ok" });
@@ -236,6 +242,27 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
       {melding.tekst && (
         <div style={{ marginTop: "10px" }}>
           <span className={`status ${melding.type}`}>{melding.tekst}</span>
+        </div>
+      )}
+
+      {kanInvullen && activeType === "finaal" && (
+        <div className="form_group" style={{ marginTop: "14px" }}>
+          <label className="form_label">Eindpresentatie score (werkstuk · 20%) <span style={{ color: "var(--red)" }}>*</span></label>
+          <div className="score_knoppen">
+            {[1, 2, 3, 4, 5].map((n) => (
+              <button
+                key={n}
+                type="button"
+                className={`score_knop${eindpresentatieScore === n ? " geselecteerd" : ""}`}
+                onClick={() => setEindpresentatieScore(n)}
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+          <p style={{ fontSize: "11.5px", color: "var(--sub)", marginTop: "4px" }}>
+            Eindcijfer = (competenties × 80%) + (presentatie × 20%) × 4
+          </p>
         </div>
       )}
 

@@ -17,6 +17,7 @@ PATCH /api/internships/my/intrekken  (voorstel intrekken)
 
 ## Student / Contract & Documenten
 GET  /api/contracts/my
+GET  /api/contracts/my/pdf          (stageovereenkomst als pdf downloaden)
 POST /api/contracts/sign
 GET  /api/documents/soorten
 GET  /api/documents/my
