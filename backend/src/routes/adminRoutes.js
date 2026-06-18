@@ -9,7 +9,7 @@ const {
   sendContractReminder
 } = require("../controllers/internshipController");
 const { getSettings, updateStageRule, updateDocumentType, createDocumentType, resetDocumentTypes } = require("../controllers/settingsController");
-const { inviteMentor } = require("../controllers/userController");
+const { inviteMentor, inviteUser } = require("../controllers/userController");
 const { approveDocument, rejectDocument } = require("../controllers/documentController");
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
 
@@ -32,6 +32,7 @@ router.patch("/document-types/:id", updateDocumentType);
 router.post("/document-types/reset", resetDocumentTypes);
 
 router.post("/invitations", inviteMentor);
+router.post("/users/invite", inviteUser);
 
 router.patch("/documents/:id/approve", approveDocument);
 router.patch("/documents/:id/reject", rejectDocument);

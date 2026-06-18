@@ -361,6 +361,135 @@ async function resendInvitation(req, res) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Generieke onboarding: admin nodigt student/docent/administratie/stagecommissie uit.
+// Zelfde patroon als de mentor (uitnodiging -> activatielink -> wachtwoord), maar de
+// token leeft op `gebruikers` zodat het voor elke rol werkt. (Mentor-flow blijft ongewijzigd.)
+// ---------------------------------------------------------------------------
+const GELDIGE_INVITE_ROLLEN = ["student", "docent", "administratie", "stagecommissie"];
+
+function maakNummer(prefix, id) {
+  return `${prefix}${String(id).padStart(4, "0")}`;
+}
+
+async function inviteUser(req, res) {
+  const voornaam = String(req.body.voornaam || "").trim();
+  const achternaam = String(req.body.achternaam || "").trim();
+  const email = String(req.body.email || "").trim();
+  const rol = String(req.body.rol ?? req.body.hoofdrol ?? "").trim();
+
+  if (!voornaam || !achternaam || !email) return fail(res, 400, "Voornaam, achternaam en e-mail zijn verplicht");
+  if (!GELDIGE_INVITE_ROLLEN.includes(rol)) {
+    return fail(res, 400, `Ongeldige rol. Kies uit: ${GELDIGE_INVITE_ROLLEN.join(", ")}`);
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [dup] = await conn.query("SELECT id FROM gebruikers WHERE email = ? LIMIT 1", [email]);
+    if (dup.length > 0) { await conn.rollback(); return fail(res, 409, "Er bestaat al een gebruiker met dit e-mailadres"); }
+
+    const token = crypto.randomBytes(24).toString("hex");
+    const [u] = await conn.query(
+      `INSERT INTO gebruikers (voornaam, achternaam, email, auth_provider, hoofdrol, status,
+         uitnodiging_token, uitnodiging_status, uitnodiging_vervalt_op, aangemaakt_op, aangepast_op)
+       VALUES (?, ?, ?, 'local', ?, 'uitgenodigd', ?, 'verstuurd', DATE_ADD(NOW(), INTERVAL 14 DAY), NOW(), NOW())`,
+      [voornaam, achternaam, email, rol, token]
+    );
+    const userId = u.insertId;
+
+    // Rol-specifieke rij zodat de gebruiker meteen in de juiste lijsten verschijnt.
+    if (rol === "student") {
+      await conn.query(
+        `INSERT INTO studenten (gebruiker_id, studentennummer, opleiding, klasgroep, academiejaar) VALUES (?, ?, ?, ?, ?)`,
+        [userId, maakNummer("S", userId), req.body.opleiding || "Toegepaste Informatica",
+         req.body.klasgroep || null, req.body.academiejaar || "2025-2026"]
+      );
+    } else {
+      await conn.query(
+        `INSERT INTO medewerkers (gebruiker_id, personeelsnummer, medewerker_type, functie, dienst) VALUES (?, ?, ?, ?, ?)`,
+        [userId, maakNummer("P", userId), rol, req.body.functie || null, req.body.dienst || null]
+      );
+    }
+
+    await conn.commit();
+
+    const activatielink = `/activeren?token=${token}`;
+    await emailMelding(userId, {
+      titel: "Uitnodiging stageplatform",
+      bericht: `Je bent uitgenodigd op Stagify. Activeer je account via ${activatielink}`,
+      type: "herinnering",
+      ernst: "medium",
+      aangemaaktDoorId: Number(req.user?.id) || null
+    });
+    const volledigeLink = `${process.env.APP_URL || "http://localhost:5173"}${activatielink}`;
+    const mailResultaat = await sendMail({
+      to: email,
+      subject: "Uitnodiging — Stagify",
+      text: `Je bent uitgenodigd op Stagify.\n\nActiveer je account en kies een wachtwoord via:\n${volledigeLink}\n\nDeze link is 14 dagen geldig.`,
+      html: `<p>Je bent uitgenodigd op <strong>Stagify</strong>.</p><p>Activeer je account en kies een wachtwoord via:<br><a href="${volledigeLink}">${volledigeLink}</a></p><p>Deze link is 14 dagen geldig.</p>`
+    });
+
+    return ok(res, { userId, rol, activatielink, emailStatus: mailResultaat.sent ? "verzonden" : "geregistreerd" }, "Gebruiker uitgenodigd");
+  } catch (error) {
+    await conn.rollback();
+    if (error.code === "ER_DUP_ENTRY") return fail(res, 409, "Dubbele invoer");
+    return fail(res, 500, "Gebruiker uitnodigen mislukt", error.message);
+  } finally {
+    conn.release();
+  }
+}
+
+// Publiek: uitnodiging ophalen op token (voert de activatiepagina met naam/rol).
+async function getInvitation(req, res) {
+  const token = req.params.token || req.query.token;
+  if (!token) return fail(res, 400, "Token ontbreekt");
+  try {
+    const [rows] = await db.query(
+      `SELECT id, voornaam, achternaam, email, hoofdrol AS rol, status, uitnodiging_status, uitnodiging_vervalt_op
+       FROM gebruikers WHERE uitnodiging_token = ? LIMIT 1`,
+      [token]
+    );
+    const inv = rows[0];
+    if (!inv) return fail(res, 404, "Uitnodiging niet gevonden");
+    if (inv.uitnodiging_vervalt_op && new Date(inv.uitnodiging_vervalt_op) < new Date()) {
+      return fail(res, 410, "Uitnodiging is verlopen");
+    }
+    return ok(res, inv, "Uitnodiging opgehaald");
+  } catch (error) {
+    return fail(res, 500, "Uitnodiging ophalen mislukt", error.message);
+  }
+}
+
+// Publiek: account activeren met token + zelfgekozen wachtwoord.
+async function activateAccount(req, res) {
+  const token = req.body.token;
+  const wachtwoord = req.body.wachtwoord ?? req.body.password;
+  if (!token) return fail(res, 400, "Token ontbreekt");
+  if (!wachtwoord || String(wachtwoord).length < 8) return fail(res, 400, "Kies een wachtwoord van minstens 8 tekens");
+  try {
+    const [rows] = await db.query(
+      "SELECT id, uitnodiging_vervalt_op FROM gebruikers WHERE uitnodiging_token = ? LIMIT 1",
+      [token]
+    );
+    const u = rows[0];
+    if (!u) return fail(res, 404, "Uitnodiging niet gevonden");
+    if (u.uitnodiging_vervalt_op && new Date(u.uitnodiging_vervalt_op) < new Date()) {
+      return fail(res, 410, "Uitnodiging is verlopen");
+    }
+    await db.query(
+      `UPDATE gebruikers
+       SET status='actief', wachtwoord_hash=?, uitnodiging_token=NULL, uitnodiging_status='geactiveerd', aangepast_op=NOW()
+       WHERE id = ?`,
+      [hashLocalPassword(wachtwoord), u.id]
+    );
+    return ok(res, { userId: u.id }, "Account geactiveerd");
+  } catch (error) {
+    return fail(res, 500, "Account activeren mislukt", error.message);
+  }
+}
+
 module.exports = {
   getUsers,
   updateUser,
@@ -369,5 +498,8 @@ module.exports = {
   inviteMentor,
   resendInvitation,
   getMentorInvitation,
-  activateMentor
+  activateMentor,
+  inviteUser,
+  getInvitation,
+  activateAccount
 };

@@ -2,7 +2,16 @@
 // Vorm: base64url(payload).base64url(signature) — payload = {id, exp}.
 const crypto = require("crypto");
 
-const SECRET = process.env.AUTH_SECRET || "stagify-dev-secret-change-in-prod";
+const FALLBACK_SECRET = "stagify-dev-secret-change-in-prod";
+const SECRET = process.env.AUTH_SECRET || FALLBACK_SECRET;
+// Een publiek bekende default maakt tokens vervalsbaar. In productie weigeren we te starten;
+// in dev waarschuwen we luid zodat niemand er per ongeluk mee live gaat.
+if (SECRET === FALLBACK_SECRET) {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("AUTH_SECRET ontbreekt: zet een sterke AUTH_SECRET in de omgeving voordat je in productie start.");
+  }
+  console.warn("[WAARSCHUWING] AUTH_SECRET is niet gezet — er wordt een onveilige standaardsleutel gebruikt. Zet AUTH_SECRET in backend/.env.");
+}
 const TTL_MS = 12 * 60 * 60 * 1000; // 12 uur
 
 function sign(payloadB64) {

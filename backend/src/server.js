@@ -6,6 +6,7 @@ const fs = require("fs");
 
 const healthRoutes = require("./routes/healthRoutes");
 const authRoutes = require("./routes/authRoutes");
+const invitationRoutes = require("./routes/invitationRoutes");
 const userRoutes = require("./routes/userRoutes");
 const internshipRoutes = require("./routes/internshipRoutes");
 const committeeRoutes = require("./routes/committeeRoutes");
@@ -31,7 +32,7 @@ app.use(cors({
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "x-user-id"]
 }));
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 const UPLOADS_DIR = path.join(__dirname, "../uploads");
 app.use("/uploads", (req, res, next) => {
   const rel = req.path.replace(/^\/+/, "");
@@ -43,6 +44,7 @@ app.use("/uploads", (req, res, next) => {
 
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/invitations", invitationRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/internships", internshipRoutes);
 app.use("/api/committee", committeeRoutes);
