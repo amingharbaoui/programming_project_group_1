@@ -8,7 +8,7 @@ const {
   generateEindoverzicht,
   sendContractReminder
 } = require("../controllers/internshipController");
-const { getSettings, updateStageRule, updateDocumentType, createDocumentType, resetDocumentTypes } = require("../controllers/settingsController");
+const { getSettings, updateStageRule, updateDocumentType, createDocumentType, resetDocumentTypes, deleteDocumentType } = require("../controllers/settingsController");
 const { inviteMentor, inviteUser } = require("../controllers/userController");
 const { approveDocument, rejectDocument } = require("../controllers/documentController");
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
@@ -29,6 +29,7 @@ router.get("/settings", getSettings);
 router.patch("/stage-rules/:id", updateStageRule);
 router.post("/document-types", createDocumentType);
 router.patch("/document-types/:id", updateDocumentType);
+router.delete("/document-types/:id", deleteDocumentType);
 router.post("/document-types/reset", resetDocumentTypes);
 
 router.post("/invitations", inviteMentor);

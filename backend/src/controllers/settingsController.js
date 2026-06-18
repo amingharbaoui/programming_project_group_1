@@ -137,4 +137,21 @@ async function resetDocumentTypes(req, res) {
   }
 }
 
-module.exports = { getSettings, updateStageRule, updateDocumentType, createDocumentType, resetDocumentTypes };
+// Verwijdert een (niet-vast) documenttype. Vaste types blijven; FK in documenten wordt losgemaakt
+// (zelfde aanpak als resetDocumentTypes) zodat bestaande documenten de verwijdering niet blokkeren.
+async function deleteDocumentType(req, res) {
+  const id = Number(req.params.id);
+  if (!id) return fail(res, 400, "Ongeldig documenttype-id");
+  try {
+    const [rows] = await db.query("SELECT is_vast FROM document_soorten WHERE id = ? LIMIT 1", [id]);
+    if (rows.length === 0) return fail(res, 404, "Documenttype niet gevonden");
+    if (rows[0].is_vast) return fail(res, 409, "Een vast documenttype kan niet verwijderd worden");
+    await db.query("UPDATE documenten SET document_soort_id = NULL WHERE document_soort_id = ?", [id]);
+    await db.query("DELETE FROM document_soorten WHERE id = ?", [id]);
+    return ok(res, { id }, "Documenttype verwijderd");
+  } catch (error) {
+    return fail(res, 500, "Documenttype verwijderen mislukt", error.message);
+  }
+}
+
+module.exports = { getSettings, updateStageRule, updateDocumentType, createDocumentType, resetDocumentTypes, deleteDocumentType };
