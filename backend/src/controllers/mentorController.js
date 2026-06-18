@@ -1,6 +1,7 @@
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 const { meld } = require("../utils/notify");
+const { buildSimplePdf } = require("../utils/pdf");
 
 // GET /mentor/students
 // Geeft alle studenten terug die gekoppeld zijn aan de ingelogde mentor via stagedossiers.
@@ -219,10 +220,71 @@ async function updateAfspraken(req, res) {
   }
 }
 
+// GET /mentor/contract/:dossierId/pdf — mentor downloadt de stageovereenkomst als PDF (story 28).
+async function downloadMentorContractPdf(req, res) {
+  const mentorId = Number(req.user?.id);
+  const dossierId = Number(req.params.dossierId);
+
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT
+        so.status, so.student_getekend_op, so.bedrijf_getekend_op, so.opleiding_getekend_op,
+        d.dossiernummer, d.startdatum, d.einddatum,
+        CONCAT(gs.voornaam, ' ', gs.achternaam) AS student_naam,
+        b.naam AS bedrijf_naam,
+        CONCAT(gm.voornaam, ' ', gm.achternaam) AS mentor_naam,
+        CONCAT(gdoc.voornaam, ' ', gdoc.achternaam) AS docent_naam
+      FROM stageovereenkomsten so
+      JOIN stagedossiers d ON d.id = so.stagedossier_id
+      JOIN gebruikers gs ON gs.id = d.student_id
+      JOIN bedrijven b ON b.id = d.bedrijf_id
+      LEFT JOIN gebruikers gm ON gm.id = d.mentor_id
+      LEFT JOIN gebruikers gdoc ON gdoc.id = d.stagebegeleider_id
+      WHERE so.stagedossier_id = ? AND d.mentor_id = ?
+      LIMIT 1
+      `,
+      [dossierId, mentorId]
+    );
+
+    const c = rows[0];
+    if (!c) return fail(res, 403, "Geen toegang tot dit dossier of geen overeenkomst gevonden");
+
+    const tekenStatus = (op) => (op ? `Getekend op ${String(op).slice(0, 10)}` : "Nog niet getekend");
+    const lines = [
+      "Stageovereenkomst",
+      `Dossier: ${c.dossiernummer || "-"}`,
+      `Status: ${c.status || "-"}`,
+      "",
+      `Student: ${c.student_naam || "-"}`,
+      `Bedrijf: ${c.bedrijf_naam || "-"}`,
+      `Mentor: ${c.mentor_naam || "-"}`,
+      `Stagebegeleider: ${c.docent_naam || "-"}`,
+      `Periode: ${c.startdatum ? String(c.startdatum).slice(0, 10) : "-"} tot ${c.einddatum ? String(c.einddatum).slice(0, 10) : "-"}`,
+      "",
+      "Handtekeningen:",
+      `  Student: ${tekenStatus(c.student_getekend_op)}`,
+      `  Bedrijf: ${tekenStatus(c.bedrijf_getekend_op)}`,
+      `  Opleiding: ${tekenStatus(c.opleiding_getekend_op)}`,
+      "",
+      `Gegenereerd op: ${new Date().toISOString().slice(0, 10)}`
+    ];
+
+    const pdf = buildSimplePdf(lines);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="stageovereenkomst-${c.dossiernummer || dossierId}.pdf"`);
+    return res.send(pdf);
+  } catch (err) {
+    console.error("downloadMentorContractPdf error:", err);
+    return fail(res, 500, "Overeenkomst-PDF genereren mislukt");
+  }
+}
+
 module.exports = {
   getMentorStudents,
   getMentorContract,
   tekenContract,
+  downloadMentorContractPdf,
   getAfspraken,
   updateAfspraken,
 };

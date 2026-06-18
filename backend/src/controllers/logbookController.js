@@ -492,7 +492,7 @@ async function mentorCheckLogbookWeek(req, res) {
 
   try {
     const [existing] = await connection.query(
-      "SELECT id FROM logboek_weken WHERE id = ? LIMIT 1",
+      "SELECT id, status FROM logboek_weken WHERE id = ? LIMIT 1",
       [weekId]
     );
 
@@ -510,6 +510,11 @@ async function mentorCheckLogbookWeek(req, res) {
     );
     if (Number(mentorKoppeling[0]?.mentor_id) !== requestedMentorId) {
       return fail(res, 403, "Je bent niet de mentor van deze stagiair");
+    }
+
+    // Alleen een ingediende week kan nagekeken worden — een ontbrekende of al afgesloten week niet.
+    if (existing[0].status !== "ingediend") {
+      return fail(res, 409, `Een week met status '${existing[0].status}' kan niet nagekeken worden; enkel ingediende weken.`);
     }
 
     const validMentorId = await getValidMentorIdForWeek(connection, weekId, requestedMentorId);
@@ -651,7 +656,7 @@ async function docentReviewLogbookWeek(req, res) {
 
 async function studentAntwoordFeedback(req, res) {
   const weekId   = Number(req.params.weekId);
-  const studentId = Number(req.headers["x-user-id"] || 1);
+  const studentId = getUserId(req, 1);
   const { antwoord } = req.body;
 
   if (!antwoord || !antwoord.trim()) {
@@ -659,9 +664,10 @@ async function studentAntwoordFeedback(req, res) {
   }
 
   try {
-    // Controleer of deze week bij de student hoort
+    // Controleer of deze week bij de student hoort + haal mentor/docent op voor de melding.
     const [rows] = await db.query(
-      `SELECT lw.id FROM logboek_weken lw
+      `SELECT lw.id, lw.week_nummer, d.mentor_id, d.stagebegeleider_id
+       FROM logboek_weken lw
        JOIN stagedossiers d ON d.id = lw.stagedossier_id
        WHERE lw.id = ? AND d.student_id = ? LIMIT 1`,
       [weekId, studentId]
@@ -672,6 +678,19 @@ async function studentAntwoordFeedback(req, res) {
       "UPDATE logboek_weken SET student_antwoord = ?, aangepast_op = NOW() WHERE id = ?",
       [antwoord.trim(), weekId]
     );
+
+    // Mentor (en docent) verwittigen dat de student gereageerd heeft op de feedback.
+    try {
+      const bericht = `De student heeft gereageerd op de feedback van logboekweek ${rows[0].week_nummer}.`;
+      if (rows[0].mentor_id) {
+        await meld(rows[0].mentor_id, { titel: "Antwoord op logboekfeedback", bericht, aangemaaktDoorId: studentId, logboekWeekId: weekId });
+      }
+      if (rows[0].stagebegeleider_id) {
+        await meld(rows[0].stagebegeleider_id, { titel: "Antwoord op logboekfeedback", bericht, aangemaaktDoorId: studentId, logboekWeekId: weekId });
+      }
+    } catch (notifyError) {
+      console.error("Melding studentantwoord mislukt:", notifyError.message);
+    }
 
     return ok(res, { weekId }, "Antwoord opgeslagen");
   } catch (err) {

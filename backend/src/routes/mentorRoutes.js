@@ -3,6 +3,7 @@ const {
   getMentorStudents,
   getMentorContract,
   tekenContract,
+  downloadMentorContractPdf,
   getAfspraken,
   updateAfspraken,
 } = require("../controllers/mentorController");
@@ -38,6 +39,7 @@ router.patch("/logbooks/:weekId/check", mentorCheckLogbookWeek);
 
 // Contract (story 28)
 router.get("/contract/:dossierId", getMentorContract);
+router.get("/contract/:dossierId/pdf", downloadMentorContractPdf);
 router.patch("/contract/:dossierId/teken", tekenContract);
 
 // Praktische afspraken (story 29)

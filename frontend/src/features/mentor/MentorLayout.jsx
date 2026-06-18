@@ -6,6 +6,9 @@ import { ROLES } from "../../constants/roles";
 
 const NAV = [
   { to: "/mentor/students", icon: "ti-users", label: "Mijn stagiairs" },
+  { to: "/mentor/contract", icon: "ti-file-certificate", label: "Overeenkomst" },
+  { to: "/mentor/afspraken", icon: "ti-clipboard-text", label: "Afspraken" },
+  { to: "/mentor/planning", icon: "ti-calendar", label: "Bedrijfsbezoek" },
   { to: "/mentor/logbooks", icon: "ti-notebook", label: "Logboek" },
   { to: "/mentor/evaluation", icon: "ti-clipboard-check", label: "Evaluatie" },
 ];

@@ -128,7 +128,7 @@ export default function MentorDossierPage() {
   async function tekenContract() {
     try {
       setBezigTeken(true);
-      await api.patch(`/mentor/contract/${dossierId}/teken`, {}, H);
+      await api.patch(`/mentor/contract/${dossierId}/teken`, { tekenbevoegd: true }, H);
       await herlaad();
       setMelding({ tekst: "Stageovereenkomst ondertekend.", type: "s-ok" });
     } catch (err) {

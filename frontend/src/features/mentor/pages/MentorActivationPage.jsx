@@ -40,16 +40,16 @@ export default function MentorActivationPage() {
 
   async function handleActiveer() {
     setFout("");
-    if (!code.trim() || ww1.length < 8 || ww1 !== ww2) {
-      setFout("Vul de code in en kies tweemaal hetzelfde wachtwoord (min. 8 tekens).");
+    if (ww1.length < 8 || ww1 !== ww2) {
+      setFout("Kies tweemaal hetzelfde wachtwoord (min. 8 tekens).");
       return;
     }
     try {
       setBezig(true);
-      await api.post("/mentor/activate", { token, code: code.trim(), wachtwoord: ww1 });
+      await api.post("/mentor/activate", { token, wachtwoord: ww1 });
       setGelukt(true);
     } catch (err) {
-      setFout(err.response?.data?.message || "Activatie mislukt. Controleer de code en probeer opnieuw.");
+      setFout(err.response?.data?.message || "Activatie mislukt. Probeer opnieuw.");
     } finally {
       setBezig(false);
     }
@@ -100,8 +100,8 @@ export default function MentorActivationPage() {
             }}>
               <i className="ti ti-mail" style={{ marginRight: "5px", color: "var(--red)" }} />
               Je opent deze pagina via de link in je uitnodigingsmail. Je werd door de opleiding
-              geregistreerd als <b>mentor van {mentorInfo.stagiair_naam}</b> &mdash; kies een
-              wachtwoord en bevestig met de code uit de e-mail.
+              geregistreerd als <b>stagementor{mentorInfo.bedrijf_naam ? ` bij ${mentorInfo.bedrijf_naam}` : ""}</b> &mdash;
+              kies hieronder een wachtwoord om je account te activeren.
             </div>
 
             <div className="form_group">
@@ -112,20 +112,6 @@ export default function MentorActivationPage() {
                 value={mentorInfo.email}
                 disabled
                 style={{ background: "var(--muted)", color: "var(--sub)" }}
-              />
-            </div>
-
-            <div className="form_group">
-              <label className="form_label">
-                Verificatiecode (uit de e-mail) <span style={{ color: "var(--red)" }}>*</span>
-              </label>
-              <input
-                className="form_input"
-                type="text"
-                placeholder="bv. 482913"
-                maxLength={6}
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
               />
             </div>
 

@@ -103,6 +103,19 @@ export default function MentorLogbooksPage() {
     }
   }
 
+  async function confirmDag(dayId) {
+    try {
+      setActionLoadingId(`dag-${dayId}`);
+      await api.patch(`/mentor/logbooks/days/${dayId}/confirm`, {}, { headers: { "x-user-id": String(user.id) } });
+      const res = await api.get(`/mentor/logbooks/${detailId}`, { headers: { "x-user-id": String(user.id) } });
+      setWeeks(res.data.data || []);
+    } catch (err) {
+      alert(err.response?.data?.message || "Dag bevestigen mislukt");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
   const detailStudent = studenten.find((s) => s.id === detailId);
 
   // ─── TABEL ───
@@ -196,12 +209,28 @@ export default function MentorLogbooksPage() {
                     </div>
                     {d.uitgevoerde_taken && <div className="e-veld"><b>Taken</b><span style={{ flex: 1 }}>{d.uitgevoerde_taken}</span></div>}
                     {d.reflectie && <div className="e-veld"><b>Reflectie</b><span style={{ flex: 1 }}>{d.reflectie}</span></div>}
+                    {d.status !== "geen_stagedag" && (
+                      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
+                        {d.mentor_bevestigd_op ? (
+                          <span className="status s-ok"><i className="ti ti-check" />Dag bevestigd</span>
+                        ) : (
+                          <button className="btn sm" disabled={actionLoadingId === `dag-${d.id}`} onClick={() => confirmDag(d.id)}>
+                            <i className="ti ti-check" />Dag bevestigen
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
 
-                {week.mentor_feedback && (
+                {(week.mentor_feedback || week.student_antwoord) && (
                   <div className="comment-thread">
-                    <div className="comment"><div className="wie">Jouw feedback</div><div className="wat">{week.mentor_feedback}</div></div>
+                    {week.mentor_feedback && (
+                      <div className="comment"><div className="wie">Jouw feedback</div><div className="wat">{week.mentor_feedback}</div></div>
+                    )}
+                    {week.student_antwoord && (
+                      <div className="comment"><div className="wie">Antwoord student</div><div className="wat">{week.student_antwoord}</div></div>
+                    )}
                   </div>
                 )}
 

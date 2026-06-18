@@ -207,6 +207,20 @@ export default function MentorEvaluationPage() {
           </div>
         </div>
 
+        {/* Resultaatkaart — enkel zichtbaar nadat de docent het eindresultaat heeft vrijgegeven (story 34) */}
+        {finaalEval?.status === "vrijgegeven" && (
+          <div className="card" style={{ marginTop: 14, borderLeft: "3px solid var(--green, #16a34a)" }}>
+            <div className="card_title"><i className="ti ti-trophy" /> Eindresultaat vrijgegeven</div>
+            <div className="kv"><span className="k">Eindcijfer</span><span className="v"><b>{finaalEval.eindcijfer != null ? `${Number(finaalEval.eindcijfer).toFixed(1)}/20` : "-"}</b></span></div>
+            {finaalEval.competentie_score != null && (
+              <div className="kv"><span className="k">Competentiescore</span><span className="v">{Number(finaalEval.competentie_score).toFixed(1)}/5</span></div>
+            )}
+            {finaalEval.verslag && (
+              <div className="kv"><span className="k">Eindfeedback</span><span className="v">{finaalEval.verslag}</span></div>
+            )}
+          </div>
+        )}
+
         {loadingEval && <div className="card"><p style={{ color: "var(--sub)", fontSize: 13 }}>Evaluatie laden…</p></div>}
 
         {!loadingEval && evalData && (

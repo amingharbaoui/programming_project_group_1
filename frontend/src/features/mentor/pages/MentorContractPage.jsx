@@ -86,7 +86,7 @@ export default function MentorContractPage() {
       setMelding("");
       await api.patch(
         `/mentor/contract/${geselecteerdDossier}/teken`,
-        {},
+        { tekenbevoegd: true },
         { headers: { "x-user-id": String(user.id) } }
       );
       // Herlaad contract
@@ -99,6 +99,26 @@ export default function MentorContractPage() {
       setMelding(err.response?.data?.message || "Tekenen mislukt");
     } finally {
       setBezig(false);
+    }
+  }
+
+  async function handleDownloadPdf() {
+    if (!geselecteerdDossier) return;
+    try {
+      const res = await api.get(`/mentor/contract/${geselecteerdDossier}/pdf`, {
+        responseType: "blob",
+        headers: { "x-user-id": String(user.id) },
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "stageovereenkomst.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setMelding(err.response?.data?.message || "PDF downloaden mislukt");
     }
   }
 
@@ -183,6 +203,12 @@ export default function MentorContractPage() {
             <span className="v">{contract.versie_nummer || 1}</span>
           </div>
 
+          <div className="actions" style={{ marginTop: "12px" }}>
+            <button className="btn sm" onClick={handleDownloadPdf}>
+              <i className="ti ti-download" /> PDF downloaden
+            </button>
+          </div>
+
           {melding && (
             <div style={{ marginTop: "12px" }}>
               <span className="status s_ok">{melding}</span>
@@ -200,7 +226,7 @@ export default function MentorContractPage() {
                   disabled={bezig}
                 />
                 <span style={{ fontSize: "13px" }}>
-                  Ik bevestig dat ik de stageovereenkomst gelezen en goedgekeurd heb
+                  Ik ben tekenbevoegd en bevestig dat ik de stageovereenkomst gelezen en goedgekeurd heb
                 </span>
               </label>
               {bezig && <span className="muted">Verwerken...</span>}
