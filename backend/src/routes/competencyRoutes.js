@@ -26,5 +26,4 @@ router.post("/profiles/:id/duplicate", requireRole("administratie"), duplicatePr
 router.patch("/profiles/:id/archive", requireRole("administratie"), archiveProfile);
 router.patch("/:id", requireRole("administratie"), updateCompetency);
 router.delete("/:id", requireRole("administratie"), deleteCompetency);
-
 module.exports = router;

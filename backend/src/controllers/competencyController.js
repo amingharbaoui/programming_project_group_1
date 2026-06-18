@@ -291,7 +291,10 @@ async function createNewVersion(req, res) {
   } catch (error) {
     await conn.rollback();
     return fail(res, 500, "Reset mislukt", error.message);
-
+  } finally {
+    conn.release();
+  }
+}
 
 // Maakt een nieuwe (concept-)versie van een profiel met een kopie van alle competenties.
 // Wordt gebruikt door "Nieuwe versie maken" en "Dupliceren".

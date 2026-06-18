@@ -105,8 +105,9 @@
 	padding: 10px 16px;
 	font-size: 12px;
 	color: var(--sub);
-	border-bottom: 1px solid var(--border);
 	cursor: pointer;
 }
 .pp-rij:hover { background: var(--muted); color: var(--dark); }
+.pp-rij--static { cursor: default; }
+.pp-rij--static:hover { background: none; color: var(--sub); }
 .pp-rij i { font-size: 15px; }
