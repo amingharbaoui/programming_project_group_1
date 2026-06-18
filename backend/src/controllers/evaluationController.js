@@ -244,6 +244,16 @@ async function saveScores(req, res) {
             stagedossierId: evaluatie.stagedossier_id
           });
         }
+        // Als de student als laatste indient en de evaluatie daardoor klaar staat voor de docent,
+        // moet ook de docent verwittigd worden (anders mist die de melding).
+        if (role === "student" && nieuweStatus === "klaar_voor_docent" && evaluatie.stagebegeleider_id) {
+          await meld(evaluatie.stagebegeleider_id, {
+            titel: "Evaluatie klaar voor docent",
+            bericht: "Student en mentor hebben de evaluatie ingevuld.",
+            aangemaaktDoorId: userId,
+            stagedossierId: evaluatie.stagedossier_id
+          });
+        }
         if (role === "mentor" && evaluatie.stagebegeleider_id) {
           await meld(evaluatie.stagebegeleider_id, {
             titel: "Evaluatie klaar voor docent",

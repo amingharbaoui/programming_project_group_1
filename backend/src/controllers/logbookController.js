@@ -29,6 +29,35 @@ function sumHours(days) {
   return days.reduce((total, day) => total + Number(day.aantalUren || day.aantal_uren || 0), 0);
 }
 
+// Tz-veilige kalenderdatum-helpers (geen lokale-tijd-drift).
+function parseDatumUTC(value) {
+  const [y, m, d] = String(value).slice(0, 10).split("-").map(Number);
+  return new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+}
+function formatDatumUTC(dt) {
+  return dt.toISOString().slice(0, 10);
+}
+
+// Geeft de verplichte werkdagen (ma–vr) terug die ontbreken of nog niet bevestigd zijn (Story 8).
+function ontbrekendeVerplichteDagen(weekStart, weekEinde, dagen) {
+  const statusPerDatum = new Map();
+  for (const d of dagen) {
+    const key = String(d.datum || "").slice(0, 10);
+    if (key) statusPerDatum.set(key, String(d.status || "").trim());
+  }
+  const ontbrekend = [];
+  const start = parseDatumUTC(weekStart);
+  const eind = parseDatumUTC(weekEinde);
+  for (let dt = new Date(start); dt <= eind; dt.setUTCDate(dt.getUTCDate() + 1)) {
+    const dow = dt.getUTCDay(); // 0 = zo, 6 = za
+    if (dow === 0 || dow === 6) continue; // weekend is niet verplicht
+    const key = formatDatumUTC(dt);
+    const status = statusPerDatum.get(key);
+    if (!status || status === "concept") ontbrekend.push(key);
+  }
+  return ontbrekend;
+}
+
 async function findLatestDossierForStudent(connection, studentId) {
   const [rows] = await connection.query(
     `
@@ -47,7 +76,7 @@ async function findLatestDossierForStudent(connection, studentId) {
 async function getDossierMeta(connection, dossierId) {
   const [rows] = await connection.query(
     `
-    SELECT id, student_id, mentor_id, stagebegeleider_id
+    SELECT id, student_id, mentor_id, stagebegeleider_id, status
     FROM stagedossiers
     WHERE id = ?
     LIMIT 1
@@ -169,6 +198,16 @@ async function createLogbook(req, res) {
     }
   }
 
+  // Een week kan niet ingediend worden met ontbrekende/niet-bevestigde verplichte werkdagen (Story 8).
+  const ontbrekend = ontbrekendeVerplichteDagen(finalWeekStart, finalWeekEinde, finalDays);
+  if (ontbrekend.length > 0) {
+    return fail(
+      res,
+      400,
+      `Niet alle verplichte werkdagen zijn ingevuld of als geen-stagedag gemarkeerd: ${ontbrekend.join(", ")}`
+    );
+  }
+
   const connection = await db.getConnection();
 
   try {
@@ -205,6 +244,13 @@ async function createLogbook(req, res) {
     if (!ovk[0] || !ovk[0].student_getekend_op) {
       await connection.rollback();
       return fail(res, 409, "Je kan pas een logboek indienen nadat je de stageovereenkomst getekend hebt");
+    }
+
+    // Logboek opent pas zodra het dossier startklaar/geregistreerd is — niet tijdens de contract-/controlefase (Story 7 gate).
+    const teVroeg = ["wacht_op_student", "wacht_op_bedrijf", "in_controle_bij_administratie", "document_afgekeurd"];
+    if (teVroeg.includes(dossier.status)) {
+      await connection.rollback();
+      return fail(res, 409, "Je kan pas een logboek indienen zodra je stagedossier startklaar geregistreerd is");
     }
 
     const totaalUren = sumHours(finalDays);
@@ -334,6 +380,21 @@ async function createLogbook(req, res) {
     }
 
     await connection.commit();
+
+    // Mentor verwittigen van de ingediende logboekweek (Story 8).
+    try {
+      if (dossier.mentor_id) {
+        await meld(dossier.mentor_id, {
+          titel: "Logboekweek ingediend",
+          bericht: `Een stagiair heeft logboekweek ${finalWeekNummer} ingediend.`,
+          aangemaaktDoorId: studentId,
+          stagedossierId: dossierId,
+          logboekWeekId: weekId
+        });
+      }
+    } catch (notifyError) {
+      console.error("Melding logboek-indiening mislukt:", notifyError.message);
+    }
 
     return ok(
       res,

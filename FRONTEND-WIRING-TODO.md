@@ -84,3 +84,23 @@ de statische `/uploads`-handler in `server.js` serveert geen subpaden — contro
 
 ## ℹ️ Kleinere/cosmetische punten
 - Story 44 gebruikt `window.confirm` i.p.v. een echte bevestigingsmodal (functioneel gelijkwaardig).
+
+---
+
+# Cross-user verificatie (tegen Stagify-FLOWS-VOLLEDIG.md)
+
+## ✅ Gefixt in deze ronde
+- **Week indienen** dwingt nu server-side af dat alle verplichte werkdagen ingevuld/geen-stagedag zijn (was client-only — regressie hersteld).
+- **Melding "logboekweek ingediend → mentor"** opnieuw toegevoegd (was verloren bij de forward-port).
+- **Logboek-gate**: indienen kan pas zodra het dossier voorbij de contract-/controlefase is (blokkeert `wacht_op_student/_bedrijf/in_controle/document_afgekeurd`).
+- **Docent-melding tussentijdse/finale evaluatie**: docent wordt nu ook verwittigd wanneer de **student als laatste** indient en de evaluatie daardoor `klaar_voor_docent` wordt.
+
+## ℹ️ Bewust niet gewijzigd (consistent of bewuste keuze)
+- `decideApplication` weigert `aanpassingen_gevraagd`: dit is **correct** per de flow (student herindient eerst → `heringediend`). De commissie-UI toont de beslis-knoppen ook enkel bij `ingediend`/`heringediend` (`isBeslis`), dus geen 409-mismatch.
+- Eindcijfer-maskering, vrijgave-gating, handtekeningvolgorde, mentor→docent-logboekvolgorde: allemaal correct server-side afgedwongen.
+
+## ⚠️ Resterend (klein / latere ronde)
+- Geen generieke **audit-log** bij begeleider-koppeling (`assignDossier`) en eindoverzicht-generatie (enkel timestamp + meldingen).
+- "Dubbele actieve mentor-uitnodiging" leunt op e-mailuniciteit i.p.v. een expliciete uitnodiging-statuscheck.
+- Eindpresentatie "gegeven" stuurt een generieke "Planning bijgewerkt"-melding i.p.v. een specifieke.
+- **App-breed:** auth is een `x-user-id`-demostub (geen wachtwoord/sessie). Alle cross-user beveiliging steunt op de per-controller ownership-checks (die zijn correct). Echte authenticatie = aparte app-brede taak.
