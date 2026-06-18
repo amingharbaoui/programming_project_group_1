@@ -32,9 +32,9 @@ router.get("/proposals", getDocentProposals);
 router.get("/proposals/:id", getDocentProposalById);
 
 // Logboeken (stories 39, 40)
+router.get("/logbooks/missing", getMissingLogbooksForDocent);
 router.get("/logbooks/:studentId", getLogbooksByStudent);
 router.patch("/logbooks/:weekId/review", docentReviewLogbookWeek);
-router.get("/logbooks/missing", getMissingLogbooksForDocent);
 router.post("/logbooks/:studentId/remind", sendMissingLogbookReminder);
 
 // Planning (stories 38, 42)

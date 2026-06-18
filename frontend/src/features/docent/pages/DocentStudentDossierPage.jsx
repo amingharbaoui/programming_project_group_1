@@ -10,11 +10,10 @@ function formatDate(val) {
 
 function getStatusClass(status) {
   if (!status) return "s_grijs";
-  if (status === "goedgekeurd" || status === "actief" || status === "getekend" || status === "goedgekeurd_door_docent" || status === "stage_loopt") return "s_ok";
+  if (status === "goedgekeurd" || status === "actief" || status === "getekend_door_student" || status === "volledig_ondertekend" || status === "geregistreerd" || status === "goedgekeurd_door_docent" || status === "stage_loopt" || status === "afgerond") return "s_ok";
   if (status === "ingediend" || status === "in_behandeling" || status === "afgecheckt_door_mentor") return "s_info";
-  if (status === "afgekeurd" || status?.includes("teruggestuurd")) return "s_rood";
-  if (status === "in_aanvraag" || status === "aangevraagd") return "s_amber";
-  return "s_grijs";
+  if (status === "afgekeurd" || (status && status.includes("teruggestuurd"))) return "s_rood";
+  return "s_amber";
 }
 
 export default function DocentStudentDossierPage() {
@@ -22,7 +21,7 @@ export default function DocentStudentDossierPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const [dossier, setDossier] = useState(null);
+  const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -33,7 +32,7 @@ export default function DocentStudentDossierPage() {
       const res = await api.get("/docent/students/" + dossierId + "/dossier", {
         headers: { "x-user-id": String(user.id) },
       });
-      setDossier(res.data.data);
+      setData(res.data.data);
     } catch (err) {
       setError(err.response?.data?.message || "Dossier ophalen mislukt");
     } finally {
@@ -43,7 +42,14 @@ export default function DocentStudentDossierPage() {
 
   useEffect(() => {
     loadDossier();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dossierId]);
+
+  const d = data?.dossier || null;
+  const overeenkomst = data?.stageovereenkomst || null;
+  const documenten = data?.documenten || [];
+  const logboeken = data?.logboeken || [];
+  const evaluaties = data?.evaluaties || [];
 
   return (
     <div className="page_inner">
@@ -53,118 +59,86 @@ export default function DocentStudentDossierPage() {
             <i className="ti ti-arrow-left" /> Terug
           </button>
           <h1>Studentdossier</h1>
-          <p>Volledig overzicht van stage, contract, logboeken en evaluaties.</p>
+          <p>Volledig overzicht van stage, contract, documenten, logboeken en evaluaties (read-only).</p>
         </div>
         <button className="btn sm" onClick={loadDossier}>Vernieuwen</button>
       </div>
 
-      {loading && (
-        <div className="card"><p className="muted">Dossier laden...</p></div>
-      )}
+      {loading && <div className="card"><p className="muted">Dossier laden...</p></div>}
+      {error && <div className="card"><span className="status s_rood">{error}</span></div>}
 
-      {error && (
-        <div className="card"><span className="status s_rood">{error}</span></div>
-      )}
-
-      {!loading && !error && dossier && (
+      {!loading && !error && d && (
         <>
-          {/* Student + Bedrijf */}
+          {/* Snelle links */}
+          <div className="card" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="btn sm" onClick={() => navigate(`/docent/logbooks?student=${d.student_id}`)}><i className="ti ti-notebook" /> Logboek</button>
+            <button className="btn sm" onClick={() => navigate(`/docent/evaluation?student=${d.student_id}`)}><i className="ti ti-clipboard-check" /> Evaluatie</button>
+            <button className="btn sm" onClick={() => navigate("/docent/planning")}><i className="ti ti-calendar" /> Planning</button>
+          </div>
+
+          {/* Student */}
           <div className="card">
             <div className="card_title">Student</div>
-            <div className="kv">
-              <span className="k">Naam</span>
-              <span className="v">{dossier.student_voornaam} {dossier.student_achternaam}</span>
-            </div>
-            <div className="kv">
-              <span className="k">Studentnummer</span>
-              <span className="v">{dossier.studentennummer || "-"}</span>
-            </div>
-            <div className="kv">
-              <span className="k">Opleiding</span>
-              <span className="v">{dossier.opleiding || "-"}</span>
-            </div>
-            <div className="kv">
-              <span className="k">Academiejaar</span>
-              <span className="v">{dossier.academiejaar || "-"}</span>
-            </div>
-            <div className="kv">
-              <span className="k">Dossierstatus</span>
-              <span className={"status " + getStatusClass(dossier.dossier_status)}>
-                {dossier.dossier_status || "-"}
-              </span>
-            </div>
+            <div className="kv"><span className="k">Naam</span><span className="v">{d.student_naam || "-"}</span></div>
+            <div className="kv"><span className="k">Studentnummer</span><span className="v">{d.studentennummer || "-"}</span></div>
+            <div className="kv"><span className="k">Opleiding</span><span className="v">{d.opleiding || "-"}</span></div>
+            <div className="kv"><span className="k">Academiejaar</span><span className="v">{d.academiejaar || "-"}</span></div>
+            <div className="kv"><span className="k">Dossierstatus</span><span className={"status " + getStatusClass(d.status)}>{d.status || "-"}</span></div>
           </div>
 
           {/* Bedrijf + Mentor */}
           <div className="card">
             <div className="card_title">Bedrijf &amp; Mentor</div>
-            <div className="kv">
-              <span className="k">Bedrijf</span>
-              <span className="v">{dossier.bedrijf_naam || "-"}</span>
-            </div>
-            <div className="kv">
-              <span className="k">Adres</span>
-              <span className="v">{dossier.bedrijf_adres || "-"}</span>
-            </div>
-            <div className="kv">
-              <span className="k">Mentor</span>
-              <span className="v">
-                {dossier.mentor_voornaam ? dossier.mentor_voornaam + " " + dossier.mentor_achternaam : "-"}
-              </span>
-            </div>
-            <div className="kv">
-              <span className="k">Startdatum</span>
-              <span className="v">{formatDate(dossier.startdatum)}</span>
-            </div>
-            <div className="kv">
-              <span className="k">Einddatum</span>
-              <span className="v">{formatDate(dossier.einddatum)}</span>
-            </div>
+            <div className="kv"><span className="k">Bedrijf</span><span className="v">{d.bedrijf_naam || "-"}</span></div>
+            <div className="kv"><span className="k">Adres</span><span className="v">{d.bedrijf_adres || "-"}</span></div>
+            <div className="kv"><span className="k">Mentor</span><span className="v">{d.mentor_naam || "-"}</span></div>
+            <div className="kv"><span className="k">Periode</span><span className="v">{formatDate(d.startdatum)} – {formatDate(d.einddatum)}</span></div>
           </div>
 
           {/* Contract */}
           <div className="card">
-            <div className="card_title">Contract</div>
-            <div className="kv">
-              <span className="k">Status</span>
-              <span className={"status " + getStatusClass(dossier.contract_status)}>
-                {dossier.contract_status || "Niet beschikbaar"}
-              </span>
-            </div>
-            {dossier.contract_getekend_op && (
-              <div className="kv">
-                <span className="k">Getekend op</span>
-                <span className="v">{formatDate(dossier.contract_getekend_op)}</span>
-              </div>
+            <div className="card_title">Stageovereenkomst</div>
+            <div className="kv"><span className="k">Status</span><span className={"status " + getStatusClass(overeenkomst?.status)}>{overeenkomst?.status || "Niet beschikbaar"}</span></div>
+            <div className="kv"><span className="k">Student getekend</span><span className="v">{formatDate(overeenkomst?.student_getekend_op)}</span></div>
+            <div className="kv"><span className="k">Bedrijf getekend</span><span className="v">{formatDate(overeenkomst?.bedrijf_getekend_op)}</span></div>
+          </div>
+
+          {/* Documenten */}
+          <div className="card">
+            <div className="card_title">Documenten</div>
+            {documenten.length === 0 ? (
+              <p className="muted">Geen documenten gevonden.</p>
+            ) : (
+              <table className="tbl">
+                <thead><tr><th>Document</th><th>Versie</th><th>Status</th></tr></thead>
+                <tbody>
+                  {documenten.map((doc) => (
+                    <tr key={doc.id}>
+                      <td>{doc.documenttype || doc.bestand_naam || "-"}</td>
+                      <td>{doc.versie_nummer || 1}</td>
+                      <td><span className={"status " + getStatusClass(doc.status)}>{doc.status || "-"}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
 
           {/* Logboeken */}
           <div className="card">
             <div className="card_title">Logboeken</div>
-            {(!dossier.logboeken || dossier.logboeken.length === 0) ? (
+            {logboeken.length === 0 ? (
               <p className="muted">Geen logboeken gevonden.</p>
             ) : (
               <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>Week</th>
-                    <th>Periode</th>
-                    <th>Uren</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>Week</th><th>Periode</th><th>Uren</th><th>Status</th></tr></thead>
                 <tbody>
-                  {dossier.logboeken.map((w) => (
+                  {logboeken.map((w) => (
                     <tr key={w.id}>
                       <td>Week {w.week_nummer}</td>
                       <td>{formatDate(w.week_start)} - {formatDate(w.week_einde)}</td>
                       <td>{w.totaal_uren || 0}</td>
-                      <td>
-                        <span className={"status " + getStatusClass(w.status)}>
-                          {w.status || "-"}
-                        </span>
-                      </td>
+                      <td><span className={"status " + getStatusClass(w.status)}>{w.status || "-"}</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -175,26 +149,16 @@ export default function DocentStudentDossierPage() {
           {/* Evaluaties */}
           <div className="card">
             <div className="card_title">Evaluaties</div>
-            {(!dossier.evaluaties || dossier.evaluaties.length === 0) ? (
+            {evaluaties.length === 0 ? (
               <p className="muted">Geen evaluaties gevonden.</p>
             ) : (
               <table className="tbl">
-                <thead>
-                  <tr>
-                    <th>Type</th>
-                    <th>Status</th>
-                    <th>Datum</th>
-                  </tr>
-                </thead>
+                <thead><tr><th>Type</th><th>Status</th><th>Datum</th></tr></thead>
                 <tbody>
-                  {dossier.evaluaties.map((e, i) => (
+                  {evaluaties.map((e, i) => (
                     <tr key={i}>
                       <td>{e.type || "-"}</td>
-                      <td>
-                        <span className={"status " + getStatusClass(e.status)}>
-                          {e.status || "-"}
-                        </span>
-                      </td>
+                      <td><span className={"status " + getStatusClass(e.status)}>{e.status || "-"}</span></td>
                       <td>{formatDate(e.aangemaakt_op)}</td>
                     </tr>
                   ))}

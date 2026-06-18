@@ -10,7 +10,8 @@ function formatDateTime(val) {
 function getStatusClass(status) {
   if (status === "bevestigd") return "s_ok";
   if (status === "voorgesteld") return "s_amber";
-  if (status === "gegeven" || status === "afgerond") return "s_info";
+  if (status === "gegeven" || status === "geweest" || status === "afgerond") return "s_info";
+  if (status === "alternatief_gevraagd") return "s_amber";
   if (status === "geannuleerd") return "s_rood";
   return "s_grijs";
 }
@@ -18,7 +19,9 @@ function getStatusClass(status) {
 function getStatusLabel(status) {
   if (status === "bevestigd") return "Bevestigd";
   if (status === "voorgesteld") return "Wacht op bevestiging";
+  if (status === "alternatief_gevraagd") return "Alternatief voorgesteld";
   if (status === "gegeven") return "Gegeven";
+  if (status === "geweest") return "Geweest";
   if (status === "afgerond") return "Afgerond";
   if (status === "geannuleerd") return "Geannuleerd";
   return status || "-";
@@ -98,13 +101,15 @@ export default function DocentPlanningPage() {
     }
   }
 
-  async function markeerGegeven(id) {
+  async function markeerGegeven(id, type) {
+    // Een bedrijfsbezoek krijgt status 'geweest', een eindpresentatie 'gegeven'.
+    const nieuweStatus = type === "bedrijfsbezoek" ? "geweest" : "gegeven";
     try {
       setGegevenId(id);
-      await api.patch("/docent/planning/" + id, { status: "gegeven" }, {
+      await api.patch("/docent/planning/" + id, { status: nieuweStatus }, {
         headers: { "x-user-id": String(user.id) },
       });
-      setGelukt("Gemarkeerd als gegeven!");
+      setGelukt(nieuweStatus === "geweest" ? "Gemarkeerd als geweest!" : "Gemarkeerd als gegeven!");
       await loadPlanning();
     } catch (err) {
       alert(err.response?.data?.message || "Markeren mislukt");
@@ -177,8 +182,8 @@ export default function DocentPlanningPage() {
                   <td className="right">
                     {p.status !== "gegeven" && p.status !== "afgerond" && (
                       <button className="btn sm" disabled={gegevenId === p.id}
-                        onClick={() => markeerGegeven(p.id)}>
-                        <i className="ti ti-check" /> Markeer als gegeven
+                        onClick={() => markeerGegeven(p.id, p.type)}>
+                        <i className="ti ti-check" /> {p.type === "bedrijfsbezoek" ? "Markeer als geweest" : "Markeer als gegeven"}
                       </button>
                     )}
                   </td>

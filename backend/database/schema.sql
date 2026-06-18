@@ -193,6 +193,7 @@ CREATE TABLE `logboek_dagen` (
   `reflectie` text,
   `problemen` text,
   `leerpunten` text,
+  `competenties` json DEFAULT NULL,
   `aantal_uren` decimal(4,2) DEFAULT NULL,
   `mentor_bevestigd_op` timestamp NULL DEFAULT NULL,
   `aangemaakt_op` timestamp NULL DEFAULT NULL,

@@ -107,7 +107,7 @@ export default function DocentLogbooksPage() {
     try {
       setRemindLoading(true);
       setRemindMelding({ weekNr: null, tekst: "", type: "" });
-      await api.post(`/docent/logbooks/${studentId}/remind`, {}, {
+      await api.post(`/docent/logbooks/${studentId}/remind`, { weken: weekNr ? [weekNr] : [] }, {
         headers: { "x-user-id": String(user.id) },
       });
       setRemindMelding({ weekNr, tekst: "Herinnering verstuurd naar student.", type: "s_ok" });
@@ -122,14 +122,21 @@ export default function DocentLogbooksPage() {
     }
   }
 
-  // Bereken ontbrekende weeknummers (gaten in de reeks)
+  const geselecteerdeStudent = studenten.find(
+    (s) => (s.student_id || s.id) === studentId
+  );
+
+  // Bereken ontbrekende weeknummers: alle weken 1..aantal_weken die nog niet (volledig) bestaan.
   function getOntbrekendeWeken(weeks) {
-    if (weeks.length === 0) return [];
-    const aanwezig = new Set(weeks.map((w) => w.week_nummer));
-    const max = Math.max(...weeks.map((w) => w.week_nummer));
+    const ingevuld = new Set(
+      weeks.filter((w) => w.status && w.status !== "ontbreekt").map((w) => w.week_nummer)
+    );
+    // Totaal verwachte weken: uit de stage (aantal_weken), met fallback op de hoogste ingediende week.
+    const totaal = Number(geselecteerdeStudent?.aantal_weken)
+      || (weeks.length > 0 ? Math.max(...weeks.map((w) => w.week_nummer)) : 0);
     const ontbrekend = [];
-    for (let n = 1; n < max; n++) {
-      if (!aanwezig.has(n)) ontbrekend.push(n);
+    for (let n = 1; n <= totaal; n++) {
+      if (!ingevuld.has(n)) ontbrekend.push(n);
     }
     return ontbrekend;
   }
@@ -141,10 +148,6 @@ export default function DocentLogbooksPage() {
     ...weeks.map((w) => ({ ...w, ontbreekt: false })),
     ...ontbrekendeWeken.map((n) => ({ week_nummer: n, ontbreekt: true })),
   ].sort((a, b) => b.week_nummer - a.week_nummer);
-
-  const geselecteerdeStudent = studenten.find(
-    (s) => (s.student_id || s.id) === studentId
-  );
 
   return (
     <div className="page_inner">

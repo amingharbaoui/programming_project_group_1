@@ -62,3 +62,25 @@ de statische `/uploads`-handler in `server.js` serveert geen subpaden — contro
 
 ## ℹ️ Bekend (app-breed, geen mentor-bug)
 - Login verifieert geen wachtwoord (e-mail-only) en auth is een `x-user-id`-demostub. Het mentor-wachtwoord wordt wél veilig (pbkdf2) opgeslagen bij activatie, maar bij login niet gecontroleerd — aanpakken hoort bij een app-brede auth-taak.
+
+---
+
+# Docent (stories 35–44) — gefixt + resterend
+
+## ✅ Gefixt in deze ronde
+- **37** Studentdossier laadt nu (route-param `:dossierId` ↔ controller gelijkgetrokken + filter op `d.id`); frontend leest de juiste velden (`student_naam`, `mentor_naam`, `stageovereenkomst.*`), **documentenkaart** + **snelle links** (logboek/evaluatie/planning) toegevoegd.
+- **40** `/docent/logbooks/missing` staat nu vóór `/:studentId` (was onbereikbaar); "Herinner student" stuurt het **weeknummer** mee; ontbrekende weken worden berekend o.b.v. **`aantal_weken`** (i.p.v. enkel gaten tussen ingediende weken).
+- **43** **Rekenbug gefixt**: eindpresentatie wordt nu op **/20** ingevoerd (matcht de gewogen backend-berekening) i.p.v. 1–5.
+- **38** Bedrijfsbezoek: "Markeer als geweest" zet nu status `geweest` (i.p.v. `gegeven`) + label/kleur toegevoegd.
+- **36** Voorstellen-tabel toont nu correcte velden (`voorstel_status`, `stagefunctie`); detail haalt **commissiefeedback + versiehistoriek** op via `getDocentProposalById`.
+- Schema: `logboek_dagen.competenties` toegevoegd aan `schema.sql` (verse install brak voorheen).
+
+## ⚠️ Nog te doen
+1. **Story 35** — kolom "openstaande actie / deadline" in het studentenoverzicht (backend moet volgende actie/deadline berekenen).
+2. **Story 41** — docent-evaluatie-UI: feedbackveld **per competentie**, weergave van student-/mentor-motivering, logboekbewijzen, en een **verslag-invoerveld** (backend slaat `verslag` + per-competentie `feedback` al op; UI ontbreekt).
+3. **Story 42** — **deelnemers**-veld bij eindpresentatie (vereist kolom in `planning_momenten`) + expliciete koppeling presentatie ↔ finale beoordeling.
+4. **Story 43** — vooraf-**checklist met ontbrekende voorwaarden** (logboek/mentorinput/presentatie) in de UI; nu worden ontbrekende voorwaarden enkel als foutmelding ná een poging getoond (backend dwingt ze wél correct af).
+5. **Story 39** — competenties per logboekdag tonen in het docent-weekdetail (data wordt al opgehaald, kolom nog niet gerenderd).
+
+## ℹ️ Kleinere/cosmetische punten
+- Story 44 gebruikt `window.confirm` i.p.v. een echte bevestigingsmodal (functioneel gelijkwaardig).

@@ -138,8 +138,8 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
       setMelding({ tekst: "Geef voor elke competentie een score in.", type: "s_amber" });
       return;
     }
-    if (activeType === "finaal" && !eindpresentatieScore) {
-      setMelding({ tekst: "Geef een score voor de eindpresentatie in.", type: "s_amber" });
+    if (activeType === "finaal" && (eindpresentatieScore === null || eindpresentatieScore === "" || eindpresentatieScore === undefined)) {
+      setMelding({ tekst: "Geef een score (0–20) voor de eindpresentatie in.", type: "s_amber" });
       return;
     }
     // Eerst scores opslaan
@@ -247,21 +247,19 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
 
       {kanInvullen && activeType === "finaal" && (
         <div className="form_group" style={{ marginTop: "14px" }}>
-          <label className="form_label">Eindpresentatie score (werkstuk · 20%) <span style={{ color: "var(--red)" }}>*</span></label>
-          <div className="score_knoppen">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                type="button"
-                className={`score_knop${eindpresentatieScore === n ? " geselecteerd" : ""}`}
-                onClick={() => setEindpresentatieScore(n)}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
+          <label className="form_label">Eindpresentatie score op 20 (werkstuk · 20%) <span style={{ color: "var(--red)" }}>*</span></label>
+          <input
+            className="form_input"
+            type="number"
+            min="0"
+            max="20"
+            step="0.5"
+            style={{ maxWidth: 140 }}
+            value={eindpresentatieScore ?? ""}
+            onChange={(e) => setEindpresentatieScore(e.target.value === "" ? null : Number(e.target.value))}
+          />
           <p style={{ fontSize: "11.5px", color: "var(--sub)", marginTop: "4px" }}>
-            Eindcijfer = (competenties × 80%) + (presentatie × 20%) × 4
+            Eindcijfer (op 20) = competentiescore×4 × 80% + presentatiescore × 20%
           </p>
         </div>
       )}

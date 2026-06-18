@@ -22,6 +22,7 @@ async function getDocentStudents(req, res) {
         sd.status        AS dossier_status,
         sd.startdatum,
         sd.einddatum,
+        sd.aantal_weken,
         (
           SELECT lw.status
           FROM logboek_weken lw
@@ -147,9 +148,9 @@ async function getDocentProposalById(req, res) {
 
 async function getDocentStudentDossier(req, res) {
   const docentId = Number(req.user?.id);
-  const studentId = Number(req.params.id);
+  const dossierId = Number(req.params.dossierId);
   if (!docentId) return fail(res, 401, "Niet ingelogd");
-  if (!studentId) return fail(res, 400, "Ongeldig student-id");
+  if (!dossierId) return fail(res, 400, "Ongeldig dossier-id");
 
   try {
     const [dossiers] = await db.query(
@@ -173,11 +174,11 @@ async function getDocentStudentDossier(req, res) {
       JOIN gebruikers gs ON gs.id = d.student_id
       JOIN bedrijven b ON b.id = d.bedrijf_id
       LEFT JOIN gebruikers gm ON gm.id = d.mentor_id
-      WHERE d.student_id = ? AND d.stagebegeleider_id = ?
+      WHERE d.id = ? AND d.stagebegeleider_id = ?
       ORDER BY d.aangemaakt_op DESC
       LIMIT 1
       `,
-      [studentId, docentId]
+      [dossierId, docentId]
     );
     const dossier = dossiers[0];
     if (!dossier) return fail(res, 404, "Dossier niet gevonden");
