@@ -29,6 +29,36 @@ function sumHours(days) {
   return days.reduce((total, day) => total + Number(day.aantalUren || day.aantal_uren || 0), 0);
 }
 
+// Tz-veilige parsing/formatting op kalenderdatum (geen lokale-tijd-drift).
+function parseDatumUTC(value) {
+  const [y, m, d] = String(value).slice(0, 10).split("-").map(Number);
+  return new Date(Date.UTC(y, (m || 1) - 1, d || 1));
+}
+function formatDatumUTC(dt) {
+  return dt.toISOString().slice(0, 10);
+}
+
+// Geeft de verplichte werkdagen (ma–vr) terug die ontbreken of nog niet bevestigd zijn.
+function ontbrekendeVerplichteDagen(weekStart, weekEinde, dagen) {
+  const statusPerDatum = new Map();
+  for (const d of dagen) {
+    const key = String(d.datum || "").slice(0, 10);
+    if (key) statusPerDatum.set(key, String(d.status || "").trim());
+  }
+
+  const ontbrekend = [];
+  const start = parseDatumUTC(weekStart);
+  const eind = parseDatumUTC(weekEinde);
+  for (let dt = new Date(start); dt <= eind; dt.setUTCDate(dt.getUTCDate() + 1)) {
+    const dow = dt.getUTCDay(); // 0 = zo, 6 = za
+    if (dow === 0 || dow === 6) continue; // weekend is niet verplicht
+    const key = formatDatumUTC(dt);
+    const status = statusPerDatum.get(key);
+    if (!status || status === "concept") ontbrekend.push(key);
+  }
+  return ontbrekend;
+}
+
 async function findLatestDossierForStudent(connection, studentId) {
   const [rows] = await connection.query(
     `
@@ -167,6 +197,16 @@ async function createLogbook(req, res) {
     if (uren < 0) {
       return fail(res, 400, "Aantal uren per dag kan niet negatief zijn");
     }
+  }
+
+  // Een week kan niet ingediend worden met ontbrekende verplichte werkdagen (Story 8).
+  const ontbrekend = ontbrekendeVerplichteDagen(finalWeekStart, finalWeekEinde, finalDays);
+  if (ontbrekend.length > 0) {
+    return fail(
+      res,
+      400,
+      `Niet alle verplichte werkdagen zijn ingevuld of als geen-stagedag gemarkeerd: ${ontbrekend.join(", ")}`
+    );
   }
 
   const connection = await db.getConnection();
@@ -324,6 +364,21 @@ async function createLogbook(req, res) {
     }
 
     await connection.commit();
+
+    // Mentor verwittigen van de ingediende logboekweek
+    try {
+      if (dossier.mentor_id) {
+        await meld(dossier.mentor_id, {
+          titel: "Logboekweek ingediend",
+          bericht: `Een stagiair heeft logboekweek ${finalWeekNummer} ingediend.`,
+          aangemaaktDoorId: studentId,
+          stagedossierId: dossierId,
+          logboekWeekId: weekId
+        });
+      }
+    } catch (notifyError) {
+      console.error("Melding logboek-indiening mislukt:", notifyError.message);
+    }
 
     return ok(
       res,
@@ -605,7 +660,7 @@ async function docentReviewLogbookWeek(req, res) {
 
 async function studentAntwoordFeedback(req, res) {
   const weekId   = Number(req.params.weekId);
-  const studentId = Number(req.headers["x-user-id"] || 1);
+  const studentId = getUserId(req, 1);
   const { antwoord } = req.body;
 
   if (!antwoord || !antwoord.trim()) {
@@ -766,8 +821,104 @@ async function sendMissingLogbookReminder(req, res) {
   }
 }
 
+// PATCH /api/logbooks/entries/:id — één logboekdag van de ingelogde student bijwerken.
+async function updateLogbookEntry(req, res) {
+  const studentId = getUserId(req, 1);
+  const entryId = Number(req.params.id);
+
+  if (!entryId) return fail(res, 400, "Ongeldige logboekdag-id");
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [rows] = await connection.query(
+      `
+      SELECT ld.id, ld.logboek_week_id, lw.status AS week_status, d.student_id
+      FROM logboek_dagen ld
+      JOIN logboek_weken lw ON lw.id = ld.logboek_week_id
+      JOIN stagedossiers d ON d.id = lw.stagedossier_id
+      WHERE ld.id = ?
+      LIMIT 1
+      `,
+      [entryId]
+    );
+
+    const entry = rows[0];
+    if (!entry) {
+      await connection.rollback();
+      return fail(res, 404, "Logboekdag niet gevonden");
+    }
+    if (entry.student_id !== studentId) {
+      await connection.rollback();
+      return fail(res, 403, "Je mag alleen je eigen logboekdagen aanpassen");
+    }
+    if (entry.week_status === "afgesloten") {
+      await connection.rollback();
+      return fail(res, 409, "Deze week is afgesloten en kan niet meer aangepast worden");
+    }
+
+    const b = req.body || {};
+    const velden = [];
+    const params = [];
+    const setVeld = (kolom, waarde) => { velden.push(`${kolom} = ?`); params.push(waarde); };
+
+    if (b.status !== undefined) setVeld("status", b.status);
+    if (b.titel !== undefined) setVeld("titel", b.titel || null);
+    if (b.uitgevoerdeTaken !== undefined || b.uitgevoerde_taken !== undefined)
+      setVeld("uitgevoerde_taken", b.uitgevoerdeTaken ?? b.uitgevoerde_taken ?? null);
+    if (b.reflectie !== undefined) setVeld("reflectie", b.reflectie || null);
+    if (b.problemen !== undefined) setVeld("problemen", b.problemen || null);
+    if (b.leerpunten !== undefined) setVeld("leerpunten", b.leerpunten || null);
+    if (b.competenties !== undefined) {
+      const comp = Array.isArray(b.competenties) ? b.competenties : [];
+      setVeld("competenties", comp.length > 0 ? JSON.stringify(comp) : null);
+    }
+    if (b.aantalUren !== undefined || b.aantal_uren !== undefined) {
+      const uren = Number(b.aantalUren ?? b.aantal_uren ?? 0);
+      if (uren < 0) {
+        await connection.rollback();
+        return fail(res, 400, "Aantal uren kan niet negatief zijn");
+      }
+      setVeld("aantal_uren", uren);
+    }
+
+    if (velden.length === 0) {
+      await connection.rollback();
+      return fail(res, 400, "Geen velden om bij te werken");
+    }
+
+    params.push(entryId);
+    await connection.query(
+      `UPDATE logboek_dagen SET ${velden.join(", ")}, aangepast_op = NOW() WHERE id = ?`,
+      params
+    );
+
+    // Weektotaal opnieuw berekenen.
+    await connection.query(
+      `
+      UPDATE logboek_weken
+      SET totaal_uren = (
+        SELECT COALESCE(SUM(aantal_uren), 0) FROM logboek_dagen WHERE logboek_week_id = ?
+      ), aangepast_op = NOW()
+      WHERE id = ?
+      `,
+      [entry.logboek_week_id, entry.logboek_week_id]
+    );
+
+    await connection.commit();
+    return ok(res, { id: entryId, logboekWeekId: entry.logboek_week_id }, "Logboekdag bijgewerkt");
+  } catch (error) {
+    await connection.rollback();
+    return fail(res, 500, "Logboekdag bijwerken mislukt", error.message);
+  } finally {
+    connection.release();
+  }
+}
+
 module.exports = {
   createLogbook,
+  updateLogbookEntry,
   getLogbooksByStudent,
   mentorCheckLogbookWeek,
   docentReviewLogbookWeek,

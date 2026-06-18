@@ -1,6 +1,7 @@
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 const { meld } = require("../utils/notify");
+const { buildSimplePdf } = require("../utils/pdf");
 
 const GELDIGE_TYPES = ["tussentijds", "finaal"];
 
@@ -116,10 +117,18 @@ async function getEvaluationsForStudent(req, res) {
       scores = scoreRows;
     }
 
-    const result = evaluaties.map((e) => ({
-      ...e,
-      scores: scores.filter((s) => s.evaluatie_id === e.id),
-    }));
+    const result = evaluaties.map((e) => {
+      let eScores = scores.filter((s) => s.evaluatie_id === e.id);
+      const row = { ...e };
+      // Een student mag het eindcijfer + de docentbeoordeling pas zien na vrijgave.
+      if (role === "student" && e.status !== "vrijgegeven") {
+        row.eindcijfer = null;
+        row.competentie_score = null;
+        row.eindpresentatie_score = null;
+        eScores = eScores.filter((s) => s.rol !== "docent");
+      }
+      return { ...row, scores: eScores };
+    });
 
     return ok(res, { stagedossierId: dossier.id, competenties, evaluaties: result }, "Evaluaties opgehaald");
   } catch (error) {
@@ -420,4 +429,119 @@ async function getMyStudents(req, res) {
   }
 }
 
-module.exports = { openEvaluation, getEvaluationsForStudent, saveScores, calculateResult, releaseResult, getMyStudents };
+// GET /api/students/me/final-result — vrijgegeven eindresultaat van de ingelogde student.
+// Toont niets zolang het resultaat niet vrijgegeven is (Story 10).
+async function getMyFinalResult(req, res) {
+  const studentId = getUserId(req);
+  try {
+    const dossier = await getLatestDossierForStudent(db, studentId);
+    if (!dossier) return ok(res, { vrijgegeven: false }, "Geen stagedossier gevonden");
+
+    const [drows] = await db.query(
+      `SELECT id, status, eindresultaat, eindresultaat_vrijgegeven_op, eindoverzicht_gegenereerd_op
+       FROM stagedossiers WHERE id = ? LIMIT 1`,
+      [dossier.id]
+    );
+    const d = drows[0];
+
+    if (!d || d.eindresultaat_vrijgegeven_op == null) {
+      return ok(res, { vrijgegeven: false }, "Eindresultaat is nog niet vrijgegeven");
+    }
+
+    const [erows] = await db.query(
+      `SELECT verslag, eindcijfer FROM evaluaties
+       WHERE stagedossier_id = ? AND type = 'finaal' ORDER BY id DESC LIMIT 1`,
+      [dossier.id]
+    );
+    const eind = erows[0] || {};
+
+    const [orows] = await db.query(
+      `SELECT doc.bestand_url, doc.bestand_naam
+       FROM documenten doc
+       JOIN document_soorten ds ON ds.id = doc.document_soort_id
+       WHERE doc.stagedossier_id = ? AND ds.type = 'eindoverzicht'
+       ORDER BY doc.versie_nummer DESC LIMIT 1`,
+      [dossier.id]
+    );
+
+    return ok(
+      res,
+      {
+        vrijgegeven: true,
+        eindresultaat: d.eindresultaat,
+        eindcijfer: eind.eindcijfer ?? d.eindresultaat,
+        eindfeedback: eind.verslag || null,
+        vrijgegevenOp: d.eindresultaat_vrijgegeven_op,
+        status: d.status,
+        eindoverzichtUrl: orows[0]?.bestand_url || null,
+        eindoverzichtNaam: orows[0]?.bestand_naam || null
+      },
+      "Eindresultaat opgehaald"
+    );
+  } catch (error) {
+    return fail(res, 500, "Eindresultaat ophalen mislukt", error.message);
+  }
+}
+
+// GET /api/students/me/eindoverzicht.pdf — eindoverzicht als PDF, enkel na vrijgave (Story 10).
+async function downloadMyEindoverzicht(req, res) {
+  const studentId = getUserId(req);
+  try {
+    const [rows] = await db.query(
+      `SELECT d.id, d.dossiernummer, d.status, d.startdatum, d.einddatum, d.totaal_uren,
+              d.eindresultaat, d.eindresultaat_vrijgegeven_op, d.opleiding, d.academiejaar,
+              CONCAT(gs.voornaam, ' ', gs.achternaam) AS student_naam, s.studentennummer,
+              b.naam AS bedrijf_naam,
+              CONCAT(gm.voornaam, ' ', gm.achternaam) AS mentor_naam,
+              CONCAT(gd.voornaam, ' ', gd.achternaam) AS docent_naam
+       FROM stagedossiers d
+       JOIN gebruikers gs ON gs.id = d.student_id
+       JOIN studenten s ON s.gebruiker_id = d.student_id
+       JOIN bedrijven b ON b.id = d.bedrijf_id
+       LEFT JOIN gebruikers gm ON gm.id = d.mentor_id
+       LEFT JOIN gebruikers gd ON gd.id = d.stagebegeleider_id
+       WHERE d.student_id = ?
+       ORDER BY d.aangemaakt_op DESC LIMIT 1`,
+      [studentId]
+    );
+    const d = rows[0];
+    if (!d) return fail(res, 404, "Geen stagedossier gevonden");
+    if (d.eindresultaat_vrijgegeven_op == null) {
+      return fail(res, 403, "Eindresultaat is nog niet vrijgegeven");
+    }
+
+    const [er] = await db.query(
+      `SELECT verslag, eindcijfer FROM evaluaties WHERE stagedossier_id = ? AND type = 'finaal' ORDER BY id DESC LIMIT 1`,
+      [d.id]
+    );
+    const eind = er[0] || {};
+    const cijfer = eind.eindcijfer ?? d.eindresultaat;
+    const feedbackRegels = eind.verslag ? String(eind.verslag).match(/.{1,80}(\s|$)/g) || [String(eind.verslag)] : ["-"];
+
+    const lines = [
+      "Eindoverzicht stage",
+      `Dossier: ${d.dossiernummer || "-"}`,
+      `Student: ${d.student_naam} (${d.studentennummer || "-"})`,
+      `Opleiding: ${d.opleiding || "-"} | ${d.academiejaar || "-"}`,
+      `Bedrijf: ${d.bedrijf_naam || "-"}`,
+      `Mentor: ${d.mentor_naam || "-"}`,
+      `Stagebegeleider: ${d.docent_naam || "-"}`,
+      `Periode: ${d.startdatum ? String(d.startdatum).slice(0, 10) : "-"} tot ${d.einddatum ? String(d.einddatum).slice(0, 10) : "-"}`,
+      `Totaal uren: ${d.totaal_uren ?? "-"}`,
+      `Eindresultaat: ${cijfer ?? "-"}`,
+      `Vrijgegeven op: ${String(d.eindresultaat_vrijgegeven_op).slice(0, 10)}`,
+      "",
+      "Eindfeedback:",
+      ...feedbackRegels.map((r) => `  ${r.trim()}`)
+    ];
+
+    const pdf = buildSimplePdf(lines);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="eindoverzicht-${d.dossiernummer || d.id}.pdf"`);
+    return res.send(pdf);
+  } catch (error) {
+    return fail(res, 500, "Eindoverzicht downloaden mislukt", error.message);
+  }
+}
+
+module.exports = { openEvaluation, getEvaluationsForStudent, saveScores, calculateResult, releaseResult, getMyStudents, getMyFinalResult, downloadMyEindoverzicht };

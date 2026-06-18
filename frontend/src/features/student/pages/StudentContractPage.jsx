@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { apiRequest } from "../../../services/api";
+import api, { apiRequest } from "../../../services/api";
 import "./StudentContractPage.css";
 import Modal from "../../../components/ui/Modal";
 import {
@@ -113,6 +113,22 @@ export default function StudentContractPage() {
       setFout(err.response?.data?.message || "Ondertekenen mislukt.");
     } finally {
       setBezig(false);
+    }
+  }
+
+  async function handleDownloadPdf() {
+    try {
+      const res = await api.get("/contracts/my/pdf", { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "stageovereenkomst.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setFout("PDF downloaden mislukt.");
     }
   }
 
@@ -277,10 +293,16 @@ export default function StudentContractPage() {
             Alles wordt automatisch overgenomen uit je goedgekeurde voorstel. Klopt er iets niet? Onderteken dan niet en contacteer de stagecoördinator.
           </p>
 
-          <button className="btn sm" onClick={() => setOvereenkomstOpen(true)}>
-            <i className="ti ti-eye"></i>
-            Volledige overeenkomst lezen
-          </button>
+          <div className="actions" style={{ marginTop: 4 }}>
+            <button className="btn sm" onClick={() => setOvereenkomstOpen(true)}>
+              <i className="ti ti-eye"></i>
+              Volledige overeenkomst lezen
+            </button>
+            <button className="btn sm" onClick={handleDownloadPdf}>
+              <i className="ti ti-download"></i>
+              PDF downloaden
+            </button>
+          </div>
         </div>
       </div>
 

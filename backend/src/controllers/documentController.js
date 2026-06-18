@@ -135,7 +135,7 @@ async function uploadDocument(req, res) {
       await connection.query(
         `UPDATE documenten
          SET status = 'ingediend', versie_nummer = ?, bestand_url = ?, bestand_naam = ?,
-             opgeladen_door_id = ?, afkeurreden = NULL, aangepast_op = NOW()
+             opgeladen_door_id = ?, opgeladen_op = NOW(), afkeurreden = NULL, aangepast_op = NOW()
          WHERE id = ?`,
         [nieuw_versie, bestandUrl, req.file.originalname, studentId, resultId]
       );
@@ -144,14 +144,32 @@ async function uploadDocument(req, res) {
       nieuw_versie = 1;
       const [ins] = await connection.query(
         `INSERT INTO documenten
-           (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam, opgeladen_door_id, aangemaakt_op, aangepast_op)
-         VALUES (?, ?, 'ingediend', 1, ?, ?, ?, NOW(), NOW())`,
+           (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam, opgeladen_door_id, opgeladen_op, aangemaakt_op, aangepast_op)
+         VALUES (?, ?, 'ingediend', 1, ?, ?, ?, NOW(), NOW(), NOW())`,
         [dossier_id, document_soort_id, bestandUrl, req.file.originalname, studentId]
       );
       resultId = ins.insertId;
     }
 
     await connection.commit();
+
+    // Administratie verwittigen van het nieuwe/bijgewerkte document
+    try {
+      const [admins] = await db.query(
+        "SELECT id FROM gebruikers WHERE hoofdrol = 'administratie' AND status = 'actief'"
+      );
+      for (const a of admins) {
+        await meld(a.id, {
+          titel: "Nieuw document ingediend",
+          bericht: "Een student heeft een document geüpload dat gecontroleerd moet worden.",
+          aangemaaktDoorId: studentId,
+          stagedossierId: dossier_id,
+          documentId: resultId
+        });
+      }
+    } catch (notifyError) {
+      console.error("Melding document-upload mislukt:", notifyError.message);
+    }
 
     return ok(
       res,
@@ -201,13 +219,31 @@ async function uploadEigenDocument(req, res) {
     const [result] = await connection.query(
       `
       INSERT INTO documenten
-        (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam, opgeladen_door_id, aangemaakt_op, aangepast_op)
-      VALUES (?, NULL, 'ingediend', 1, ?, ?, ?, NOW(), NOW())
+        (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam, opgeladen_door_id, opgeladen_op, aangemaakt_op, aangepast_op)
+      VALUES (?, NULL, 'ingediend', 1, ?, ?, ?, NOW(), NOW(), NOW())
       `,
       [dossier_id, bestandUrl, req.file.originalname, studentId]
     );
 
     await connection.commit();
+
+    // Administratie verwittigen van het nieuwe eigen document
+    try {
+      const [admins] = await db.query(
+        "SELECT id FROM gebruikers WHERE hoofdrol = 'administratie' AND status = 'actief'"
+      );
+      for (const a of admins) {
+        await meld(a.id, {
+          titel: "Nieuw document ingediend",
+          bericht: "Een student heeft een eigen document geüpload dat gecontroleerd moet worden.",
+          aangemaaktDoorId: studentId,
+          stagedossierId: dossier_id,
+          documentId: result.insertId
+        });
+      }
+    } catch (notifyError) {
+      console.error("Melding document-upload mislukt:", notifyError.message);
+    }
 
     return ok(
       res,

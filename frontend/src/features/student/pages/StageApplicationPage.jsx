@@ -21,12 +21,15 @@ export default function StageApplicationPage() {
 
   const [form, setForm] = useState({
     bedrijfNaam: "",
+    bedrijfAfdeling: "",
     bedrijfAdres: "",
     mentorNaam: "",
     mentorEmail: "",
+    mentorTelefoon: "",
     mentorFunctie: "",
     startDatum: "",
     eindDatum: "",
+    urenPerWeek: 38,
     opdrachtTitel: "",
     opdrachtOmschrijving: "",
   });
@@ -47,12 +50,15 @@ export default function StageApplicationPage() {
 
         setForm({
           bedrijfNaam:           data.bedrijf_naam        || "",
+          bedrijfAfdeling:       data.bedrijfsafdeling    || "",
           bedrijfAdres:          data.bedrijfsadres       || "",
           mentorNaam:            data.mentor_naam         || "",
           mentorEmail:           data.mentor_email        || "",
+          mentorTelefoon:        data.mentor_telefoon     || "",
           mentorFunctie:         data.mentor_functie      || "",
           startDatum:            data.startdatum ? data.startdatum.slice(0, 10) : "",
           eindDatum:             data.einddatum  ? data.einddatum.slice(0, 10)  : "",
+          urenPerWeek:           data.uren_per_week       || 38,
           opdrachtTitel:         data.stagefunctie        || "",
           opdrachtOmschrijving:  data.opdrachtomschrijving || "",
         });
@@ -74,15 +80,17 @@ export default function StageApplicationPage() {
     try {
       await apiRequest("POST", "/internships/draft", {
         bedrijfNaam:          form.bedrijfNaam,
+        bedrijfsafdeling:     form.bedrijfAfdeling,
         bedrijfsadres:        form.bedrijfAdres,
         mentorNaam:           form.mentorNaam,
         mentorEmail:          form.mentorEmail,
+        mentorTelefoon:       form.mentorTelefoon,
         mentorFunctie:        form.mentorFunctie,
         stagefunctie:         form.opdrachtTitel,
         opdrachtomschrijving: form.opdrachtOmschrijving,
         startdatum:           form.startDatum,
         einddatum:            form.eindDatum,
-        urenPerWeek:          38,
+        urenPerWeek:          Number(form.urenPerWeek) || 38,
       });
       setHeeftConcept(true);
       setModal({
@@ -101,20 +109,43 @@ export default function StageApplicationPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
+
+    // Client-side validatie van verplichte velden (backend blijft de bewaker).
+    const verplicht = {
+      Bedrijfsnaam: form.bedrijfNaam,
+      Adres: form.bedrijfAdres,
+      "Mentor naam": form.mentorNaam,
+      "Mentor functie": form.mentorFunctie,
+      "Mentor e-mail": form.mentorEmail,
+      "Titel opdracht": form.opdrachtTitel,
+      "Omschrijving opdracht": form.opdrachtOmschrijving,
+      Startdatum: form.startDatum,
+      Einddatum: form.eindDatum,
+    };
+    const ontbrekend = Object.entries(verplicht)
+      .filter(([, v]) => !String(v || "").trim())
+      .map(([k]) => k);
+    if (ontbrekend.length > 0) {
+      setError("Vul de verplichte velden in: " + ontbrekend.join(", ") + ".");
+      return;
+    }
+
     const isHerindienen = huidigStatus === "aanpassingen_gevraagd";
     const endpoint = isHerindienen ? "/internships/my/herindienen" : "/internships";
     try {
       await apiRequest("POST", endpoint, {
         bedrijfNaam:          form.bedrijfNaam,
+        bedrijfsafdeling:     form.bedrijfAfdeling,
         bedrijfsadres:        form.bedrijfAdres,
         mentorNaam:           form.mentorNaam,
         mentorEmail:          form.mentorEmail,
+        mentorTelefoon:       form.mentorTelefoon,
         mentorFunctie:        form.mentorFunctie,
         stagefunctie:         form.opdrachtTitel,
         opdrachtomschrijving: form.opdrachtOmschrijving,
         startdatum:           form.startDatum,
         einddatum:            form.eindDatum,
-        urenPerWeek:          38,
+        urenPerWeek:          Number(form.urenPerWeek) || 38,
       });
       setSubmitted(true);
       setModal({
@@ -168,11 +199,15 @@ export default function StageApplicationPage() {
             </div>
             <div className="form_group">
               <label className="form_label">Bedrijfsnaam<span className="req">*</span></label>
-              <input className="form_input" type="text" name="bedrijfNaam" value={form.bedrijfNaam} onChange={handleChange} placeholder="Naam van het bedrijf" />
+              <input className="form_input" type="text" name="bedrijfNaam" value={form.bedrijfNaam} onChange={handleChange} placeholder="Naam van het bedrijf" required />
+            </div>
+            <div className="form_group">
+              <label className="form_label">Afdeling</label>
+              <input className="form_input" type="text" name="bedrijfAfdeling" value={form.bedrijfAfdeling} onChange={handleChange} placeholder="bv. IT / Development" />
             </div>
             <div className="form_group">
               <label className="form_label">Adres<span className="req">*</span></label>
-              <input className="form_input" type="text" name="bedrijfAdres" value={form.bedrijfAdres} onChange={handleChange} placeholder="Straat nr, postcode gemeente" />
+              <input className="form_input" type="text" name="bedrijfAdres" value={form.bedrijfAdres} onChange={handleChange} placeholder="Straat nr, postcode gemeente" required />
             </div>
           </div>
 
@@ -185,16 +220,22 @@ export default function StageApplicationPage() {
             <div className="form_row">
               <div className="form_group">
                 <label className="form_label">Naam<span className="req">*</span></label>
-                <input className="form_input" type="text" name="mentorNaam" value={form.mentorNaam} onChange={handleChange} placeholder="Naam van je mentor" />
+                <input className="form_input" type="text" name="mentorNaam" value={form.mentorNaam} onChange={handleChange} placeholder="Naam van je mentor" required />
               </div>
               <div className="form_group">
                 <label className="form_label">Functie<span className="req">*</span></label>
-                <input className="form_input" type="text" name="mentorFunctie" value={form.mentorFunctie} onChange={handleChange} placeholder="Functie" />
+                <input className="form_input" type="text" name="mentorFunctie" value={form.mentorFunctie} onChange={handleChange} placeholder="Functie" required />
               </div>
             </div>
-            <div className="form_group">
-              <label className="form_label">E-mail<span className="req">*</span></label>
-              <input className="form_input" type="email" name="mentorEmail" value={form.mentorEmail} onChange={handleChange} />
+            <div className="form_row">
+              <div className="form_group">
+                <label className="form_label">E-mail<span className="req">*</span></label>
+                <input className="form_input" type="email" name="mentorEmail" value={form.mentorEmail} onChange={handleChange} required />
+              </div>
+              <div className="form_group">
+                <label className="form_label">Telefoon</label>
+                <input className="form_input" type="tel" name="mentorTelefoon" value={form.mentorTelefoon} onChange={handleChange} placeholder="bv. +32 ..." />
+              </div>
             </div>
           </div>
 
@@ -206,11 +247,11 @@ export default function StageApplicationPage() {
             </div>
             <div className="form_group">
               <label className="form_label">Titel van de opdracht<span className="req">*</span></label>
-              <input className="form_input" type="text" name="opdrachtTitel" value={form.opdrachtTitel} onChange={handleChange} placeholder="bv. Webdeveloper" />
+              <input className="form_input" type="text" name="opdrachtTitel" value={form.opdrachtTitel} onChange={handleChange} placeholder="bv. Webdeveloper" required />
             </div>
             <div className="form_group">
               <label className="form_label">Omschrijving van de opdracht<span className="req">*</span></label>
-              <textarea className="form_textarea" name="opdrachtOmschrijving" value={form.opdrachtOmschrijving} onChange={handleChange} placeholder="Technologie, taken, team..." />
+              <textarea className="form_textarea" name="opdrachtOmschrijving" value={form.opdrachtOmschrijving} onChange={handleChange} placeholder="Technologie, taken, team..." required />
             </div>
           </div>
 
@@ -223,12 +264,16 @@ export default function StageApplicationPage() {
             <div className="form_row">
               <div className="form_group">
                 <label className="form_label">Startdatum<span className="req">*</span></label>
-                <input className="form_input" type="date" name="startDatum" value={form.startDatum} onChange={handleChange} />
+                <input className="form_input" type="date" name="startDatum" value={form.startDatum} onChange={handleChange} required />
               </div>
               <div className="form_group">
                 <label className="form_label">Einddatum<span className="req">*</span></label>
-                <input className="form_input" type="date" name="eindDatum" value={form.eindDatum} onChange={handleChange} />
+                <input className="form_input" type="date" name="eindDatum" value={form.eindDatum} onChange={handleChange} required />
               </div>
+            </div>
+            <div className="form_group">
+              <label className="form_label">Uren per week</label>
+              <input className="form_input" type="number" min="1" max="60" name="urenPerWeek" value={form.urenPerWeek} onChange={handleChange} placeholder="38" />
             </div>
             <p className="stagevenster-info">Moet binnen het stagevenster van de opleiding vallen: 9 feb - 26 jun 2026.</p>
           </div>

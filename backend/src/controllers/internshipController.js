@@ -572,6 +572,24 @@ async function withdrawInternship(req, res) {
     );
 
     await conn.commit();
+
+    // Stagecommissie verwittigen dat het voorstel niet langer actief is
+    try {
+      const [commissie] = await db.query(
+        "SELECT id FROM gebruikers WHERE hoofdrol = 'stagecommissie' AND status = 'actief'"
+      );
+      for (const lid of commissie) {
+        await meld(lid.id, {
+          titel: "Stagevoorstel ingetrokken",
+          bericht: "Een student heeft zijn stagevoorstel ingetrokken; het is niet langer actief.",
+          aangemaaktDoorId: studentId,
+          stagevoorstelId: voorstel.id
+        });
+      }
+    } catch (notifyError) {
+      console.error("Melding intrekken mislukt:", notifyError.message);
+    }
+
     return ok(res, { stagevoorstelId: voorstel.id, status: "ingetrokken" }, "Stagevoorstel ingetrokken");
   } catch (err) {
     await conn.rollback();
@@ -691,6 +709,7 @@ async function getCommitteeApplications(req, res) {
           ORDER BY vb.beslist_op DESC
           LIMIT 1
         )
+      WHERE sp.status <> 'concept'
       ORDER BY sp.aangemaakt_op DESC
       `
     );
@@ -753,6 +772,12 @@ async function decideApplication(req, res) {
     if (!voorstel) {
       await connection.rollback();
       return fail(res, 404, "Stagevoorstel niet gevonden");
+    }
+
+    const beslisbaar = ["ingediend", "heringediend", "aanpassingen_gevraagd"];
+    if (!beslisbaar.includes(voorstel.status)) {
+      await connection.rollback();
+      return fail(res, 409, `Een voorstel met status '${voorstel.status}' kan niet (opnieuw) beoordeeld worden`);
     }
 
     await connection.query(
@@ -1518,12 +1543,82 @@ async function sendContractReminder(req, res) {
   }
 }
 
+// GET /api/internships/my/historiek — echte versie-/beslissingstijdlijn van het eigen voorstel (Story 3/4).
+async function getMyInternshipHistory(req, res) {
+  const studentId = getUserId(req, 1);
+  try {
+    const [voorstellen] = await db.query(
+      `SELECT id, status, ingediend_op, heringediend_op, goedgekeurd_op, afgekeurd_op, ingetrokken_op
+       FROM stagevoorstellen
+       WHERE student_id = ?
+       ORDER BY aangemaakt_op DESC
+       LIMIT 1`,
+      [studentId]
+    );
+    const voorstel = voorstellen[0];
+    if (!voorstel) return ok(res, [], "Geen voorstel gevonden");
+
+    const [versies] = await db.query(
+      `SELECT versie_nummer, ingediend_op, aangemaakt_op
+       FROM stagevoorstel_versies
+       WHERE stagevoorstel_id = ?
+       ORDER BY versie_nummer ASC`,
+      [voorstel.id]
+    );
+
+    const [beslissingen] = await db.query(
+      `SELECT beslissing, feedback, beslist_op
+       FROM voorstel_beslissingen
+       WHERE stagevoorstel_id = ?
+       ORDER BY beslist_op ASC`,
+      [voorstel.id]
+    );
+
+    const beslissingLabel = {
+      goedgekeurd: "Goedgekeurd door de stagecommissie",
+      afgekeurd: "Afgekeurd door de stagecommissie",
+      aanpassingen_gevraagd: "Aanpassingen gevraagd door de stagecommissie",
+      goedgekeurd_met_uitzondering: "Goedgekeurd met uitzondering"
+    };
+
+    const events = [];
+    for (const v of versies) {
+      events.push({
+        wat: `Versie ${v.versie_nummer} ingediend`,
+        tijd: v.ingediend_op || v.aangemaakt_op || null
+      });
+    }
+    for (const b of beslissingen) {
+      events.push({
+        wat: beslissingLabel[b.beslissing] || "Beslissing genomen",
+        tijd: b.beslist_op || null
+      });
+    }
+    if (voorstel.ingetrokken_op) {
+      events.push({ wat: "Voorstel ingetrokken door jou", tijd: voorstel.ingetrokken_op });
+    }
+
+    // Aflopend sorteren (nieuwste eerst); items zonder tijd achteraan.
+    events.sort((a, b) => {
+      if (!a.tijd) return 1;
+      if (!b.tijd) return -1;
+      return new Date(b.tijd) - new Date(a.tijd);
+    });
+    if (events.length > 0) events[0].actief = true;
+
+    return ok(res, events, "Historiek opgehaald");
+  } catch (error) {
+    return fail(res, 500, "Historiek ophalen mislukt", error.message);
+  }
+}
+
 module.exports = {
   createInternship,
   saveDraft,
   withdrawInternship,
   resubmitInternship,
   getMyInternship,
+  getMyInternshipHistory,
   getCommitteeApplications,
   decideApplication,
   getApplicationVersions,
