@@ -18,6 +18,7 @@ export const NAVIGATION = {
     { label: "Dossiers",    path: "/admin/dossiers",      icon: "ti-folder" },
     { label: "Gebruikers",  path: "/admin/users",         icon: "ti-users" },
     { label: "Competenties",path: "/admin/competencies",  icon: "ti-target" },
+    { label: "Instellingen",path: "/admin/settings",      icon: "ti-settings" },
   ],
 
   [ROLES.MENTOR]: [

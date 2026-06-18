@@ -22,6 +22,7 @@ import ApplicationsPage from "./features/committee/pages/ApplicationsPage";
 import DossiersPage from "./features/admin/pages/DossiersPage";
 import UsersPage from "./features/admin/pages/UsersPage";
 import CompetenciesPage from "./features/admin/pages/CompetenciesPage";
+import SettingsPage from "./features/admin/pages/SettingsPage";
 
 import MentorActivationPage from "./features/mentor/pages/MentorActivationPage";
 import MentorStudentsPage from "./features/mentor/pages/MentorStudentsPage";
@@ -125,6 +126,7 @@ export default function App() {
             <Route path="/admin/dossiers" element={<DossiersPage />} />
             <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/admin/competencies" element={<CompetenciesPage />} />
+            <Route path="/admin/settings" element={<SettingsPage />} />
 
             <Route path="/docent/students" element={<DocentStudentsPage />} />
             <Route path="/docent/logbooks" element={<DocentLogbooksPage />} />
