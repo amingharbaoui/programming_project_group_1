@@ -7,18 +7,44 @@ async function getUsers(req, res) {
     const [users] = await db.query(
       `
       SELECT
-        id,
-        voornaam,
-        achternaam,
-        email,
-        hoofdrol,
-        status,
-        auth_provider,
-        laatste_login_op,
-        aangemaakt_op,
-        aangepast_op
-      FROM gebruikers
-      ORDER BY hoofdrol, achternaam, voornaam
+        g.id,
+        g.voornaam,
+        g.achternaam,
+        g.email,
+        g.hoofdrol,
+        g.status,
+        g.auth_provider,
+        g.laatste_login_op,
+        g.aangemaakt_op,
+        g.aangepast_op,
+        CASE
+          WHEN g.hoofdrol = 'student' THEN (
+            SELECT sd.dossiernummer
+            FROM stagedossiers sd
+            WHERE sd.student_id = g.id
+            ORDER BY sd.aangemaakt_op DESC
+            LIMIT 1
+          )
+          WHEN g.hoofdrol = 'mentor' THEN (
+            SELECT b.naam
+            FROM mentoren m
+            JOIN bedrijven b ON m.bedrijf_id = b.id
+            WHERE m.gebruiker_id = g.id
+            LIMIT 1
+          )
+          WHEN g.hoofdrol = 'docent' THEN (
+            SELECT CONCAT('Stagebegeleider van ', s.voornaam, ' ', s.achternaam)
+            FROM stagedossiers sd
+            JOIN gebruikers s ON sd.student_id = s.id
+            WHERE sd.stagebegeleider_id = g.id
+            ORDER BY sd.aangemaakt_op DESC
+            LIMIT 1
+          )
+          WHEN g.hoofdrol = 'administratie' THEN 'Beheerder'
+          ELSE NULL
+        END AS koppeling
+      FROM gebruikers g
+      ORDER BY g.hoofdrol, g.achternaam, g.voornaam
       `
     );
 
@@ -65,6 +91,48 @@ async function reactivateUser(req, res) {
     return ok(res, { id, status: "actief" }, "Gebruiker geactiveerd");
   } catch (error) {
     return fail(res, 500, "Activeren mislukt", error.message);
+  }
+}
+
+// Gebruiker wijzigen: voornaam, achternaam, email en/of hoofdrol aanpassen.
+const GELDIGE_ROLLEN = ["student", "docent", "mentor", "stagecommissie", "administratie"];
+
+async function updateUser(req, res) {
+  const id = Number(req.params.id);
+  const me = Number(req.user?.id);
+  if (!id) return fail(res, 400, "Ongeldig gebruikers-id");
+
+  const { voornaam, achternaam, email, hoofdrol } = req.body;
+
+  if (hoofdrol && !GELDIGE_ROLLEN.includes(hoofdrol)) {
+    return fail(res, 400, `Ongeldige rol. Kies uit: ${GELDIGE_ROLLEN.join(", ")}`);
+  }
+
+  // Eigen rol mag niet gewijzigd worden
+  if (id === me && hoofdrol) {
+    return fail(res, 400, "Je kan je eigen rol niet wijzigen");
+  }
+
+  const fields = [];
+  const values = [];
+
+  if (voornaam !== undefined) { fields.push("voornaam = ?"); values.push(voornaam.trim()); }
+  if (achternaam !== undefined) { fields.push("achternaam = ?"); values.push(achternaam.trim()); }
+  if (email !== undefined) { fields.push("email = ?"); values.push(email.trim()); }
+  if (hoofdrol !== undefined) { fields.push("hoofdrol = ?"); values.push(hoofdrol); }
+
+  if (fields.length === 0) return fail(res, 400, "Geen velden om aan te passen");
+
+  try {
+    const [r] = await db.query(
+      `UPDATE gebruikers SET ${fields.join(", ")}, aangepast_op = NOW() WHERE id = ?`,
+      [...values, id]
+    );
+    if (r.affectedRows === 0) return fail(res, 404, "Gebruiker niet gevonden");
+    return ok(res, { id }, "Gebruiker bijgewerkt");
+  } catch (error) {
+    if (error.code === "ER_DUP_ENTRY") return fail(res, 409, "Dit e-mailadres is al in gebruik");
+    return fail(res, 500, "Wijzigen mislukt", error.message);
   }
 }
 
@@ -124,6 +192,7 @@ async function inviteMentor(req, res) {
 
 module.exports = {
   getUsers,
+  updateUser,
   deactivateUser,
   reactivateUser,
   inviteMentor

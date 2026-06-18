@@ -149,7 +149,6 @@ function CompetentieModal({ initial, onClose, onSaved, maxVolgorde }) {
   );
 }
 
-// ─── Modal: Verwijderen bevestigen ──────────────────────────────────────────
 function VerwijderModal({ competentie, onClose, onDeleted }) {
   const [deleting, setDeleting] = useState(false);
   const [err, setErr] = useState("");
@@ -207,8 +206,68 @@ function VerwijderModal({ competentie, onClose, onDeleted }) {
   );
 }
 
+function SuccesModal({ title, message, onClose }) {
+  return (
+    <div className="modal_overlay" onClick={onClose}>
+      <div className="modal_box" onClick={(e) => e.stopPropagation()}>
+        <div className="modal_header">
+          <span className="modal_title">{title}</span>
+          <button className="icon_btn" onClick={onClose} type="button">
+            <IconX size={16} stroke={1.8} />
+          </button>
+        </div>
+        <div className="modal_body">
+          <p style={{ margin: 0, fontSize: 13.5, color: "var(--dark)", lineHeight: 1.6 }}>
+            {message}
+          </p>
+        </div>
+        <div className="modal_footer">
+          <button className="btn primary" onClick={onClose} type="button">
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-// ─── Modal: Nieuwe versie bevestigen ────────────────────────────────────────
+function PublicerenModal({ onClose, onConfirm, loading }) {
+  return (
+    <div className="modal_overlay" onClick={onClose}>
+      <div className="modal_box" onClick={(e) => e.stopPropagation()}>
+        <div className="modal_header">
+          <span className="modal_title">Competentieprofiel publiceren</span>
+          <button className="icon_btn" onClick={onClose} type="button">
+            <IconX size={16} stroke={1.8} />
+          </button>
+        </div>
+        <div className="modal_body">
+          <p style={{ margin: 0, fontSize: 13.5, color: "var(--dark)", lineHeight: 1.6 }}>
+            Ben je zeker dat je dit competentieprofiel wil publiceren?
+          </p>
+          <p style={{ margin: "10px 0 0", fontSize: 13, color: "var(--sub)", lineHeight: 1.6 }}>
+            Het profiel wordt actief gezet en alle andere profielen worden gearchiveerd. Dit kan niet ongedaan worden gemaakt.
+          </p>
+        </div>
+        <div className="modal_footer">
+          <button className="btn" onClick={onClose} type="button" disabled={loading}>
+            Annuleren
+          </button>
+          <button
+            className="btn primary"
+            onClick={onConfirm}
+            disabled={loading}
+            type="button"
+          >
+            {loading ? <IconLoader2 size={16} stroke={1.8} className="spin" /> : <IconChecks size={16} stroke={1.8} />}
+            Ja, publiceren
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function NieuweVersieModal({ onClose, onConfirm, loading }) {
   return (
     <div className="modal_overlay" onClick={onClose}>
@@ -260,34 +319,49 @@ export default function CompetenciesPage() {
   const [loading, setLoading] = useState(true);
   const [resetKey, setResetKey] = useState(0);
   const [error, setError] = useState("");
+  const [gekoppeldeDossiers, setGekoppeldeDossiers] = useState(null);
 
   const [publishLoading, setPublishLoading] = useState(false);
   const [publishError, setPublishError] = useState("");
-  const [publishSuccess, setPublishSuccess] = useState("");
+  const [publishSuccesOpen, setPublishSuccesOpen] = useState(false);
 
   const [nieuweVersieLoading, setNieuweVersieLoading] = useState(false);
   const [nieuweVersieError, setNieuweVersieError] = useState("");
-  const [nieuweVersieSuccess, setNieuweVersieSuccess] = useState("");
+  const [nieuweVersieSuccesOpen, setNieuweVersieSuccesOpen] = useState(false);
   const [nieuweVersieModalOpen, setNieuweVersieModalOpen] = useState(false);
+  const [publicerenModalOpen, setPublicerenModalOpen] = useState(false);
 
   // Modals
   const [toevoegenOpen, setToevoegenOpen] = useState(false);
-  const [bewerkTarget, setBewerkTarget] = useState(null); // competentie object
-  const [verwijderTarget, setVerwijderTarget] = useState(null); // competentie object
+  const [bewerkTarget, setBewerkTarget] = useState(null);
+  const [verwijderTarget, setVerwijderTarget] = useState(null);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
-      const res = await api.get("/competencies", { params: { _t: Date.now() } });
-      const { profiel, competenties } = res.data.data;
-      setProfiel(profiel);
-      setCompetenties(competenties);
+      const [compRes, dossierRes] = await Promise.all([
+        api.get("/competencies", { params: { _t: Date.now() } }),
+        api.get("/admin/dossiers").catch(() => null),
+      ]);
+      const { profiel: geladen_profiel, competenties: geladen_competenties } = compRes.data.data;
+      setProfiel(geladen_profiel);
+      setCompetenties(geladen_competenties);
       const weights = {};
-      competenties.forEach((c) => {
+      geladen_competenties.forEach((c) => {
         weights[c.id] = Number(c.gewicht_percentage);
       });
       setLocalGewichten(weights);
+
+      if (dossierRes && geladen_profiel?.academiejaar) {
+        const dossiers = dossierRes.data.data || [];
+        const count = dossiers.filter(
+          (d) => d.academiejaar === geladen_profiel.academiejaar
+        ).length;
+        setGekoppeldeDossiers(count);
+      } else {
+        setGekoppeldeDossiers(null);
+      }
     } catch (err) {
       setError(err.response?.data?.message || "Competenties ophalen mislukt");
     } finally {
@@ -325,10 +399,9 @@ export default function CompetenciesPage() {
     if (!profiel?.id) return;
     setPublishLoading(true);
     setPublishError("");
-    setPublishSuccess("");
     try {
       await api.patch(`/competencies/profiles/${profiel.id}/publish`);
-      setPublishSuccess("Competentieprofiel succesvol gepubliceerd.");
+      setPublishSuccesOpen(true);
       fetchData();
     } catch (err) {
       setPublishError(err.response?.data?.message || "Publiceren mislukt");
@@ -342,11 +415,8 @@ export default function CompetenciesPage() {
     setNieuweVersieModalOpen(false);
     setNieuweVersieLoading(true);
     setNieuweVersieError("");
-    setNieuweVersieSuccess("");
     try {
-      // Reset gewichten naar standaardwaarden op de backend
       await api.post(`/competencies/profiles/${profiel.id}/new-version`);
-      // Herlaad hetzelfde profiel — gewichten zijn nu gereset
       const res = await api.get("/competencies", { params: { _t: Date.now() } });
       const { profiel: nieuwProfiel, competenties: nieuweCompetenties } = res.data.data;
       setProfiel(nieuwProfiel);
@@ -357,7 +427,7 @@ export default function CompetenciesPage() {
       });
       setLocalGewichten(weights);
       setResetKey((k) => k + 1);
-      setNieuweVersieSuccess("Gewichten gereset naar standaardwaarden.");
+      setNieuweVersieSuccesOpen(true);
     } catch (err) {
       setNieuweVersieError(err.response?.data?.message || "Reset mislukt");
     } finally {
@@ -393,12 +463,32 @@ export default function CompetenciesPage() {
           onDeleted={() => { setVerwijderTarget(null); fetchData(); }}
         />
       )}
-
       {nieuweVersieModalOpen && (
         <NieuweVersieModal
           onClose={() => setNieuweVersieModalOpen(false)}
           onConfirm={handleNieuweVersie}
           loading={nieuweVersieLoading}
+        />
+      )}
+      {publicerenModalOpen && (
+        <PublicerenModal
+          onClose={() => setPublicerenModalOpen(false)}
+          onConfirm={() => { setPublicerenModalOpen(false); handlePublish(); }}
+          loading={publishLoading}
+        />
+      )}
+      {publishSuccesOpen && (
+        <SuccesModal
+          title="Competentieprofiel gepubliceerd"
+          message="Het competentieprofiel is succesvol gepubliceerd en is nu actief."
+          onClose={() => setPublishSuccesOpen(false)}
+        />
+      )}
+      {nieuweVersieSuccesOpen && (
+        <SuccesModal
+          title="Nieuwe versie aangemaakt"
+          message="De 11 standaardcompetenties zijn hersteld en de gewichten zijn teruggezet naar de standaardwaarden."
+          onClose={() => setNieuweVersieSuccesOpen(false)}
         />
       )}
 
@@ -407,7 +497,7 @@ export default function CompetenciesPage() {
           {/* Hero */}
           <div className="card competencies_hero">
             <div className="competencies_hero_content">
-              <span className={profiel?.status === "actief" ? "page_chip page_chip_actief" : "page_chip"}>
+              <span className={`page_chip${profiel?.status === "actief" ? " page_chip_actief" : ""}`}>
                 {profiel?.status === "actief" ? "Actief profiel" : profiel?.status ?? "—"}
               </span>
               <h1>Competentieprofiel</h1>
@@ -417,7 +507,7 @@ export default function CompetenciesPage() {
               </p>
               {error && <p style={{ color: "var(--red)", margin: "6px 0 0" }}>{error}</p>}
               {publishError && <p style={{ color: "var(--red)", margin: "6px 0 0" }}>{publishError}</p>}
-              {publishSuccess && <p style={{ color: "var(--green)", margin: "6px 0 0" }}>{publishSuccess}</p>}
+              {nieuweVersieError && <p style={{ color: "var(--red)", margin: "6px 0 0" }}>{nieuweVersieError}</p>}
             </div>
 
             <div className="competencies_hero_actions">
@@ -433,7 +523,7 @@ export default function CompetenciesPage() {
               </button>
               <button
                 className="btn primary"
-                onClick={handlePublish}
+                onClick={() => setPublicerenModalOpen(true)}
                 disabled={publishLoading || !totaalOk}
               >
                 {publishLoading
@@ -453,25 +543,22 @@ export default function CompetenciesPage() {
               </div>
               <div className="kv">
                 <span className="k">Profiel</span>
-                <span className="v">{profiel.opleiding} {profiel.academiejaar}</span>
-              </div>
-              <div className="kv">
-                <span className="k">Status</span>
-                <span className="v">
-                  <span className={`status ${profiel.status === "actief" ? "s_ok" : profiel.status === "concept" ? "s_concept" : ""}`}>
-                    {profiel.status.charAt(0).toUpperCase() + profiel.status.slice(1)}
-                  </span>
-                </span>
+                <span className="v">{profiel.opleiding}</span>
               </div>
               <div className="kv">
                 <span className="k">Geldig vanaf</span>
                 <span className="v">{profiel.academiejaar}</span>
               </div>
-              <div className="profile_note">
-                Wijzigingen aan een gepubliceerd competentieprofiel gelden alleen
-                voor nieuwe dossiers of voor dossiers waarvoor deze versie
-                expliciet wordt gekoppeld.
-              </div>
+              {gekoppeldeDossiers !== null && (
+                <div className="kv">
+                  <span className="k">Gekoppelde dossiers</span>
+                  <span className="v">
+                    {gekoppeldeDossiers === 0
+                      ? "Geen dossiers"
+                      : `${gekoppeldeDossiers} ${gekoppeldeDossiers === 1 ? "actief dossier" : "actieve dossiers"}`}
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
