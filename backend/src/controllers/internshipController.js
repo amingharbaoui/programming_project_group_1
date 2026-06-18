@@ -1684,10 +1684,89 @@ async function getApplicationDecisions(req, res) {
   }
 }
 
+// Bouwt een aflopende tijdlijn (versies + beslissingen + intrekking) voor één stagevoorstel.
+async function buildVoorstelHistoriek(voorstelId) {
+  const [voorstellen] = await db.query(
+    `SELECT id, ingetrokken_op FROM stagevoorstellen WHERE id = ? LIMIT 1`,
+    [voorstelId]
+  );
+  const voorstel = voorstellen[0];
+  if (!voorstel) return [];
+
+  const [versies] = await db.query(
+    `SELECT versie_nummer, ingediend_op, aangemaakt_op
+     FROM stagevoorstel_versies WHERE stagevoorstel_id = ? ORDER BY versie_nummer ASC`,
+    [voorstelId]
+  );
+  const [beslissingen] = await db.query(
+    `SELECT beslissing, beslist_op FROM voorstel_beslissingen
+     WHERE stagevoorstel_id = ? ORDER BY beslist_op ASC`,
+    [voorstelId]
+  );
+
+  const beslissingLabel = {
+    goedgekeurd: "Goedgekeurd door de stagecommissie",
+    goedgekeurd_met_uitzondering: "Goedgekeurd met uitzondering",
+    afgekeurd: "Afgekeurd door de stagecommissie",
+    aanpassingen_gevraagd: "Aanpassingen gevraagd door de stagecommissie"
+  };
+
+  const events = [];
+  for (const v of versies) {
+    events.push({ wat: `Versie ${v.versie_nummer} ingediend`, tijd: v.ingediend_op || v.aangemaakt_op || null });
+  }
+  for (const b of beslissingen) {
+    events.push({ wat: beslissingLabel[b.beslissing] || "Beslissing genomen", tijd: b.beslist_op || null });
+  }
+  if (voorstel.ingetrokken_op) {
+    events.push({ wat: "Voorstel ingetrokken door de student", tijd: voorstel.ingetrokken_op });
+  }
+
+  events.sort((a, b) => {
+    if (!a.tijd) return 1;
+    if (!b.tijd) return -1;
+    return new Date(b.tijd) - new Date(a.tijd);
+  });
+  if (events.length > 0) events[0].actief = true;
+  return events;
+}
+
+// GET /api/committee/applications/:id/historiek — echte tijdlijn voor de commissie (Story 14).
+async function getApplicationHistory(req, res) {
+  const id = Number(req.params.id);
+  if (!id) return fail(res, 400, "Ongeldig stagevoorstel-id");
+  try {
+    const events = await buildVoorstelHistoriek(id);
+    return ok(res, events, "Historiek opgehaald");
+  } catch (error) {
+    return fail(res, 500, "Historiek ophalen mislukt", error.message);
+  }
+}
+
+// GET /api/internships/my/historiek — echte versie-/beslissingstijdlijn van het eigen voorstel (Story 3/4).
+async function getMyInternshipHistory(req, res) {
+  const studentId = getUserId(req, 1);
+  try {
+    const events = await (async () => {
+      const [voorstellen] = await db.query(
+        `SELECT id FROM stagevoorstellen WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1`,
+        [studentId]
+      );
+      if (!voorstellen[0]) return [];
+      return buildVoorstelHistoriek(voorstellen[0].id);
+    })();
+    return ok(res, events, "Historiek opgehaald");
+  } catch (error) {
+    return fail(res, 500, "Historiek ophalen mislukt", error.message);
+  }
+}
+
 module.exports = {
   getApplicationChecklist,
   saveApplicationChecklist,
   getApplicationDecisions,
+  getApplicationHistory,
+  getMyInternshipHistory,
   createInternship,
   saveDraft,
   withdrawInternship,

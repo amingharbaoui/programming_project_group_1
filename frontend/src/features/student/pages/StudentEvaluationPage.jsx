@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
-import { apiRequest } from "../../../services/api";
+import api, { apiRequest } from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 import "./StudentEvaluationPage.css";
 import {
   IconClipboardCheck, IconCircleCheck, IconAlertCircle,
   IconClock, IconSend, IconDeviceFloppy, IconTrophy,
   IconChevronRight, IconX, IconPrinter, IconLock, IconPencil,
-  IconCheck, IconHourglass,
+  IconCheck, IconHourglass, IconDownload,
 } from "@tabler/icons-react";
 
 const SCORE_LBL = ["", "Onvoldoende", "Matig", "Voldoende", "Goed", "Uitstekend"];
@@ -122,7 +122,14 @@ function Matrix({ competenties, studentScores, mentorScores, docentScores, kanIn
             onClick={() => kanInvullen && onKlik(c)}
           >
             <span className="m-code">{c.code}</span>
-            <span className="m-naam">{c.naam}</span>
+            <span className="m-naam">
+              {c.naam}
+              {c.gewicht_percentage != null && (
+                <span style={{ display: "block", fontSize: 11, color: "var(--sub)", fontWeight: 400 }}>
+                  Weging {c.gewicht_percentage}%
+                </span>
+              )}
+            </span>
             <Pil score={zScore} variant="jij" leeg={leeg} />
             <Pil score={mScore} leeg={leeg} />
             <Pil score={dScore} variant={vrijgegeven ? "eind" : undefined} leeg={leeg} />
@@ -240,6 +247,22 @@ export default function StudentEvaluationPage() {
   function getActieveEval(evaluaties) {
     if (!evaluaties) return null;
     return evaluaties.find((e) => e.status === "open") || evaluaties[evaluaties.length - 1] || null;
+  }
+
+  async function handleDownloadEindoverzicht() {
+    try {
+      const res = await api.get("/students/me/eindoverzicht.pdf", { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "eindoverzicht.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setMelding({ type: "fout", tekst: "Eindoverzicht downloaden mislukt." });
+    }
   }
 
   function buildScoreMap(evaluatie, rol) {
@@ -372,9 +395,12 @@ export default function StudentEvaluationPage() {
             <div className="b-text">
               Vrijgegeven op {formatDatum(actief.vrijgegeven_op)}. Je scores per competentie staan in de matrix hieronder.
             </div>
-            <div style={{ marginTop: 8 }}>
-              <button className="btn primary sm" onClick={() => window.print()}>
-                <IconPrinter size={14} /> Eindoverzicht afdrukken
+            <div style={{ marginTop: 8, display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button className="btn primary sm" onClick={handleDownloadEindoverzicht}>
+                <IconDownload size={14} /> Eindoverzicht downloaden
+              </button>
+              <button className="btn sm" onClick={() => window.print()}>
+                <IconPrinter size={14} /> Afdrukken
               </button>
             </div>
           </div>
@@ -408,13 +434,6 @@ export default function StudentEvaluationPage() {
             </div>
           </div>
 
-          {/* Schaallegenda */}
-          <div className="scale-legend">
-            {[1, 2, 3, 4, 5].map((n) => (
-              <span key={n}><strong>{n}</strong> {SCORE_LBL[n]}</span>
-            ))}
-          </div>
-
           {/* Voortgang + indienen */}
           <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
             <span style={{ fontSize: 12.5, color: "var(--sub)" }}>
@@ -432,6 +451,13 @@ export default function StudentEvaluationPage() {
           </div>
         </>
       )}
+
+      {/* Rubric: scoreschaal — altijd zichtbaar (ook bij de finale/vrijgegeven evaluatie) */}
+      <div className="scale-legend">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <span key={n}><strong>{n}</strong> {SCORE_LBL[n]}</span>
+        ))}
+      </div>
 
       {/* Matrix */}
       <Matrix

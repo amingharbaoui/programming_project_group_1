@@ -281,42 +281,24 @@ function BeslisKaart({ onAanpassingen, onAfkeuren, onGoedkeuren }) {
 /* ══════════════════════════════════════════
    HISTORIEK KAART
 ══════════════════════════════════════════ */
-function HistoriekKaart({ aanvraag }) {
-  const status = aanvraag?.status;
-  const items  = [];
-
-  if (status === "aanpassingen_gevraagd") {
-    items.push({ label: "Aanpassingen gevraagd door stagecommissie", actief: true });
-    items.push({ label: "Versie 1 ingediend" });
-  } else if (status === "heringediend") {
-    items.push({ label: "Heringediend door student", actief: true });
-    items.push({ label: "Aanpassingen gevraagd door stagecommissie" });
-    items.push({ label: "Versie 1 ingediend" });
-  } else if (status === "goedgekeurd") {
-    items.push({ label: "Goedgekeurd door stagecommissie", actief: true });
-    if (aanvraag.huidige_versie_nummer > 1) items.push({ label: "Heringediend door student" });
-    if (aanvraag.laatste_feedback) items.push({ label: "Aanpassingen gevraagd door stagecommissie" });
-    items.push({ label: "Versie 1 ingediend" });
-  } else if (status === "afgekeurd") {
-    items.push({ label: "Afgekeurd door stagecommissie", actief: true });
-    items.push({ label: "Versie 1 ingediend" });
-  } else if (status === "ingetrokken") {
-    items.push({ label: "Ingetrokken door student", actief: true });
-    items.push({ label: "Versie 1 ingediend" });
-  } else {
-    return null;
-  }
-
+function HistoriekKaart({ items }) {
+  const fmt = (t) => {
+    if (!t) return "";
+    const d = new Date(t);
+    return d.toLocaleDateString("nl-BE", { day: "2-digit", month: "short", year: "numeric" }) +
+      " " + d.toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit" });
+  };
+  const lijst = Array.isArray(items) ? items : [];
   return (
     <div className="card">
       <div className="card_title"><i className="ti ti-history" /> Historiek</div>
-      {items.map((it, i) => (
+      {lijst.length === 0 ? (
+        <div style={{ fontSize: 13, color: "var(--sub)" }}>Nog geen historiek beschikbaar.</div>
+      ) : lijst.map((it, i) => (
         <div key={i} className={`comm-versie${it.actief ? " actief" : ""}`}>
           <span className="comm-v-dot" />
-          <span className="comm-v-wat">
-            <b>{it.label}</b>
-          </span>
-          {it.ts && <span className="comm-v-tijd">{it.ts}</span>}
+          <span className="comm-v-wat"><b>{it.wat}</b></span>
+          {it.tijd && <span className="comm-v-tijd">{fmt(it.tijd)}</span>}
         </div>
       ))}
     </div>
@@ -329,14 +311,8 @@ function HistoriekKaart({ aanvraag }) {
 function DiffKaart({ oud, nieuw }) {
   if (!oud || !nieuw) return null;
 
-  const velden = [
-    { key: "opdrachtomschrijving", label: "Opdrachtomschrijving" },
-    { key: "mentor_functie",       label: "Mentorfunctie" },
-    { key: "aantal_weken",         label: "Aantal weken" },
-    { key: "startdatum",           label: "Startdatum", fmt: formatDate },
-    { key: "einddatum",            label: "Einddatum",  fmt: formatDate },
-    { key: "totaal_uren",          label: "Totaal uren" },
-  ];
+  // Hergebruik dezelfde velddekking als de vergelijkmodal, zodat geen wijziging gemist wordt.
+  const velden = VERGELIJK_VELDEN;
 
   const gewijzigd = velden.filter(({ key }) =>
     String(oud[key] ?? "") !== String(nieuw[key] ?? "")
@@ -363,8 +339,17 @@ function DiffKaart({ oud, nieuw }) {
 /* ══════════════════════════════════════════
    BESLIS MODAL
 ══════════════════════════════════════════ */
+const ONDERDEEL_OPTIES = [
+  "Bedrijfsgegevens",
+  "Mentorgegevens",
+  "Stageperiode",
+  "Opdrachtomschrijving",
+  "Algemeen",
+];
+
 function BeslisModal({ type, aanvraag, criteria, onSluit, onBeslissing }) {
   const [feedback, setFeedback]   = useState("");
+  const [onderdeel, setOnderdeel] = useState("Algemeen");
   const [motivering, setMotivering] = useState("");
   const [uitzMot, setUitzMot]     = useState("");
   const [uitzondering, setUitz]   = useState(false);
@@ -387,8 +372,12 @@ function BeslisModal({ type, aanvraag, criteria, onSluit, onBeslissing }) {
       await api.patch(`/committee/applications/${aanvraag.id}/decision`, {
         beslissing,
         feedback:               type === "aanpassingen" ? feedback   : null,
+        onderdeel:              type === "aanpassingen" ? onderdeel  : null,
         motivering:             type !== "aanpassingen" ? motivering : null,
         uitzonderingMotivering: uitzondering ? uitzMot : null,
+        metUitzondering:        type === "goedkeuren" && uitzondering,
+        criteria,
+        alleCriteriaOk:         allesCriteria,
       });
       onBeslissing();
       onSluit();
@@ -439,20 +428,39 @@ function BeslisModal({ type, aanvraag, criteria, onSluit, onBeslissing }) {
 
           {/* Feedback / motivering */}
           {type === "aanpassingen" && (
-            <div className="form_group" style={{ marginTop: 14 }}>
-              <label className="form_label">Feedback aan student <span style={{ color: "var(--red)" }}>*</span></label>
-              <textarea
-                className="form_textarea"
-                rows={4}
-                placeholder="Welke aanpassingen zijn nodig?"
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-              />
-            </div>
+            <>
+              <div className="form_group" style={{ marginTop: 14 }}>
+                <label className="form_label">Onderdeel</label>
+                <select
+                  className="form_input"
+                  value={onderdeel}
+                  onChange={(e) => setOnderdeel(e.target.value)}
+                >
+                  {ONDERDEEL_OPTIES.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              <div className="form_group">
+                <label className="form_label">Feedback aan student <span style={{ color: "var(--red)" }}>*</span></label>
+                <textarea
+                  className="form_textarea"
+                  rows={4}
+                  placeholder="Welke aanpassingen zijn nodig?"
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                />
+              </div>
+            </>
           )}
 
           {(type === "afkeuren") && (
             <div className="form_group" style={{ marginTop: 14 }}>
+              <div className="banner rood" style={{ marginBottom: 12 }}>
+                <i className="ti ti-alert-triangle" />
+                <div>
+                  <div className="b-title">Afkeuring is definitief</div>
+                  <div className="b-text">Het voorstel wordt afgekeurd en kan niet meer beoordeeld worden. De student moet een nieuw voorstel starten.</div>
+                </div>
+              </div>
               <label className="form_label">Motivering voor de student <span style={{ color: "var(--red)" }}>*</span></label>
               <textarea
                 className="form_textarea"
@@ -610,6 +618,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
   const [vergelijkOpen, setVergelijk] = useState(false);
   const [versies, setVersies]       = useState([]);
   const [versiesLoading, setVLaden] = useState(false);
+  const [historiek, setHistoriek]   = useState([]);
 
   const status     = aanvraag.status;
   const isBeslis   = ["ingediend", "heringediend"].includes(status);
@@ -628,6 +637,20 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
         .finally(() => setVLaden(false));
     }
   }, [aanvraag.id, status, heeftMeerdereVersies]);
+
+  // Echte historiek + eerder opgeslagen criteriaresultaten laden.
+  useEffect(() => {
+    api.get(`/committee/applications/${aanvraag.id}/historiek`)
+      .then((r) => setHistoriek(r.data.data || []))
+      .catch(() => {});
+    api.get(`/committee/applications/${aanvraag.id}/checklist`)
+      .then((r) => {
+        const seed = {};
+        (r.data.data || []).forEach((c) => { seed[c.criterium] = !!c.is_in_orde; });
+        if (Object.keys(seed).length > 0) setCriteria(seed);
+      })
+      .catch(() => {});
+  }, [aanvraag.id]);
 
   function toggleCrit(id, val) {
     setCriteria((prev) => ({ ...prev, [id]: val }));
@@ -709,8 +732,11 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
           <div className="banner groen" style={{ marginBottom: 16 }}>
             <i className="ti ti-check" />
             <div>
-              <div className="b-title">Stagevoorstel goedgekeurd</div>
+              <div className="b-title">Stagevoorstel goedgekeurd{aanvraag.laatste_uitzondering_motivering ? " (met uitzondering)" : ""}</div>
               <div className="b-text">Het stagevoorstel voldoet aan de criteria. Administratie start de stageovereenkomst en registratieflow op.</div>
+              {aanvraag.laatste_uitzondering_motivering && (
+                <div className="b-text" style={{ marginTop: 6 }}><strong>Uitzondering:</strong> {aanvraag.laatste_uitzondering_motivering}</div>
+              )}
             </div>
           </div>
         )}
@@ -722,6 +748,9 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
             <div>
               <div className="b-title">Stagevoorstel afgekeurd</div>
               <div className="b-text">De student kan een nieuw stagevoorstel starten — er wordt geen stagedossier aangemaakt.</div>
+              {aanvraag.laatste_motivering && (
+                <div className="b-text" style={{ marginTop: 6 }}><strong>Reden:</strong> {aanvraag.laatste_motivering}</div>
+              )}
             </div>
           </div>
         )}
@@ -749,7 +778,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
               )}
               <VoorstelKaart aanvraag={aanvraag} />
             </div>
-            <HistoriekKaart aanvraag={aanvraag} />
+            <HistoriekKaart items={historiek} />
           </>
         )}
 
@@ -781,7 +810,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
               </div>
               <div className="comm-gap-16">
                 <CriteriaKaart aanvraag={aanvraag} criteria={criteria} onChange={toggleCrit} readonly={false} />
-                <HistoriekKaart aanvraag={aanvraag} />
+                <HistoriekKaart items={historiek} />
               </div>
             </div>
           </>
@@ -809,7 +838,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
           <>
             <VoorstelKaart aanvraag={aanvraag} />
             <CriteriaKaart aanvraag={aanvraag} criteria={{}} onChange={() => {}} readonly />
-            <HistoriekKaart aanvraag={aanvraag} />
+            <HistoriekKaart items={historiek} />
           </>
         )}
       </div>
@@ -821,6 +850,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
    OVERZICHT VIEW
 ══════════════════════════════════════════ */
 function OverzichtView({ aanvragen, loading, fout, onVernieuwen, onOpen }) {
+  const [filter, setFilter] = useState("alle"); // 'alle' | 'open' | 'afgerond'
   const stats = [
     { lbl: "Nieuwe aanvragen", n: aanvragen.filter((a) => a.status === "ingediend").length,             ic: "ti-file-plus" },
     { lbl: "Heringediend",     n: aanvragen.filter((a) => a.status === "heringediend").length,           ic: "ti-refresh" },
@@ -828,12 +858,25 @@ function OverzichtView({ aanvragen, loading, fout, onVernieuwen, onOpen }) {
     { lbl: "Afgerond",         n: aanvragen.filter((a) => ["goedgekeurd","afgekeurd","ingetrokken"].includes(a.status)).length, ic: "ti-circle-check" },
   ];
 
+  /* Filter (nieuw+heringediend / afgerond / alle) */
+  const zichtbaar = aanvragen.filter((a) => {
+    if (filter === "open") return kanBeslissen(a.status);
+    if (filter === "afgerond") return ["goedgekeurd", "afgekeurd", "ingetrokken"].includes(a.status);
+    return true;
+  });
+
   /* Sorteer: openstaand eerst, dan behandeld */
-  const gesorteerd = [...aanvragen].sort((a, b) => {
+  const gesorteerd = [...zichtbaar].sort((a, b) => {
     const aOpen = kanBeslissen(a.status) ? 0 : 1;
     const bOpen = kanBeslissen(b.status) ? 0 : 1;
     return aOpen - bOpen;
   });
+
+  const FILTERS = [
+    { id: "alle",     label: "Alle" },
+    { id: "open",     label: "Nieuw + heringediend" },
+    { id: "afgerond", label: "Afgerond" },
+  ];
 
   function knopConfig(status) {
     if (status === "ingediend")             return { label: "Beoordelen",          primary: true };
@@ -868,6 +911,19 @@ function OverzichtView({ aanvragen, loading, fout, onVernieuwen, onOpen }) {
         ))}
       </div>
 
+      {/* Filter */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        {FILTERS.map((f) => (
+          <button
+            key={f.id}
+            className={`btn sm${filter === f.id ? " primary" : ""}`}
+            onClick={() => setFilter(f.id)}
+          >
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {loading && <div className="laadbericht">Aanvragen laden…</div>}
       {fout    && <div style={{ color: "var(--red)", fontSize: 13, marginBottom: 12 }}>{fout}</div>}
 
@@ -882,6 +938,7 @@ function OverzichtView({ aanvragen, loading, fout, onVernieuwen, onOpen }) {
                 <tr>
                   <th>Student</th>
                   <th>Stagebedrijf</th>
+                  <th>Versie</th>
                   <th>Ingediend</th>
                   <th>Status</th>
                   <th className="right">Actie</th>
@@ -906,6 +963,9 @@ function OverzichtView({ aanvragen, loading, fout, onVernieuwen, onOpen }) {
                       </td>
                       <td>
                         <span style={{ fontWeight: 600 }}>{a.bedrijf_naam || "–"}</span>
+                      </td>
+                      <td>
+                        <span className="muted">v{a.huidige_versie_nummer || 1}</span>
                       </td>
                       <td>
                         <span className="muted">{formatDate(a.ingediend_op)}</span>

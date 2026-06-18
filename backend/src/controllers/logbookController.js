@@ -935,9 +935,104 @@ async function mentorConfirmLogbookDay(req, res) {
   }
 }
 
+// PATCH /api/logbooks/entries/:id — één logboekdag van de ingelogde student bijwerken (Story 7).
+async function updateLogbookEntry(req, res) {
+  const studentId = getUserId(req, 1);
+  const entryId = Number(req.params.id);
+
+  if (!entryId) return fail(res, 400, "Ongeldige logboekdag-id");
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [rows] = await connection.query(
+      `
+      SELECT ld.id, ld.logboek_week_id, lw.status AS week_status, d.student_id
+      FROM logboek_dagen ld
+      JOIN logboek_weken lw ON lw.id = ld.logboek_week_id
+      JOIN stagedossiers d ON d.id = lw.stagedossier_id
+      WHERE ld.id = ?
+      LIMIT 1
+      `,
+      [entryId]
+    );
+
+    const entry = rows[0];
+    if (!entry) {
+      await connection.rollback();
+      return fail(res, 404, "Logboekdag niet gevonden");
+    }
+    if (entry.student_id !== studentId) {
+      await connection.rollback();
+      return fail(res, 403, "Je mag alleen je eigen logboekdagen aanpassen");
+    }
+    if (entry.week_status === "afgesloten") {
+      await connection.rollback();
+      return fail(res, 409, "Deze week is afgesloten en kan niet meer aangepast worden");
+    }
+
+    const b = req.body || {};
+    const velden = [];
+    const params = [];
+    const setVeld = (kolom, waarde) => { velden.push(`${kolom} = ?`); params.push(waarde); };
+
+    if (b.status !== undefined) setVeld("status", b.status);
+    if (b.titel !== undefined) setVeld("titel", b.titel || null);
+    if (b.uitgevoerdeTaken !== undefined || b.uitgevoerde_taken !== undefined)
+      setVeld("uitgevoerde_taken", b.uitgevoerdeTaken ?? b.uitgevoerde_taken ?? null);
+    if (b.reflectie !== undefined) setVeld("reflectie", b.reflectie || null);
+    if (b.problemen !== undefined) setVeld("problemen", b.problemen || null);
+    if (b.leerpunten !== undefined) setVeld("leerpunten", b.leerpunten || null);
+    if (b.competenties !== undefined) {
+      const comp = Array.isArray(b.competenties) ? b.competenties : [];
+      setVeld("competenties", comp.length > 0 ? JSON.stringify(comp) : null);
+    }
+    if (b.aantalUren !== undefined || b.aantal_uren !== undefined) {
+      const uren = Number(b.aantalUren ?? b.aantal_uren ?? 0);
+      if (uren < 0) {
+        await connection.rollback();
+        return fail(res, 400, "Aantal uren kan niet negatief zijn");
+      }
+      setVeld("aantal_uren", uren);
+    }
+
+    if (velden.length === 0) {
+      await connection.rollback();
+      return fail(res, 400, "Geen velden om bij te werken");
+    }
+
+    params.push(entryId);
+    await connection.query(
+      `UPDATE logboek_dagen SET ${velden.join(", ")}, aangepast_op = NOW() WHERE id = ?`,
+      params
+    );
+
+    await connection.query(
+      `
+      UPDATE logboek_weken
+      SET totaal_uren = (
+        SELECT COALESCE(SUM(aantal_uren), 0) FROM logboek_dagen WHERE logboek_week_id = ?
+      ), aangepast_op = NOW()
+      WHERE id = ?
+      `,
+      [entry.logboek_week_id, entry.logboek_week_id]
+    );
+
+    await connection.commit();
+    return ok(res, { id: entryId, logboekWeekId: entry.logboek_week_id }, "Logboekdag bijgewerkt");
+  } catch (error) {
+    await connection.rollback();
+    return fail(res, 500, "Logboekdag bijwerken mislukt", error.message);
+  } finally {
+    connection.release();
+  }
+}
+
 module.exports = {
   createLogbook,
   saveLogbookDay,
+  updateLogbookEntry,
   getLogbooksByStudent,
   mentorConfirmLogbookDay,
   mentorCheckLogbookWeek,

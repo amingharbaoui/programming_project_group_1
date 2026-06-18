@@ -219,6 +219,31 @@ function TaakKaart({ status, contractStudentGekend, volledigGetekend, docsOk, na
   );
 }
 
+// Echte versie-/beslissingstijdlijn van het eigen voorstel (Story 3/4).
+function Historiek({ items }) {
+  const fmt = (t) => {
+    if (!t) return "—";
+    const d = new Date(t);
+    return d.toLocaleDateString("nl-BE", { day: "2-digit", month: "short", year: "numeric" }) +
+      " " + d.toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit" });
+  };
+  const lijst = Array.isArray(items) && items.length > 0 ? items : null;
+  return (
+    <div className="card">
+      <div className="card_title"><IconHistory size={16} />Historiek</div>
+      {lijst
+        ? lijst.map((ev, i) => (
+            <div key={i} className={`versie${ev.actief ? " actief" : ""}`}>
+              <span className="v-dot"></span>
+              <span className="v-wat"><b>{ev.wat}</b></span>
+              <span className="v-tijd">{fmt(ev.tijd)}</span>
+            </div>
+          ))
+        : <p style={{ fontSize: 13, color: "var(--sub)" }}>Nog geen historiek beschikbaar.</p>}
+    </div>
+  );
+}
+
 export default function MyInternshipPage() {
   const navigate  = useNavigate();
   const location  = useLocation();
@@ -232,6 +257,7 @@ export default function MyInternshipPage() {
   const [contractStudentGekend, setContractStudentGekend] = useState(false);
   const [volledigGetekend, setVolledigGetekend] = useState(false);
   const [docsOk, setDocsOk] = useState(false);
+  const [historiek, setHistoriek] = useState([]);
 
   useEffect(() => {
     async function fetchData() {
@@ -242,6 +268,12 @@ export default function MyInternshipPage() {
         // geen voorstel
       } finally {
         setLoading(false);
+      }
+      try {
+        const res = await apiRequest("GET", "/internships/my/historiek");
+        if (Array.isArray(res.data)) setHistoriek(res.data);
+      } catch {
+        // geen historiek — ok
       }
       try {
         const res = await apiRequest("GET", "/contracts/my");
@@ -383,11 +415,7 @@ export default function MyInternshipPage() {
               </div>
             </div>
           </div>
-          <div className="card">
-            <div className="card_title"><IconHistory size={16} />Historiek</div>
-            <div className="versie actief"><span className="v-dot"></span><span className="v-wat"><b>Afgekeurd</b></span><span className="v-tijd">—</span></div>
-            <div className="versie"><span className="v-dot"></span><span className="v-wat"><b>Voorstel ingediend</b></span><span className="v-tijd">—</span></div>
-          </div>
+          <Historiek items={historiek} />
         </>
       )}
 
@@ -407,11 +435,7 @@ export default function MyInternshipPage() {
               </div>
             </div>
           </div>
-          <div className="card">
-            <div className="card_title"><IconHistory size={16} />Historiek</div>
-            <div className="versie actief"><span className="v-dot"></span><span className="v-wat"><b>Voorstel ingetrokken</b> door jou</span><span className="v-tijd">—</span></div>
-            <div className="versie"><span className="v-dot"></span><span className="v-wat"><b>Versie 1 ingediend</b></span><span className="v-tijd">—</span></div>
-          </div>
+          <Historiek items={historiek} />
         </>
       )}
 
@@ -453,11 +477,8 @@ export default function MyInternshipPage() {
               <div className="b-text">Je hebt versie 2 van je stagevoorstel ingediend. De stagecommissie herbeoordeelt je aanvraag. Je krijgt een melding zodra er een beslissing is.</div>
             </div>
           </div>
-          <div className="card" style={{ marginBottom: 16 }}>
-            <div className="card_title"><IconHistory size={16} />Historiek</div>
-            <div className="versie actief"><span className="v-dot"></span><span className="v-wat"><b>Versie 2 heringediend</b></span><span className="v-tijd">—</span></div>
-            <div className="versie"><span className="v-dot"></span><span className="v-wat"><b>Aanpassingen gevraagd</b> door de stagecommissie</span><span className="v-tijd">—</span></div>
-            <div className="versie"><span className="v-dot"></span><span className="v-wat"><b>Versie 1 ingediend</b></span><span className="v-tijd">—</span></div>
+          <div style={{ marginBottom: 16 }}>
+            <Historiek items={historiek} />
           </div>
           <div style={{ borderTop: "1px solid var(--border)", marginTop: 6, paddingTop: 14 }}>
             <div className="grid_2">
@@ -491,10 +512,8 @@ export default function MyInternshipPage() {
               </button>
             </div>
           </div>
-          <div className="card" style={{ marginTop: 16 }}>
-            <div className="card_title"><IconHistory size={16} />Historiek</div>
-            <div className="versie actief"><span className="v-dot"></span><span className="v-wat"><b>Feedback ontvangen</b></span><span className="v-tijd">—</span></div>
-            <div className="versie"><span className="v-dot"></span><span className="v-wat"><b>Versie 1 ingediend</b></span><span className="v-tijd">—</span></div>
+          <div style={{ marginTop: 16 }}>
+            <Historiek items={historiek} />
           </div>
         </>
       )}
