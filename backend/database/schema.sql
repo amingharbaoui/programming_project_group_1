@@ -194,6 +194,7 @@ CREATE TABLE `logboek_dagen` (
   `problemen` text,
   `leerpunten` text,
   `aantal_uren` decimal(4,2) DEFAULT NULL,
+  `mentor_bevestigd_op` timestamp NULL DEFAULT NULL,
   `aangemaakt_op` timestamp NULL DEFAULT NULL,
   `aangepast_op` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),

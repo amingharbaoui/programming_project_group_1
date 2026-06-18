@@ -428,7 +428,8 @@ async function getLogbooksByStudent(req, res) {
         reflectie,
         problemen,
         leerpunten,
-        aantal_uren
+        aantal_uren,
+        mentor_bevestigd_op
       FROM logboek_dagen
       WHERE logboek_week_id IN (?)
       ORDER BY datum ASC
@@ -908,10 +909,40 @@ async function saveLogbookDay(req, res) {
   }
 }
 
+// PATCH /api/mentor/logbooks/days/:dayId/confirm — mentor bevestigt één logboekdag (story 31).
+async function mentorConfirmLogbookDay(req, res) {
+  const dayId = Number(req.params.dayId);
+  const mentorId = Number(req.user?.id);
+  if (!dayId) return fail(res, 400, "Ongeldig dag-id");
+
+  try {
+    const [rows] = await db.query(
+      `SELECT ld.id, ld.status, d.mentor_id
+       FROM logboek_dagen ld
+       JOIN logboek_weken lw ON lw.id = ld.logboek_week_id
+       JOIN stagedossiers d ON d.id = lw.stagedossier_id
+       WHERE ld.id = ? LIMIT 1`,
+      [dayId]
+    );
+    if (rows.length === 0) return fail(res, 404, "Logboekdag niet gevonden");
+    if (Number(rows[0].mentor_id) !== mentorId) return fail(res, 403, "Je bent niet de mentor van deze stagiair");
+    if (rows[0].status === "geen_stagedag") return fail(res, 400, "Een dag zonder stage kan niet bevestigd worden");
+
+    await db.query(
+      "UPDATE logboek_dagen SET mentor_bevestigd_op = NOW(), aangepast_op = NOW() WHERE id = ?",
+      [dayId]
+    );
+    return ok(res, { id: dayId }, "Logboekdag bevestigd");
+  } catch (error) {
+    return fail(res, 500, "Logboekdag bevestigen mislukt", error.message);
+  }
+}
+
 module.exports = {
   createLogbook,
   saveLogbookDay,
   getLogbooksByStudent,
+  mentorConfirmLogbookDay,
   mentorCheckLogbookWeek,
   docentReviewLogbookWeek,
   studentAntwoordFeedback,
