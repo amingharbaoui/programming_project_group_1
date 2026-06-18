@@ -127,8 +127,11 @@ export default function App() {
             <Route path="/admin/competencies" element={<CompetenciesPage />} />
 
             <Route path="/docent/students" element={<DocentStudentsPage />} />
+            <Route path="/docent/students/:dossierId/dossier" element={<DocentStudentDossierPage />} />
+            <Route path="/docent/proposals" element={<DocentProposalsPage />} />
             <Route path="/docent/logbooks" element={<DocentLogbooksPage />} />
             <Route path="/docent/evaluations" element={<DocentEvaluationsPage />} />
+            <Route path="/docent/planning" element={<DocentPlanningPage />} />
           </Route>
 
           <Route element={<MentorLayout />}>
@@ -139,13 +142,6 @@ export default function App() {
             <Route path="/mentor/contract" element={<MentorContractPage />} />
             <Route path="/mentor/afspraken" element={<MentorAfsprakenPage />} />
             <Route path="/mentor/planning" element={<MentorPlanningPage />} />
-
-            <Route path="/docent/students" element={<DocentStudentsPage />} />
-            <Route path="/docent/students/:dossierId/dossier" element={<DocentStudentDossierPage />} />
-            <Route path="/docent/proposals" element={<DocentProposalsPage />} />
-            <Route path="/docent/logbooks" element={<DocentLogbooksPage />} />
-            <Route path="/docent/evaluations" element={<DocentEvaluationsPage />} />
-            <Route path="/docent/planning" element={<DocentPlanningPage />} />
           </Route>
         </Routes>
       </BrowserRouter>
