@@ -397,13 +397,23 @@ function BeslisModal({ type, aanvraag, criteria, onSluit, onBeslissing }) {
     if (type === "aanpassingen" && !feedback.trim()) { setFout("Feedback is verplicht."); return; }
     if (type === "afkeuren" && !motivering.trim())   { setFout("Motivering is verplicht."); return; }
     if (type === "goedkeuren" && uitzondering && !uitzMot.trim()) { setFout("Motivering uitzondering is verplicht."); return; }
+    if (type === "goedkeuren" && !uitzondering && !allesCriteria) { setFout("Vink alle criteria af, of keur goed met een gemotiveerde uitzondering."); return; }
 
     setBezig(true);
     setFout("");
     try {
       const beslissing = type === "aanpassingen" ? "aanpassingen_gevraagd"
                        : type === "afkeuren"     ? "afgekeurd"
+                       : uitzondering            ? "goedgekeurd_met_uitzondering"
                        : "goedgekeurd";
+
+      // Bij een gewone goedkeuring eerst de afgevinkte checklist opslaan (de backend vereist dit).
+      if (type === "goedkeuren" && !uitzondering) {
+        await api.put(`/committee/applications/${aanvraag.id}/checklist`, {
+          items: CRITERIA_DEFS.map((c) => ({ criterium: c.label, isVerplicht: true, isInOrde: !!criteria[c.id] })),
+        });
+      }
+
       await api.patch(`/committee/applications/${aanvraag.id}/decision`, {
         beslissing,
         feedback:               type === "aanpassingen" ? feedback   : null,
