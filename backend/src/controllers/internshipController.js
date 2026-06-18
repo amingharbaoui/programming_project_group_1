@@ -208,6 +208,16 @@ async function createInternship(req, res) {
     const aantalWeken = calculateWeeks(startdatum, einddatum);
     const totaalUren = aantalWeken * finalUrenPerWeek;
 
+    // Controle op de minimumregels van de opleiding.
+    if (stageRegel.minimum_weken && aantalWeken < Number(stageRegel.minimum_weken)) {
+      await connection.rollback();
+      return fail(res, 400, `De stageperiode moet minstens ${stageRegel.minimum_weken} weken bedragen (nu ${aantalWeken} weken).`);
+    }
+    if (stageRegel.minimum_uren && totaalUren < Number(stageRegel.minimum_uren)) {
+      await connection.rollback();
+      return fail(res, 400, `De stage moet minstens ${stageRegel.minimum_uren} uren bedragen (nu ${totaalUren} uren).`);
+    }
+
     // Als er al een concept bestaat, upgrade dat naar 'ingediend' i.p.v. nieuw aanmaken
     const [conceptRows] = await connection.query(
       "SELECT id, bedrijf_id FROM stagevoorstellen WHERE student_id = ? AND status = 'concept' ORDER BY aangemaakt_op DESC LIMIT 1",
@@ -253,6 +263,18 @@ async function createInternship(req, res) {
         [stagevoorstelId]
       );
     } else {
+      // Voorkom een tweede lopend voorstel naast een al ingediend of goedgekeurd voorstel.
+      const [actief] = await connection.query(
+        `SELECT id FROM stagevoorstellen
+         WHERE student_id = ? AND status NOT IN ('concept', 'afgekeurd', 'ingetrokken')
+         LIMIT 1`,
+        [studentId]
+      );
+      if (actief.length > 0) {
+        await connection.rollback();
+        return fail(res, 409, "Je hebt al een lopend stagevoorstel. Trek dat eerst in voor je een nieuw voorstel indient.");
+      }
+
       // Geen concept: maak alles nieuw aan
       const voorlopigeStagebegeleiderId = await getDefaultDocentId(connection);
       if (!voorlopigeStagebegeleiderId) {
