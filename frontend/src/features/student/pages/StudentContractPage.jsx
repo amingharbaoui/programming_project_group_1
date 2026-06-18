@@ -146,7 +146,6 @@ export default function StudentContractPage() {
 
       <div className="page-header">
         <h1>Stageovereenkomst</h1>
-        <p>Opgesteld door de stagecoördinator · digitaal ondertekend in de tool · regelt ook je verzekering</p>
       </div>
 
       {fout && (

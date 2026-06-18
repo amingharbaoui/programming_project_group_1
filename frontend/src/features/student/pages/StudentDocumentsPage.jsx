@@ -86,7 +86,7 @@ function DocumentKaart({ soort, documenten, onUpload, onFout, onBekijken }) {
           <div className="doc-naam">{soort.naam}</div>
           {actief && (
             <div className="doc-meta">
-              Versie {actief.versie_nummer} · {formatDatum(actief.opgeladen_op)}
+              {formatDatum(actief.opgeladen_op)}
             </div>
           )}
           {actief?.afkeurreden && (
