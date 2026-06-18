@@ -165,12 +165,36 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
     }
   }
 
+  async function handleOpenen() {
+    if (!evalData?.stagedossierId) return;
+    try {
+      setBezig(true);
+      setMelding({ tekst: "", type: "" });
+      await api.post("/evaluations/open", { stagedossierId: evalData.stagedossierId, type: activeType });
+      onRefresh && onRefresh();
+    } catch (err) {
+      setMelding({ tekst: err.response?.data?.message || "Openen mislukt", type: "s_rood" });
+    } finally {
+      setBezig(false);
+    }
+  }
+
   if (!evaluatie || evaluatie.status === "niet_open") {
     return (
       <div className="card">
         <p className="muted">
           {activeType === "tussentijds" ? "Tussentijdse" : "Finale"} evaluatie is nog niet beschikbaar.
         </p>
+        {evalData?.stagedossierId && (
+          <div className="actions" style={{ marginTop: "10px" }}>
+            <button className="btn primary" disabled={bezig} onClick={handleOpenen}>
+              {bezig ? "Bezig..." : `${activeType === "tussentijds" ? "Tussentijdse" : "Finale"} evaluatie openen`}
+            </button>
+            {melding.tekst && (
+              <span className={`status ${melding.type}`} style={{ marginLeft: "8px" }}>{melding.tekst}</span>
+            )}
+          </div>
+        )}
       </div>
     );
   }
