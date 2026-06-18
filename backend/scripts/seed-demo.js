@@ -49,6 +49,11 @@ async function main() {
       [2, "Koen", "Wouters", "docent@ehb.be", "docent", "actief"],
       [3, "Lien", "Maes", "docent2@ehb.be", "docent", "actief"],
       [4, "Tom", "Admin", "admin@ehb.be", "administratie", "actief"],
+      [18, "Bram", "Devos", "commissie2@ehb.be", "stagecommissie", "actief"],
+      [19, "Eva", "Janssens", "admin2@ehb.be", "administratie", "actief"],
+      [20, "Jeroen", "Claes", "docent3@ehb.be", "docent", "actief"],
+      [21, "Inge", "Vermeulen", "commissie3@ehb.be", "stagecommissie", "actief"],
+      [22, "Karim", "Haddad", "admin3@ehb.be", "administratie", "actief"],
       // mentoren
       [5, "Sofie", "Maris", "mentor@bedrijf.be", "mentor", "actief"],
       [6, "Jan", "Peeters", "mentor2@bedrijf.be", "mentor", "actief"],
@@ -85,7 +90,12 @@ async function main() {
       (1,'P0001','stagecommissie','Lid stagecommissie','Toegepaste Informatica'),
       (2,'P0002','docent','Stagebegeleider','Toegepaste Informatica'),
       (3,'P0003','docent','Stagebegeleider','Toegepaste Informatica'),
-      (4,'P0004','administratie','Administratief medewerker','Stageadministratie')`);
+      (4,'P0004','administratie','Administratief medewerker','Stageadministratie'),
+      (18,'P0018','stagecommissie','Lid stagecommissie','Toegepaste Informatica'),
+      (19,'P0019','administratie','Administratief medewerker','Stageadministratie'),
+      (20,'P0020','docent','Stagebegeleider','Toegepaste Informatica'),
+      (21,'P0021','stagecommissie','Lid stagecommissie','Toegepaste Informatica'),
+      (22,'P0022','administratie','Administratief medewerker','Stageadministratie')`);
 
     /* ---------- MENTOREN ---------- */
     await q(`INSERT INTO mentoren (gebruiker_id, bedrijf_id, functie, telefoon, mag_stageovereenkomst_tekenen, uitnodiging_status, uitnodiging_token, uitnodiging_vervalt_op, geactiveerd_op) VALUES
