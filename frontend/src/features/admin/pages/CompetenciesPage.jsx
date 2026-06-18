@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import "./CompetenciesPage.css";
 import {
-  IconChecks,
+  IconCheck,
   IconCopyPlus,
   IconEdit,
   IconListDetails,
+  IconId,
   IconTrash,
   IconLoader2,
   IconX,
@@ -259,7 +260,7 @@ function PublicerenModal({ onClose, onConfirm, loading }) {
             disabled={loading}
             type="button"
           >
-            {loading ? <IconLoader2 size={16} stroke={1.8} className="spin" /> : <IconChecks size={16} stroke={1.8} />}
+            {loading ? <IconLoader2 size={16} stroke={1.8} className="spin" /> : <IconCheck size={16} stroke={1.8} />}
             Ja, publiceren
           </button>
         </div>
@@ -517,8 +518,8 @@ export default function CompetenciesPage() {
                 disabled={nieuweVersieLoading}
               >
                 {nieuweVersieLoading
-                  ? <IconLoader2 size={18} stroke={1.8} className="spin" />
-                  : <IconCopyPlus size={18} stroke={1.8} />}
+                  ? <IconLoader2 size={16} stroke={1.8} className="spin" />
+                  : <IconCopyPlus size={16} stroke={1.8} />}
                 Nieuwe versie maken
               </button>
               <button
@@ -527,8 +528,8 @@ export default function CompetenciesPage() {
                 disabled={publishLoading || !totaalOk}
               >
                 {publishLoading
-                  ? <IconLoader2 size={18} stroke={1.8} className="spin" />
-                  : <IconChecks size={18} stroke={1.8} />}
+                  ? <IconLoader2 size={16} stroke={1.8} className="spin" />
+                  : <IconCheck size={16} stroke={1.8} />}
                 Publiceren
               </button>
             </div>
@@ -538,7 +539,7 @@ export default function CompetenciesPage() {
           {!loading && profiel && (
             <div className="card profile_card">
               <div className="card_title">
-                <IconListDetails size={17} stroke={1.8} />
+                <IconId size={16} stroke={1.8} />
                 Profiel
               </div>
               <div className="kv">
@@ -566,11 +567,11 @@ export default function CompetenciesPage() {
           <div className="card competencies_card">
             <div className="competencies_head">
               <div className="card_title">
-                <IconListDetails size={17} stroke={1.8} />
+                <IconListDetails size={16} stroke={1.8} />
                 Competenties
               </div>
               <button className="btn" onClick={() => setToevoegenOpen(true)}>
-                <IconCopyPlus size={18} stroke={1.8} />
+                <IconCopyPlus size={16} stroke={1.8} />
                 Competentie toevoegen
               </button>
             </div>
@@ -613,7 +614,7 @@ export default function CompetenciesPage() {
                         aria-label="Competentie bewerken"
                         onClick={() => setBewerkTarget(c)}
                       >
-                        <IconEdit size={17} stroke={1.8} />
+                        <IconEdit size={16} stroke={1.8} />
                       </button>
                       <button
                         className="icon_btn"
@@ -621,7 +622,7 @@ export default function CompetenciesPage() {
                         aria-label="Competentie verwijderen"
                         onClick={() => setVerwijderTarget(c)}
                       >
-                        <IconTrash size={17} stroke={1.8} />
+                        <IconTrash size={16} stroke={1.8} />
                       </button>
                     </div>
                   </div>
@@ -676,8 +677,8 @@ export default function CompetenciesPage() {
               disabled={nieuweVersieLoading}
             >
               {nieuweVersieLoading
-                ? <IconLoader2 size={18} stroke={1.8} className="spin" />
-                : <IconCopyPlus size={18} stroke={1.8} />}
+                ? <IconLoader2 size={16} stroke={1.8} className="spin" />
+                : <IconCopyPlus size={16} stroke={1.8} />}
               Nieuwe versie maken
             </button>
             <button
@@ -686,8 +687,8 @@ export default function CompetenciesPage() {
               disabled={publishLoading || !totaalOk}
             >
               {publishLoading
-                ? <IconLoader2 size={18} stroke={1.8} className="spin" />
-                : <IconChecks size={18} stroke={1.8} />}
+                ? <IconLoader2 size={16} stroke={1.8} className="spin" />
+                : <IconCheck size={16} stroke={1.8} />}
               Publiceren
             </button>
           </div>

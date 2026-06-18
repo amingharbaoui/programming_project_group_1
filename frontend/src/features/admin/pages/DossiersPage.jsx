@@ -1,57 +1,112 @@
 import { useEffect, useState } from "react";
+import { IconEye, IconX } from "@tabler/icons-react";
+import { useNavigate } from "react-router-dom";
 import "./DossiersPage.css";
 import "../../../index.css";
 import api from "../../../services/api";
-import { useAuth } from "../../../context/AuthContext";
+import { cacheGet, cacheSet } from "../adminCache";
 
-const STATUS_CLASSES = {
-  contract_pending: "s_amber",
-  documents_pending: "s_amber",
-  active: "s_ok",
-  completed: "s_ok",
-  afgerond: "s_ok",
-  resultaat_vrijgegeven: "s_info",
-  goedgekeurd: "s_ok",
-  afgekeurd: "s_rood",
-  ingediend: "s_info",
-  ontbreekt: "s_rood",
-  geregistreerd: "s_ok",
+const STATUS_LABELS = {
+  wacht_op_student:              "Wacht op student",
+  wacht_op_bedrijf:              "Wacht op bedrijf",
+  in_controle_bij_administratie: "In controle",
+  document_afgekeurd:            "Document afgekeurd",
+  geregistreerd:                 "Geregistreerd",
+  stage_loopt:                   "Stage loopt",
+  resultaat_vrijgegeven:         "Resultaat vrijgegeven",
+  afgerond:                      "Afgerond",
 };
 
-function statusClass(status) {
-  return STATUS_CLASSES[status] || "s_amber";
+const STATUS_CLASSES = {
+  wacht_op_student:              "s_amber",
+  wacht_op_bedrijf:              "s_amber",
+  in_controle_bij_administratie: "s_amber",
+  document_afgekeurd:            "s_rood",
+  geregistreerd:                 "s_ok",
+  stage_loopt:                   "s_info",
+  resultaat_vrijgegeven:         "s_amber",
+  afgerond:                      "s_ok",
+};
+
+const NEEDS_ACTION = [
+  "in_controle_bij_administratie",
+  "document_afgekeurd",
+  "resultaat_vrijgegeven",
+];
+
+const FILTER_OPTIES = [
+  { value: "",                              label: "Alle statussen" },
+  { value: "wacht_op_student",              label: "Wacht op student" },
+  { value: "wacht_op_bedrijf",             label: "Wacht op bedrijf" },
+  { value: "in_controle_bij_administratie", label: "In controle bij administratie" },
+  { value: "document_afgekeurd",            label: "Document afgekeurd" },
+  { value: "geregistreerd",                label: "Geregistreerd" },
+  { value: "stage_loopt",                  label: "Stage loopt" },
+  { value: "resultaat_vrijgegeven",        label: "Resultaat vrijgegeven" },
+  { value: "afgerond",                     label: "Afgerond" },
+];
+
+const OVEREENKOMST_LABELS = {
+  klaar_voor_student:            "Wacht op student",
+  getekend_door_student:         "Getekend door student",
+  wacht_op_bedrijf:              "Wacht op bedrijf",
+  volledig_ondertekend:          "Volledig ondertekend",
+  in_controle_bij_administratie: "In controle",
+  afgekeurd:                     "Afgekeurd",
+  geregistreerd:                 "Geregistreerd",
+};
+
+function studentNaam(d) {
+  return `${d.student_voornaam || ""} ${d.student_achternaam || ""}`.trim();
 }
 
-function formatDate(value) {
-  if (!value) return "-";
-  return new Date(value).toLocaleDateString("nl-BE");
+function initials(naam) {
+  return naam.split(" ").filter(Boolean).map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?";
 }
 
-function studentNaam(dossier) {
-  return `${dossier.student_voornaam || ""} ${dossier.student_achternaam || ""}`.trim();
+function formatDossier(raw) {
+  const naam = studentNaam(raw);
+  const docent = `${raw.docent_voornaam || ""} ${raw.docent_achternaam || ""}`.trim();
+  const inOrde = Number(raw.documenten_in_orde || 0);
+  const verplicht = Number(raw.verplichte_documenten || 0);
+
+  return {
+    id: raw.id,
+    ini: initials(naam),
+    student: naam || "Onbekende student",
+    opleiding: raw.opleiding || raw.academiejaar || "-",
+    bedrijf: raw.bedrijf_naam || "-",
+    begeleider: docent || "Nog niet gekoppeld",
+    begeleiderSub: docent ? "Definitief gekoppeld" : "Geen koppeling",
+    dossiernr: raw.dossiernummer || "-",
+    overeenkomst: OVEREENKOMST_LABELS[raw.overeenkomst_status] || raw.overeenkomst_status || "-",
+    documenten: verplicht > 0 ? `${inOrde}/${verplicht} in orde` : "-",
+    status: raw.status,
+    statusCls: STATUS_CLASSES[raw.status] || "s_amber",
+    needsAction: NEEDS_ACTION.includes(raw.status),
+  };
 }
 
 export default function DossiersPage() {
-  const { user } = useAuth();
+  const navigate = useNavigate();
   const [dossiers, setDossiers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [detail, setDetail] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState("");
-  const [actionBusy, setActionBusy] = useState("");
-  const [actionMessage, setActionMessage] = useState("");
+  const [zoek, setZoek] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
-  useEffect(() => {
-    loadDossiers();
-  }, [user.id]);
+  useEffect(() => { loadDossiers(); }, []);
 
   async function loadDossiers() {
     try {
-      setLoading(true);
       setError("");
-      const response = await api.get("/admin/dossiers");
-      setDossiers(response.data.data || []);
+      const cached = cacheGet("admin_dossiers");
+      if (cached) { setDossiers(cached); setLoading(false); return; }
+      setLoading(true);
+      const res = await api.get("/admin/dossiers");
+      const data = res.data.data || [];
+      cacheSet("admin_dossiers", data);
+      setDossiers(data);
     } catch (err) {
       setError(err.response?.data?.message || "Dossiers ophalen mislukt");
     } finally {
@@ -59,93 +114,54 @@ export default function DossiersPage() {
     }
   }
 
-  async function openDetail(id) {
-    try {
-      setDetailLoading(true);
-      setDetailError("");
-      setActionMessage("");
-      const response = await api.get(`/admin/dossiers/${id}`);
-      setDetail(response.data.data);
-    } catch (err) {
-      setDetailError(err.response?.data?.message || "Dossier detail ophalen mislukt");
-    } finally {
-      setDetailLoading(false);
-    }
-  }
+  const geformatteerd = dossiers.map(formatDossier);
 
-  async function refreshDetail() {
-    if (!detail?.id) return;
-    await openDetail(detail.id);
-    await loadDossiers();
-  }
+  const gefilterd = geformatteerd.filter((d) => {
+    const zoekLower = zoek.toLowerCase();
+    const matchZoek = !zoek ||
+      d.student.toLowerCase().includes(zoekLower) ||
+      d.bedrijf.toLowerCase().includes(zoekLower) ||
+      d.dossiernr.toLowerCase().includes(zoekLower);
+    const matchStatus = !filterStatus || d.status === filterStatus;
+    return matchZoek && matchStatus;
+  });
 
-  async function runAction(label, action) {
-    try {
-      setActionBusy(label);
-      setActionMessage("");
-      await action();
-      setActionMessage("Actie uitgevoerd.");
-      await refreshDetail();
-    } catch (err) {
-      setActionMessage(err.response?.data?.message || "Actie mislukt.");
-    } finally {
-      setActionBusy("");
-    }
-  }
-
-  function approveDocument(documentId) {
-    runAction(`approve-${documentId}`, () => api.patch(`/admin/documents/${documentId}/approve`));
-  }
-
-  function rejectDocument(documentId) {
-    const reden = window.prompt("Reden van afkeuring:");
-    if (!reden?.trim()) return;
-    runAction(`reject-${documentId}`, () => api.patch(`/admin/documents/${documentId}/reject`, { afkeurreden: reden.trim() }));
-  }
-
-  function sendReminder() {
-    runAction("reminder", () => api.post(`/admin/dossiers/${detail.id}/reminder`));
-  }
-
-  function markStartReady() {
-    runAction("startklaar", () => api.patch(`/admin/dossiers/${detail.id}/startklaar`));
-  }
-
-  function generateSummary() {
-    runAction("eindoverzicht", () => api.post(`/admin/dossiers/${detail.id}/eindoverzicht`));
-  }
-
-  function formatDossier(dossier) {
-    const student = studentNaam(dossier);
-    const docent = `${dossier.docent_voornaam || ""} ${dossier.docent_achternaam || ""}`.trim();
-    const documenten = `${dossier.documenten_in_orde || 0}/${dossier.verplichte_documenten || 0} in orde`;
-
-    return {
-      id: dossier.id,
-      initials: student
-        .split(" ")
-        .filter(Boolean)
-        .map((part) => part[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase() || "ST",
-      student: student || "Onbekende student",
-      opleiding: dossier.opleiding || dossier.academiejaar || "-",
-      bedrijf: dossier.bedrijf_naam || "-",
-      begeleider: docent || "Nog niet gekoppeld",
-      begeleiderStatus: dossier.mentor_voornaam ? "Mentor gekoppeld" : "Mentor ontbreekt",
-      dossiernr: dossier.dossiernummer,
-      overeenkomst: dossier.overeenkomst_status || "Nog niet gestart",
-      documenten,
-      status: dossier.status,
-    };
-  }
+  const actieTelling = geformatteerd.filter((d) => d.needsAction).length;
 
   return (
     <div className="page">
       <div className="page_header">
-        <h1>Dossiers</h1>
+        <h1>
+          Dossiers
+          {actieTelling > 0 && (
+            <span className="dos_badge">{actieTelling} vereist actie</span>
+          )}
+        </h1>
         <p>Controleer documenten, handtekeningen en administratieve dossierstatus.</p>
+      </div>
+
+      <div className="dos_filters">
+        <input
+          className="dos_zoek"
+          placeholder="Zoek op student, bedrijf of dossiernummer..."
+          value={zoek}
+          onChange={(e) => setZoek(e.target.value)}
+        />
+        <select
+          className="dos_select"
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+        >
+          {FILTER_OPTIES.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        {(filterStatus || zoek) && (
+          <button className="btn sm primary" onClick={() => { setFilterStatus(""); setZoek(""); }}>
+            <IconX size={16} stroke={1.8} />
+            Wis filters
+          </button>
+        )}
       </div>
 
       <div className="card dossiers_card">
@@ -159,162 +175,65 @@ export default function DossiersPage() {
               <th>Stageovereenkomst</th>
               <th>Documenten</th>
               <th>Status</th>
-              <th className="right">Actie</th>
+              <th style={{ textAlign: "right" }}>Actie</th>
             </tr>
           </thead>
-
           <tbody>
             {loading && (
               <tr>
-                <td colSpan="8">Dossiers laden...</td>
+                <td colSpan="8" className="dos_state_cell">Dossiers laden...</td>
               </tr>
             )}
-
             {!loading && error && (
               <tr>
-                <td colSpan="8">{error}</td>
+                <td colSpan="8" className="dos_state_cell dos_error">{error}</td>
               </tr>
             )}
-
-            {!loading && !error && dossiers.length === 0 && (
+            {!loading && !error && gefilterd.length === 0 && (
               <tr>
-                <td colSpan="8">Geen dossiers gevonden.</td>
+                <td colSpan="8" className="dos_state_cell">
+                  {geformatteerd.length === 0
+                    ? "Geen stagedossiers gevonden."
+                    : "Geen dossiers komen overeen met de filters."}
+                </td>
               </tr>
             )}
-
-            {!loading && !error && dossiers.map((rawDossier) => {
-              const dossier = formatDossier(rawDossier);
-
-              return (
-                <tr key={dossier.id}>
-                  <td>
-                    <div className="student_cell">
-                      <div className="student_avatar">{dossier.initials}</div>
-                      <div className="student_info">
-                        <div className="student_name">{dossier.student}</div>
-                        <div className="student_meta">{dossier.opleiding}</div>
-                      </div>
+            {!loading && !error && gefilterd.map((d) => (
+              <tr key={d.id} className={d.needsAction ? "dos_row_actie" : ""}>
+                <td>
+                  <div className="student_cell">
+                    <div className="student_avatar">{d.ini}</div>
+                    <div className="student_info">
+                      <div className="student_name">{d.student}</div>
+                      <div className="student_meta">{d.opleiding}</div>
                     </div>
-                  </td>
-
-                  <td><div className="cell_main">{dossier.bedrijf}</div></td>
-                  <td>
-                    <div className="cell_main">{dossier.begeleider}</div>
-                    <div className="cell_sub">{dossier.begeleiderStatus}</div>
-                  </td>
-                  <td><div className="cell_dossier">{dossier.dossiernr}</div></td>
-                  <td><div className="cell_main">{dossier.overeenkomst}</div></td>
-                  <td><div className="cell_main">{dossier.documenten}</div></td>
-                  <td><span className={`status ${statusClass(dossier.status)}`}>{dossier.status}</span></td>
-
-                  <td className="right">
-                    <button className="btn primary dossiers_action_btn" onClick={() => openDetail(dossier.id)}>
-                      Controleren
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
+                  </div>
+                </td>
+                <td><div className="cell_main">{d.bedrijf}</div></td>
+                <td>
+                  <div className="cell_main">{d.begeleider}</div>
+                  <div className="cell_sub">{d.begeleiderSub}</div>
+                </td>
+                <td><div className="cell_dossier">{d.dossiernr}</div></td>
+                <td><div className="cell_main">{d.overeenkomst}</div></td>
+                <td><div className="cell_main">{d.documenten}</div></td>
+                <td>
+                  <span className={`status ${d.statusCls}`}>{STATUS_LABELS[d.status] || d.status}</span>
+                </td>
+                        <td style={{ textAlign: "right" }}>
+                  <button
+                    className={"btn sm primary" + (d.needsAction ? "" : " btn_ghost")}
+                    onClick={() => navigate(`/admin/dossiers/${d.id}`)}
+                  >
+                    <IconEye size={16} stroke={1.8} />
+                    {d.needsAction ? "Controleren" : "Bekijken"}
+                  </button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
-
-      {(detail || detailLoading || detailError) && (
-        <div className="modal-backdrop" onClick={() => setDetail(null)}>
-          <div className="dossier-modal" onClick={(event) => event.stopPropagation()}>
-            <div className="modal-head">
-              <div>
-                <h2>{detail ? detail.dossiernummer : "Dossier"}</h2>
-                <p>{detail ? studentNaam(detail) : "Dossier laden..."}</p>
-              </div>
-              <button className="btn sm" onClick={() => setDetail(null)}>Sluiten</button>
-            </div>
-
-            {detailLoading && <p className="modal-muted">Dossier laden...</p>}
-            {detailError && <p className="status s_rood">{detailError}</p>}
-
-            {detail && (
-              <>
-                <div className="detail-grid">
-                  <div className="detail-box">
-                    <span>Student</span>
-                    <strong>{studentNaam(detail)}</strong>
-                    <small>{detail.student_email}</small>
-                  </div>
-                  <div className="detail-box">
-                    <span>Bedrijf</span>
-                    <strong>{detail.bedrijf_naam}</strong>
-                    <small>{detail.bedrijf_stad || detail.bedrijf_adres || "-"}</small>
-                  </div>
-                  <div className="detail-box">
-                    <span>Stagebegeleider</span>
-                    <strong>{`${detail.docent_voornaam || ""} ${detail.docent_achternaam || ""}`.trim() || "-"}</strong>
-                    <small>{detail.docent_email || "-"}</small>
-                  </div>
-                  <div className="detail-box">
-                    <span>Stageovereenkomst</span>
-                    <strong>{detail.stageovereenkomst?.status || "Nog niet gestart"}</strong>
-                    <small>
-                      Student: {formatDate(detail.stageovereenkomst?.student_getekend_op)} · Bedrijf: {formatDate(detail.stageovereenkomst?.bedrijf_getekend_op)}
-                    </small>
-                  </div>
-                </div>
-
-                <div className="modal-actions">
-                  <button className="btn" disabled={!!actionBusy} onClick={sendReminder}>
-                    {actionBusy === "reminder" ? "Bezig..." : "Herinnering sturen"}
-                  </button>
-                  <button className="btn primary" disabled={!!actionBusy} onClick={markStartReady}>
-                    {actionBusy === "startklaar" ? "Bezig..." : "Startklaar zetten"}
-                  </button>
-                  <button className="btn" disabled={!!actionBusy} onClick={generateSummary}>
-                    {actionBusy === "eindoverzicht" ? "Bezig..." : "Eindoverzicht genereren"}
-                  </button>
-                </div>
-
-                {actionMessage && (
-                  <p className={`status ${actionMessage.includes("mislukt") || actionMessage.includes("nog niet") ? "s_rood" : "s_ok"}`}>
-                    {actionMessage}
-                  </p>
-                )}
-
-                <div className="documents-panel">
-                  <div className="section-title">Documenten</div>
-                  {detail.documenten.length === 0 ? (
-                    <p className="modal-muted">Geen documenten gevonden.</p>
-                  ) : (
-                    <div className="doc-admin-list">
-                      {detail.documenten.map((document) => (
-                        <div className="doc-admin-row" key={document.id}>
-                          <div>
-                            <div className="doc-admin-name">{document.naam || document.bestand_naam || "Eigen document"}</div>
-                            <div className="doc-admin-meta">
-                              {document.is_verplicht ? "Verplicht" : "Eigen/optioneel"} · v{document.versie_nummer} · {formatDate(document.opgeladen_op)}
-                            </div>
-                            {document.afkeurreden && <div className="doc-reason">{document.afkeurreden}</div>}
-                          </div>
-                          <div className="doc-admin-actions">
-                            <span className={`status ${statusClass(document.status)}`}>{document.status}</span>
-                            {document.bestand_url && (
-                              <a className="btn sm" href={document.bestand_url} target="_blank" rel="noreferrer">Bekijken</a>
-                            )}
-                            <button className="btn sm" disabled={!!actionBusy} onClick={() => approveDocument(document.id)}>
-                              {actionBusy === `approve-${document.id}` ? "..." : "Goedkeuren"}
-                            </button>
-                            <button className="btn sm danger" disabled={!!actionBusy} onClick={() => rejectDocument(document.id)}>
-                              {actionBusy === `reject-${document.id}` ? "..." : "Afkeuren"}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

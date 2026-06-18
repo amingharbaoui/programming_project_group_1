@@ -1,297 +1,189 @@
 .page {
-	padding: 18px 16px 24px;
+  padding: 0 0 32px;
 }
 
 .page_header {
-	margin-bottom: 16px;
+  margin-bottom: 20px;
 }
 
 .page_header h1 {
-	margin: 0;
-	font-size: 26px;
-	font-weight: 700;
-	letter-spacing: -0.4px;
-	color: var(--dark);
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: var(--dark);
 }
 
 .page_header p {
-	margin: 6px 0 0;
-	font-size: 13px;
-	color: var(--sub);
-	line-height: 1.5;
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--sub);
+  line-height: 1.5;
 }
 
 .dossiers_card {
-	padding: 18px 18px 8px;
-	overflow-x: auto;
+  padding: 18px 18px 8px;
 }
 
 .dossiers_tbl {
-	min-width: 1220px;
+  width: 100%;
 }
 
 .dossiers_tbl th {
-	padding-top: 14px;
-	padding-bottom: 14px;
-	font-size: 11px;
-	letter-spacing: 0.6px;
-	color: var(--faint);
+  padding-top: 14px;
+  padding-bottom: 14px;
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  color: var(--faint);
 }
 
 .dossiers_tbl td {
-	padding-top: 22px;
-	padding-bottom: 22px;
+  padding-top: 22px;
+  padding-bottom: 22px;
 }
 
 .student_cell {
-	display: flex;
-	align-items: center;
-	gap: 14px;
-	min-width: 210px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
 }
 
 .student_avatar {
-	width: 44px;
-	height: 44px;
-	border-radius: 999px;
-	background: var(--red-light);
-	color: var(--red);
-	font-size: 13px;
-	font-weight: 700;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--red-light);
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .student_info {
-	display: flex;
-	flex-direction: column;
-	gap: 3px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
 }
 
 .student_name {
-	font-size: 14px;
-	font-weight: 700;
-	color: var(--dark);
-	line-height: 1.35;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dark);
+  line-height: 1.35;
 }
 
 .student_meta {
-	font-size: 12px;
-	color: var(--faint);
-	line-height: 1.5;
-	max-width: 150px;
+  font-size: 12px;
+  color: var(--faint);
+  line-height: 1.5;
+  max-width: 150px;
 }
 
 .cell_main {
-	font-size: 13px;
-	color: var(--dark);
-	line-height: 1.45;
+  font-size: 13px;
+  color: var(--dark);
+  line-height: 1.45;
 }
 
 .cell_sub {
-	margin-top: 3px;
-	font-size: 12px;
-	color: var(--faint);
-	line-height: 1.45;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--faint);
+  line-height: 1.45;
 }
 
 .cell_dossier {
-	font-size: 12px;
-	color: var(--faint);
-	white-space: nowrap;
+  font-size: 12px;
+  color: var(--faint);
+  white-space: nowrap;
 }
 
 .dossiers_action_btn {
-	min-width: 132px;
-	justify-content: center;
+  min-width: 110px;
+  justify-content: center;
 }
 
-.dossiers_tbl td:nth-child(2) {
-	min-width: 170px;
+.dos_badge {
+  display: inline-block;
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 20px;
+  background: var(--amber-bg);
+  color: var(--amber);
+  vertical-align: middle;
 }
 
-.dossiers_tbl td:nth-child(3) {
-	min-width: 190px;
+.dos_filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
 }
 
-.dossiers_tbl td:nth-child(4) {
-	min-width: 140px;
+.dos_zoek {
+  flex: 1;
+  min-width: 220px;
+  max-width: 360px;
+  border: 0.5px solid var(--border);
+  border-radius: 7px;
+  padding: 7px 12px;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--dark);
+  background: var(--white);
+  outline: none;
+  transition: border-color 0.12s;
 }
 
-.dossiers_tbl td:nth-child(5) {
-	min-width: 190px;
+.dos_zoek:focus {
+  border-color: var(--red);
 }
 
-.dossiers_tbl td:nth-child(6) {
-	min-width: 120px;
+.dos_select {
+  border: 0.5px solid var(--border);
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--gray);
+  background: var(--white);
+  outline: none;
+  cursor: pointer;
 }
 
-.dossiers_tbl td:nth-child(7) {
-	min-width: 210px;
+.dos_row_actie td:first-child {
+  border-left: 2.5px solid var(--amber);
 }
 
-.modal-backdrop {
-	position: fixed;
-	inset: 0;
-	z-index: 50;
-	background: rgba(15, 23, 42, 0.28);
-	display: flex;
-	justify-content: flex-end;
-	padding: 18px;
+.dos_state_cell {
+  padding: 28px 16px !important;
+  font-size: 13px;
+  color: var(--sub);
 }
 
-.dossier-modal {
-	width: min(880px, 100%);
-	max-height: calc(100vh - 36px);
-	overflow: auto;
-	background: var(--white);
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	box-shadow: 0 24px 60px rgba(15, 23, 42, 0.18);
-	padding: 18px;
+.dos_error {
+  color: var(--red);
 }
 
-.modal-head {
-	display: flex;
-	align-items: flex-start;
-	justify-content: space-between;
-	gap: 16px;
-	padding-bottom: 14px;
-	border-bottom: 1px solid var(--border);
+/* Status badges */
+.dossiers_tbl .status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
 }
 
-.modal-head h2 {
-	margin: 0;
-	font-size: 20px;
-	color: var(--dark);
-}
-
-.modal-head p,
-.modal-muted {
-	margin: 5px 0 0;
-	font-size: 13px;
-	color: var(--sub);
-}
-
-.detail-grid {
-	display: grid;
-	grid-template-columns: repeat(2, minmax(0, 1fr));
-	gap: 10px;
-	margin: 16px 0;
-}
-
-.detail-box {
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	padding: 12px;
-	background: var(--muted);
-	display: flex;
-	flex-direction: column;
-	gap: 5px;
-	min-width: 0;
-}
-
-.detail-box span,
-.doc-admin-meta {
-	font-size: 11.5px;
-	color: var(--faint);
-}
-
-.detail-box strong {
-	font-size: 13.5px;
-	color: var(--dark);
-}
-
-.detail-box small {
-	font-size: 12px;
-	color: var(--sub);
-	line-height: 1.45;
-}
-
-.modal-actions {
-	display: flex;
-	flex-wrap: wrap;
-	gap: 8px;
-	margin: 12px 0;
-}
-
-.documents-panel {
-	margin-top: 18px;
-}
-
-.section-title {
-	font-size: 13px;
-	font-weight: 700;
-	color: var(--dark);
-	margin-bottom: 10px;
-}
-
-.doc-admin-list {
-	display: flex;
-	flex-direction: column;
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	overflow: hidden;
-}
-
-.doc-admin-row {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) auto;
-	gap: 12px;
-	align-items: center;
-	padding: 12px;
-	border-bottom: 1px solid var(--border);
-}
-
-.doc-admin-row:last-child {
-	border-bottom: 0;
-}
-
-.doc-admin-name {
-	font-size: 13.5px;
-	font-weight: 700;
-	color: var(--dark);
-}
-
-.doc-admin-actions {
-	display: flex;
-	align-items: center;
-	justify-content: flex-end;
-	flex-wrap: wrap;
-	gap: 8px;
-}
-
-.doc-reason {
-	margin-top: 6px;
-	font-size: 12px;
-	color: var(--red);
-	line-height: 1.45;
-}
-
-.btn.danger {
-	color: var(--red);
-	border-color: var(--red-mid);
-}
-
-@media (max-width: 760px) {
-	.modal-backdrop {
-		padding: 0;
-	}
-
-	.dossier-modal {
-		min-height: 100vh;
-		max-height: 100vh;
-		border-radius: 0;
-	}
-
-	.detail-grid,
-	.doc-admin-row {
-		grid-template-columns: 1fr;
-	}
-
-	.doc-admin-actions {
-		justify-content: flex-start;
-	}
-}
+.dossiers_tbl .s_amber { background: var(--amber-bg); color: var(--amber); }
+.dossiers_tbl .s_ok    { background: var(--green-bg); color: var(--green); }
+.dossiers_tbl .s_info  { background: var(--blue-bg);  color: var(--blue);  }
+.dossiers_tbl .s_rood  { background: var(--red-light); color: var(--red);  }

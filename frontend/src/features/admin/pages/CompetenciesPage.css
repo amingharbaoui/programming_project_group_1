@@ -23,17 +23,17 @@
 }
 
 .competencies_hero_content h1 {
-	margin: 8px 0 6px;
+	margin: 0 0 6px;
 	font-size: 26px;
 	font-weight: 700;
 	color: var(--dark);
 }
 
 .competencies_hero_content p {
-	margin: 0;
+	margin: 6px 0 0;
 	font-size: 13px;
 	color: var(--sub);
-	line-height: 1.6;
+	line-height: 1.5;
 	max-width: 62ch;
 }
 

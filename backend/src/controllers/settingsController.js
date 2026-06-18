@@ -113,24 +113,28 @@ async function createDocumentType(req, res) {
   }
 }
 
-// DELETE /api/admin/document-types/:id — documenttype verwijderen (vaste types zijn beschermd).
-async function deleteDocumentType(req, res) {
-  const id = Number(req.params.id);
-  if (!id) return fail(res, 400, "Ongeldig documenttype-id");
 
+// Reset documenttypes: verwijder custom types (is_vast=0), herstel vaste types naar seed-defaults.
+async function resetDocumentTypes(req, res) {
   try {
-    const [rows] = await db.query("SELECT is_vast FROM document_soorten WHERE id = ? LIMIT 1", [id]);
-    if (rows.length === 0) return fail(res, 404, "Documenttype niet gevonden");
-    if (rows[0].is_vast) return fail(res, 409, "Een vast documenttype kan niet verwijderd worden");
-
-    await db.query("DELETE FROM document_soorten WHERE id = ?", [id]);
-    return ok(res, { id }, "Documenttype verwijderd");
+    // Nullify FK in documenten for custom types before deleting
+    await db.query(
+      "UPDATE documenten SET document_soort_id = NULL WHERE document_soort_id IN (SELECT id FROM document_soorten WHERE is_vast = 0)"
+    );
+    // Delete admin-added types
+    await db.query("DELETE FROM document_soorten WHERE is_vast = 0");
+    // Restore fixed types to seed defaults (is_verplicht + status)
+    await db.query(`
+      UPDATE document_soorten SET
+        is_verplicht = CASE id WHEN 4 THEN 0 ELSE 1 END,
+        status = 'actief',
+        aangepast_op = NOW()
+      WHERE is_vast = 1
+    `);
+    return ok(res, {}, "Documenttypes gereset naar standaardwaarden");
   } catch (error) {
-    if (error.code === "ER_ROW_IS_REFERENCED_2") {
-      return fail(res, 409, "Dit documenttype is in gebruik en kan niet verwijderd worden");
-    }
-    return fail(res, 500, "Documenttype verwijderen mislukt", error.message);
+    return fail(res, 500, "Reset mislukt", error.message);
   }
 }
 
-module.exports = { getSettings, updateStageRule, updateDocumentType, createDocumentType, deleteDocumentType };
+module.exports = { getSettings, updateStageRule, updateDocumentType, createDocumentType, resetDocumentTypes };
