@@ -75,7 +75,7 @@ async function getDocuments(req, res) {
       FROM documenten doc
       LEFT JOIN document_soorten ds ON ds.id = doc.document_soort_id
       JOIN stagedossiers d ON d.id = doc.stagedossier_id
-      WHERE d.student_id = ?
+      WHERE d.student_id = ? AND doc.zichtbaar_voor_student = 1
       ORDER BY ds.naam ASC, doc.versie_nummer DESC
       `,
       [studentId]
