@@ -21,14 +21,26 @@ const FASE_IDX = {
   resultaat_vrijgegeven: 4, afgerond: 4,
 };
 
-function getFaseIdx(status, contractGetekend) {
+function isStageGestart(startdatum) {
+  if (!startdatum) return false;
+  const start = new Date(startdatum);
+  start.setHours(0, 0, 0, 0);
+  const vandaag = new Date();
+  vandaag.setHours(0, 0, 0, 0);
+  return vandaag >= start;
+}
+
+function getFaseIdx(status, contractGetekend, gestart) {
+  if (status === "goedgekeurd" && contractGetekend && gestart) return 4;
   if (status === "goedgekeurd" && contractGetekend) return 3;
   return FASE_IDX[status] ?? 0;
 }
 
-function getSubs(status, contractGetekend) {
+function getSubs(status, contractGetekend, gestart) {
+  if (status === "goedgekeurd" && contractGetekend && gestart)
+    return ["Ingediend", "Goedgekeurd", "Geregistreerd", "Stage loopt", "—"];
   if (status === "goedgekeurd" && contractGetekend)
-    return ["Ingediend", "Goedgekeurd", "Getekend", "Stage loopt", "—"];
+    return ["Ingediend", "Goedgekeurd", "Getekend", "Wacht op startdatum", "—"];
   const map = {
     concept:               ["Concept opgeslagen", "—", "—", "—", "—"],
     ingediend:             ["Ingediend", "Wacht op beslissing", "—", "—", "—"],
@@ -42,9 +54,10 @@ function getSubs(status, contractGetekend) {
   return map[status] ?? ["Nog niet gestart", "—", "—", "—", "—"];
 }
 
-function ProgressBar({ status, contractGetekend }) {
-  const idx  = getFaseIdx(status, contractGetekend);
-  const subs = getSubs(status, contractGetekend);
+function ProgressBar({ status, contractGetekend, startdatum }) {
+  const gestart = isStageGestart(startdatum);
+  const idx  = getFaseIdx(status, contractGetekend, gestart);
+  const subs = getSubs(status, contractGetekend, gestart);
   return (
     <div className="steps">
       {FASES.map((fase, i) => {
@@ -135,14 +148,14 @@ function BegeleidingKaart({ data, wacht }) {
 const VERBERG_DOC = new Set(["reflectiebijlage", "eindoverzicht", "stageovereenkomst"]);
 const DOC_ACTIE_STATUS = new Set(["ontbreekt", "afgekeurd"]);
 
-function TaakKaart({ status, contractStudentGekend, docsOk, navigate }) {
+function TaakKaart({ status, contractStudentGekend, volledigGetekend, docsOk, navigate, startdatum }) {
   if (status !== "goedgekeurd") {
-    // Stage loopt of andere fase — geen taken meer van toepassing
     return null;
   }
 
   const contractOk = !!contractStudentGekend;
   const alleOk = contractOk && docsOk;
+  const gestart = isStageGestart(startdatum);
 
   return (
     <div className="taak-kaart">
@@ -151,10 +164,23 @@ function TaakKaart({ status, contractStudentGekend, docsOk, navigate }) {
         Wat moet je nu doen
       </div>
 
-      {alleOk ? (
+      {alleOk && gestart ? (
+        <div className="taak-rij">
+          <div className="taak-icon groen"><i className="ti ti-circle-check"></i></div>
+          <div className="taak-info">Je stage loopt. Vul wekelijks je logboek in.</div>
+          <button className="btn primary sm" onClick={() => navigate("/student/logbook")}>
+            Logboek <IconArrowRight size={13} />
+          </button>
+        </div>
+      ) : alleOk && volledigGetekend ? (
         <div className="taak-rij">
           <div className="taak-icon groen"><i className="ti ti-circle-check"></i></div>
           <div className="taak-info">Alles in orde — je stage start binnenkort.</div>
+        </div>
+      ) : alleOk && !volledigGetekend ? (
+        <div className="taak-rij">
+          <div className="taak-icon amber"><i className="ti ti-hourglass"></i></div>
+          <div className="taak-info">Wacht op de handtekening van het stagebedrijf.</div>
         </div>
       ) : (
         <>
@@ -476,8 +502,8 @@ export default function MyInternshipPage() {
       {/* ── GOEDGEKEURD / TERUGGESTUURD / VALIDATIE ── */}
       {isGoedgekeurd && (
         <>
-          <ProgressBar status={currentStatus} contractGetekend={volledigGetekend} />
-          <TaakKaart status={currentStatus} contractStudentGekend={contractStudentGekend} docsOk={docsOk} navigate={navigate} />
+          <ProgressBar status={currentStatus} contractGetekend={volledigGetekend} startdatum={internship?.startdatum} />
+          <TaakKaart status={currentStatus} contractStudentGekend={contractStudentGekend} volledigGetekend={volledigGetekend} docsOk={docsOk} navigate={navigate} startdatum={internship?.startdatum} />
           <div style={{ borderTop: "1px solid var(--border)", marginTop: 16, paddingTop: 14 }}>
             <div className="grid_2">
               <DossierKaart
