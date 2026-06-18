@@ -3,6 +3,7 @@ const multer = require("multer");
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 const { meld } = require("../utils/notify");
+const { verifyToken } = require("../utils/token");
 
 async function getDocumentStudentId(documentId) {
   const [rows] = await db.query(
@@ -299,6 +300,11 @@ const fs = require("fs");
 const UPLOADS_DIR = path.join(__dirname, "../../uploads");
 
 function serveBestand(req, res) {
+  // Auth vereist: token via Authorization-header of ?t= query (een iframe/preview kan geen header sturen).
+  const headerToken = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+  if (!verifyToken(headerToken || req.query.t)) {
+    return res.status(401).json({ success: false, message: "Authenticatie vereist" });
+  }
   const filename = req.params.filename;
   if (!filename || filename.includes("..") || filename.includes("/") || filename.includes("\\")) {
     return res.status(400).json({ success: false, message: "Ongeldige bestandsnaam" });

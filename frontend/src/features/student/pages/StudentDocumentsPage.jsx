@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import api, { apiRequest } from "../../../services/api";
+import api, { apiRequest, fileUrl } from "../../../services/api";
 import "./StudentDocumentsPage.css";
 import Modal from "../../../components/ui/Modal";
 import {
@@ -36,12 +36,10 @@ function isAfbeelding(url) {
   return /\.(png|jpe?g|gif|webp)(\?|$)/i.test(url ?? "");
 }
 
-// Zet /uploads/bestandsnaam.pdf om naar /api/documents/bestand/bestandsnaam.pdf
-// zodat het via de Vite-proxy (/api) gaat — die werkt altijd
+// Bouwt de bekijk-URL via de centrale helper (geeft het sessietoken als ?t= mee zodat
+// de nu-beveiligde bestand-route het toelaat). Gaat via de Vite-proxy (/api).
 function bestandSrc(url) {
-  if (!url) return "";
-  const filename = url.replace(/^\/uploads\//, "");
-  return `/api/documents/bestand/${filename}`;
+  return fileUrl(url);
 }
 
 function deadlineVoorDocument(soort, documenten, contract) {

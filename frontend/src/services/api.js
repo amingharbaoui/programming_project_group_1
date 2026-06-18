@@ -27,6 +27,15 @@ export function setAuthToken(token) {
 // Behouden voor compatibiliteit (oude demo-switcher); doet niets meer in de echte auth.
 export function setApiUserId() {}
 
+// URL om een geüpload bestand te bekijken/downloaden. Het sessietoken gaat als query (?t=) mee,
+// omdat een <iframe>/<a> geen Authorization-header kan sturen; de backend valideert het token.
+export function fileUrl(bestandUrl) {
+  if (!bestandUrl) return "";
+  const filename = String(bestandUrl).replace(/^\/uploads\//, "");
+  const suffix = authToken ? `?t=${encodeURIComponent(authToken)}` : "";
+  return `/api/documents/bestand/${filename}${suffix}`;
+}
+
 export async function apiRequest(method, url, data = null) {
   const res = await api({ method, url, data });
   return res.data;
