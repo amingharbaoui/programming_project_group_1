@@ -765,6 +765,12 @@ async function decideApplication(req, res) {
       return fail(res, 404, "Stagevoorstel niet gevonden");
     }
 
+    // Enkel een voorstel dat nog in beoordeling is, kan beslist worden.
+    if (!["ingediend", "heringediend"].includes(voorstel.status)) {
+      await connection.rollback();
+      return fail(res, 409, `Dit voorstel is niet meer in beoordeling (status: ${voorstel.status})`);
+    }
+
     // Story 12/15: een gewone goedkeuring kan enkel als de checklist ingevuld is en alle verplichte criteria in orde zijn.
     if (beslissing === "goedgekeurd") {
       const [checklist] = await connection.query(
