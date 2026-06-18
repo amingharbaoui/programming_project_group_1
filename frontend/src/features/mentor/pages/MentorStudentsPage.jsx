@@ -2,37 +2,26 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import "../mentor.css";
 
-function getDossierFaseLabel(status) {
-  if (!status) return "Onbekend";
-  if (status === "actief") return "Lopend";
+function initialen(s) {
+  const a = (s.voornaam || "").charAt(0);
+  const b = (s.achternaam || "").charAt(0);
+  return (a + b).toUpperCase() || "?";
+}
+
+function faseLabel(status) {
   if (status === "afgerond" || status === "voltooid") return "Afgerond";
   if (status === "in_aanvraag" || status === "aangevraagd") return "Niet gestart";
-  return "Lopend";
+  return "Stage loopt";
 }
 
-function getDossierFaseClass(status) {
-  if (status === "actief") return "s_ok";
-  if (status === "afgerond" || status === "voltooid") return "s_info";
-  return "s_grijs";
-}
-
-function getLogboekClass(status) {
-  if (status === "ingediend") return "s_info";
-  if (status === "afgecheckt_door_mentor") return "s_ok";
-  if (status === "goedgekeurd_door_docent") return "s_ok";
-  if (status?.includes("teruggestuurd")) return "s_rood";
-  if (!status || status === "geen") return "s_grijs";
-  return "s_grijs";
-}
-
-function getLogboekLabel(status) {
-  if (status === "ingediend") return "Ingediend";
-  if (status === "afgecheckt_door_mentor") return "Afgetekend";
-  if (status === "goedgekeurd_door_docent") return "Goedgekeurd";
-  if (status?.includes("teruggestuurd")) return "Teruggestuurd";
-  if (!status || status === "geen") return "Geen";
-  return status;
+function logboekBadge(status) {
+  if (status === "ingediend") return { cls: "s-info", icon: "ti-clock", txt: "Ingediend" };
+  if (status === "afgecheckt_door_mentor") return { cls: "s-ok", icon: "ti-check", txt: "Afgetekend" };
+  if (status === "goedgekeurd_door_docent") return { cls: "s-ok", icon: "ti-check", txt: "Goedgekeurd" };
+  if (status && status.includes("teruggestuurd")) return { cls: "s-rood", icon: "ti-arrow-back", txt: "Teruggestuurd" };
+  return { cls: "s-grijs", icon: "", txt: "Geen" };
 }
 
 export default function MentorStudentsPage() {
@@ -41,21 +30,6 @@ export default function MentorStudentsPage() {
   const [studenten, setStudenten] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-
-  async function loadStudenten() {
-    try {
-      setLoading(true);
-      setError("");
-      const res = await api.get("/mentor/students", {
-        headers: { "x-user-id": String(user.id) },
-      });
-      setStudenten(res.data.data || []);
-    } catch (err) {
-      setError(err.response?.data?.message || "Studenten ophalen mislukt");
-    } finally {
-      setLoading(false);
-    }
-  }
 
   useEffect(() => {
     async function init() {
@@ -75,83 +49,92 @@ export default function MentorStudentsPage() {
   }, []);
 
   return (
-    <div className="page_inner">
-      <div className="page_header">
-        <div>
+    <div className="mtr">
+      <div className="page-inner">
+        <div className="page-header">
           <h1>Mijn stagiairs</h1>
-          <p>Overzicht van alle studenten die jij begeleidt.</p>
+          <p>Studenten die stage lopen onder jouw begeleiding</p>
         </div>
-        <button className="btn sm" onClick={loadStudenten}>
-          Vernieuwen
-        </button>
-      </div>
 
-      {loading && (
-        <div className="card">
-          <p className="muted">Studenten laden...</p>
-        </div>
-      )}
+        {loading && (
+          <div className="card"><p style={{ color: "var(--sub)", fontSize: 13 }}>Stagiairs laden…</p></div>
+        )}
 
-      {error && (
-        <div className="card">
-          <span className="status s_rood">{error}</span>
-        </div>
-      )}
+        {error && (
+          <div className="card"><span className="status s-rood">{error}</span></div>
+        )}
 
-      {!loading && !error && studenten.length === 0 && (
-        <div className="empty_state">Geen stagiairs gevonden.</div>
-      )}
+        {!loading && !error && studenten.length === 0 && (
+          <div className="card"><p style={{ color: "var(--sub)", fontSize: 13 }}>Geen stagiairs gevonden.</p></div>
+        )}
 
-      {!loading && studenten.length > 0 && (
-        <div className="card">
-          <div className="card_title">Stagiairs ({studenten.length})</div>
-          <table className="tbl">
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th>Bedrijf</th>
-                <th>Fase</th>
-                <th>Logboek</th>
-                <th className="right">Acties</th>
-              </tr>
-            </thead>
-            <tbody>
-              {studenten.map((s) => (
-                <tr key={s.dossier_id}>
-                  <td>
-                    <strong>
-                      {s.voornaam} {s.achternaam}
-                    </strong>
-                    <br />
-                    <span className="muted">{s.studentennummer}</span>
-                  </td>
-
-                  <td>{s.bedrijf || "-"}</td>
-
-                  <td>
-                    <span className={`status ${getDossierFaseClass(s.dossier_status)}`}>
-                      {getDossierFaseLabel(s.dossier_status)}
-                    </span>
-                  </td>
-
-                  <td>
-                    <span className={`status ${getLogboekClass(s.logboek_status)}`}>
-                      {getLogboekLabel(s.logboek_status)}
-                    </span>
-                  </td>
-
-                  <td className="right">
-                    <div className="actions">
-                      <button className="btn sm" onClick={() => navigate(`/mentor/logbooks?student=${s.id}`)}>Logboek</button>
-                      <button className="btn sm" onClick={() => navigate(`/mentor/evaluation?student=${s.id}`)}>Evaluatie</button>
-                    </div>
-                  </td>
+        {!loading && !error && studenten.length > 0 && (
+          <div className="card" style={{ padding: "6px 14px" }}>
+            <table className="tbl">
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Fase</th>
+                  <th>Logboek</th>
+                  <th>Evaluatie</th>
+                  <th>Actie</th>
+                  <th></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {studenten.map((s) => {
+                  const lb = logboekBadge(s.logboek_status);
+                  const teControleren = s.logboek_status === "ingediend";
+                  return (
+                    <tr key={s.dossier_id ?? s.id}>
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                          <div className="prof-av" style={{ width: 30, height: 30, fontSize: 11 }}>{initialen(s)}</div>
+                          <div
+                            style={{ fontSize: 13.5, fontWeight: 600, cursor: "pointer" }}
+                            onClick={() => navigate(`/mentor/dossier?student=${s.id}`)}
+                          >
+                            {s.voornaam} {s.achternaam}
+                            <div style={{ fontSize: 11.5, fontWeight: 400, color: "var(--faint)" }}>{s.bedrijf || "-"}</div>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td style={{ fontSize: 12.5, color: "var(--sub)" }}>
+                        <div style={{ whiteSpace: "nowrap" }}>{faseLabel(s.dossier_status)}</div>
+                      </td>
+
+                      <td style={{ cursor: "pointer" }} title="Open het logboek" onClick={() => navigate(`/mentor/logbooks?student=${s.id}`)}>
+                        <span className={`status ${lb.cls}`}>
+                          {lb.icon && <i className={`ti ${lb.icon}`} />}{lb.txt}
+                        </span>
+                      </td>
+
+                      <td style={{ cursor: "pointer" }} title="Open de evaluatie" onClick={() => navigate(`/mentor/evaluation?student=${s.id}`)}>
+                        <span className="status s-grijs">Bekijken</span>
+                      </td>
+
+                      <td>
+                        {teControleren ? (
+                          <span className="status s-rood"><span className="warn-mini">!</span>Logboek na te kijken</span>
+                        ) : (
+                          <span className="status s-ok"><i className="ti ti-check" />Niets te doen</span>
+                        )}
+                      </td>
+
+                      <td style={{ textAlign: "right" }}>
+                        <button className="btn sm" onClick={() => navigate(`/mentor/dossier?student=${s.id}`)}>
+                          Open dossier <i className="ti ti-chevron-right" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

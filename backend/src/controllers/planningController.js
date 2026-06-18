@@ -144,7 +144,7 @@ async function updateDocentPlanning(req, res) {
 
   if (!planningId) return fail(res, 400, "Ongeldig planning-id");
 
-  const allowedStatuses = ["voorgesteld", "bevestigd", "alternatief_gevraagd", "gepland", "gegeven", "geannuleerd"];
+  const allowedStatuses = ["voorgesteld", "bevestigd", "alternatief_gevraagd", "gepland", "gegeven", "geweest", "geannuleerd"];
   if (status && !allowedStatuses.includes(status)) return fail(res, 400, "Ongeldige planningstatus");
 
   const fields = [];
@@ -181,6 +181,31 @@ async function updateDocentPlanning(req, res) {
     );
 
     if (result.affectedRows === 0) return fail(res, 404, "Planningmoment niet gevonden");
+
+    // Student en mentor verwittigen van de wijziging.
+    try {
+      const [info] = await db.query(
+        `SELECT pm.type, pm.stagedossier_id, sd.student_id, sd.mentor_id
+         FROM planning_momenten pm JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
+         WHERE pm.id = ? LIMIT 1`,
+        [planningId]
+      );
+      const moment = info[0];
+      if (moment) {
+        const label = moment.type === "eindpresentatie" ? "de eindpresentatie" : "het bedrijfsbezoek";
+        for (const ontvangerId of [moment.student_id, moment.mentor_id].filter(Boolean)) {
+          await meld(ontvangerId, {
+            titel: "Planning bijgewerkt",
+            bericht: `De docent heeft ${label} bijgewerkt.`,
+            aangemaaktDoorId: docentId,
+            stagedossierId: moment.stagedossier_id
+          });
+        }
+      }
+    } catch (notifyError) {
+      console.error("Melding planning bijwerken mislukt:", notifyError.message);
+    }
+
     return ok(res, { id: planningId }, "Planningmoment bijgewerkt");
   } catch (error) {
     console.error("updateDocentPlanning error:", error);
@@ -212,6 +237,14 @@ async function confirmMentorPlanning(req, res) {
       aangemaaktDoorId: mentorId,
       stagedossierId: dossier.stagedossier_id
     });
+    if (dossier.student_id) {
+      await meld(dossier.student_id, {
+        titel: "Bedrijfsbezoek bevestigd",
+        bericht: "Je mentor bevestigde het bedrijfsbezoek.",
+        aangemaaktDoorId: mentorId,
+        stagedossierId: dossier.stagedossier_id
+      });
+    }
 
     return ok(res, { id: planningId, status: "bevestigd" }, "Planningmoment bevestigd");
   } catch (error) {
@@ -223,12 +256,12 @@ async function confirmMentorPlanning(req, res) {
 async function proposeAlternative(req, res) {
   const mentorId = getUserId(req);
   const planningId = Number(req.params.id);
-  const { alternatief, reden, geplandOp, datum } = req.body;
-  const tekst = alternatief || reden;
+  const { alternatief, reden, bericht, geplandOp, datum } = req.body;
+  const tekst = alternatief || reden || bericht;
   const geplandOpFinal = normalizeDateTime(geplandOp || datum);
 
   if (!planningId) return fail(res, 400, "Ongeldig planning-id");
-  if (!tekst && !geplandOpFinal) return fail(res, 400, "Alternatief voorstel of tijdstip is verplicht");
+  if (!tekst || !String(tekst).trim()) return fail(res, 400, "Een bericht is verplicht bij een alternatief voorstel");
 
   try {
     const dossier = await getMentorDossierByPlanning(planningId, mentorId);
@@ -253,6 +286,14 @@ async function proposeAlternative(req, res) {
       aangemaaktDoorId: mentorId,
       stagedossierId: dossier.stagedossier_id
     });
+    if (dossier.student_id) {
+      await meld(dossier.student_id, {
+        titel: "Ander bezoekmoment voorgesteld",
+        bericht: "Je mentor stelde een ander moment voor het bedrijfsbezoek voor.",
+        aangemaaktDoorId: mentorId,
+        stagedossierId: dossier.stagedossier_id
+      });
+    }
 
     return ok(res, { id: planningId, status: "alternatief_gevraagd" }, "Alternatief voorgesteld");
   } catch (error) {

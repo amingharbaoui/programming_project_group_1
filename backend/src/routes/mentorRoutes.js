@@ -10,6 +10,7 @@ const { getMentorInvitation, activateMentor } = require("../controllers/userCont
 const {
   getLogbooksByStudent,
   mentorCheckLogbookWeek,
+  mentorConfirmLogbookDay,
 } = require("../controllers/logbookController");
 const {
   listMentorPlanning,
@@ -31,6 +32,8 @@ router.get("/students", getMentorStudents);
 
 // Logboeken
 router.get("/logbooks/:studentId", getLogbooksByStudent);
+router.patch("/logbooks/days/:dayId/confirm", mentorConfirmLogbookDay);
+router.patch("/logbooks/days/:dayId/bevestig", mentorConfirmLogbookDay);
 router.patch("/logbooks/:weekId/check", mentorCheckLogbookWeek);
 
 // Contract (story 28)

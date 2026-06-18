@@ -75,7 +75,7 @@ async function getDocuments(req, res) {
       FROM documenten doc
       LEFT JOIN document_soorten ds ON ds.id = doc.document_soort_id
       JOIN stagedossiers d ON d.id = doc.stagedossier_id
-      WHERE d.student_id = ?
+      WHERE d.student_id = ? AND doc.zichtbaar_voor_student = 1
       ORDER BY ds.naam ASC, doc.versie_nummer DESC
       `,
       [studentId]
@@ -153,6 +153,13 @@ async function uploadDocument(req, res) {
 
     await connection.commit();
 
+    try {
+      const [admins] = await db.query("SELECT id FROM gebruikers WHERE hoofdrol = 'administratie' AND status = 'actief'");
+      for (const a of admins) {
+        await meld(a.id, { titel: "Nieuw document ingediend", bericht: "Een student heeft een document opgeladen ter controle.", aangemaaktDoorId: studentId, stagedossierId: dossier_id, documentId: resultId });
+      }
+    } catch (e) { console.error("Melding document upload mislukt:", e.message); }
+
     return ok(
       res,
       {
@@ -208,6 +215,13 @@ async function uploadEigenDocument(req, res) {
     );
 
     await connection.commit();
+
+    try {
+      const [admins] = await db.query("SELECT id FROM gebruikers WHERE hoofdrol = 'administratie' AND status = 'actief'");
+      for (const a of admins) {
+        await meld(a.id, { titel: "Nieuw document toegevoegd", bericht: "Een student heeft een eigen document toegevoegd aan zijn dossier.", aangemaaktDoorId: studentId, stagedossierId: dossier_id, documentId: result.insertId });
+      }
+    } catch (e) { console.error("Melding eigen document mislukt:", e.message); }
 
     return ok(
       res,

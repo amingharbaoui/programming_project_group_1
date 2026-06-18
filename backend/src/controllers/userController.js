@@ -228,11 +228,58 @@ async function activateMentor(req, res) {
   }
 }
 
+// POST /api/admin/invitations/:id/resend — uitnodiging opnieuw versturen (nieuwe token + e-mail).
+async function resendInvitation(req, res) {
+  const mentorGebruikerId = Number(req.params.id);
+  if (!mentorGebruikerId) return fail(res, 400, "Ongeldig mentor-id");
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [rows] = await conn.query(
+      `SELECT m.gebruiker_id, g.status
+       FROM mentoren m JOIN gebruikers g ON g.id = m.gebruiker_id
+       WHERE m.gebruiker_id = ? LIMIT 1`,
+      [mentorGebruikerId]
+    );
+    if (rows.length === 0) { await conn.rollback(); return fail(res, 404, "Mentor niet gevonden"); }
+    if (rows[0].status === "actief") { await conn.rollback(); return fail(res, 409, "Deze mentor heeft het account al geactiveerd"); }
+
+    const token = crypto.randomBytes(24).toString("hex");
+    await conn.query(
+      `UPDATE mentoren
+       SET uitnodiging_token = ?, uitnodiging_status = 'verstuurd', uitnodiging_vervalt_op = DATE_ADD(NOW(), INTERVAL 14 DAY)
+       WHERE gebruiker_id = ?`,
+      [token, mentorGebruikerId]
+    );
+
+    await conn.commit();
+
+    const activatielink = `/activeren?token=${token}`;
+    await emailMelding(mentorGebruikerId, {
+      titel: "Uitnodiging stageplatform (opnieuw verstuurd)",
+      bericht: `Hier is je nieuwe activatielink: ${activatielink}`,
+      type: "herinnering",
+      ernst: "medium",
+      aangemaaktDoorId: Number(req.user?.id) || null
+    });
+
+    return ok(res, { mentorId: mentorGebruikerId, activatielink, emailStatus: "geregistreerd" }, "Uitnodiging opnieuw verstuurd");
+  } catch (error) {
+    await conn.rollback();
+    return fail(res, 500, "Uitnodiging opnieuw versturen mislukt", error.message);
+  } finally {
+    conn.release();
+  }
+}
+
 module.exports = {
   getUsers,
   deactivateUser,
   reactivateUser,
   inviteMentor,
+  resendInvitation,
   getMentorInvitation,
   activateMentor
 };

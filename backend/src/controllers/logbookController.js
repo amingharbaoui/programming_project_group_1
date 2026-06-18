@@ -197,6 +197,16 @@ async function createLogbook(req, res) {
       return fail(res, 403, "Je mag alleen een logboek indienen voor je eigen stagedossier");
     }
 
+    // Logboek pas invulbaar nadat de student de stageovereenkomst getekend heeft.
+    const [ovk] = await connection.query(
+      "SELECT student_getekend_op FROM stageovereenkomsten WHERE stagedossier_id = ? ORDER BY aangemaakt_op DESC LIMIT 1",
+      [dossierId]
+    );
+    if (!ovk[0] || !ovk[0].student_getekend_op) {
+      await connection.rollback();
+      return fail(res, 409, "Je kan pas een logboek indienen nadat je de stageovereenkomst getekend hebt");
+    }
+
     const totaalUren = sumHours(finalDays);
 
     const [existingWeeks] = await connection.query(
@@ -432,7 +442,8 @@ async function getLogbooksByStudent(req, res) {
         problemen,
         leerpunten,
         competenties,
-        aantal_uren
+        aantal_uren,
+        mentor_bevestigd_op
       FROM logboek_dagen
       WHERE logboek_week_id IN (?)
       ORDER BY datum ASC
@@ -474,6 +485,9 @@ async function mentorCheckLogbookWeek(req, res) {
   } = req.body;
 
   const needsResubmission = Boolean(herindieningNodig);
+  if (needsResubmission && !((feedback || mentorFeedback) && String(feedback || mentorFeedback).trim())) {
+    return fail(res, 400, "Feedback is verplicht wanneer je de week terugstuurt voor aanpassing");
+  }
   const connection = await db.getConnection();
 
   try {
@@ -484,6 +498,18 @@ async function mentorCheckLogbookWeek(req, res) {
 
     if (existing.length === 0) {
       return fail(res, 404, "Logboekweek niet gevonden");
+    }
+
+    // Een mentor mag enkel de weken van zijn eigen stagiair nakijken.
+    const [mentorKoppeling] = await connection.query(
+      `SELECT d.mentor_id
+       FROM logboek_weken lw
+       JOIN stagedossiers d ON d.id = lw.stagedossier_id
+       WHERE lw.id = ? LIMIT 1`,
+      [weekId]
+    );
+    if (Number(mentorKoppeling[0]?.mentor_id) !== requestedMentorId) {
+      return fail(res, 403, "Je bent niet de mentor van deze stagiair");
     }
 
     const validMentorId = await getValidMentorIdForWeek(connection, weekId, requestedMentorId);
@@ -545,16 +571,36 @@ async function docentReviewLogbookWeek(req, res) {
   } = req.body;
 
   const needsResubmission = Boolean(herindieningNodig);
+  if (needsResubmission && !((feedback || docentFeedback) && String(feedback || docentFeedback).trim())) {
+    return fail(res, 400, "Feedback is verplicht wanneer je de week terugstuurt voor aanpassing");
+  }
   const connection = await db.getConnection();
 
   try {
     const [existing] = await connection.query(
-      "SELECT id FROM logboek_weken WHERE id = ? LIMIT 1",
+      "SELECT id, status FROM logboek_weken WHERE id = ? LIMIT 1",
       [weekId]
     );
 
     if (existing.length === 0) {
       return fail(res, 404, "Logboekweek niet gevonden");
+    }
+
+    // Een docent mag enkel de weken van zijn eigen student nakijken.
+    const [docentKoppeling] = await connection.query(
+      `SELECT d.stagebegeleider_id
+       FROM logboek_weken lw
+       JOIN stagedossiers d ON d.id = lw.stagedossier_id
+       WHERE lw.id = ? LIMIT 1`,
+      [weekId]
+    );
+    if (Number(docentKoppeling[0]?.stagebegeleider_id) !== requestedDocentId) {
+      return fail(res, 403, "Je bent niet de stagebegeleider van deze student");
+    }
+
+    // De docent kijkt pas na nadat de mentor de week heeft afgecheckt.
+    if (!["afgecheckt_door_mentor", "goedgekeurd_door_docent", "teruggestuurd_door_docent"].includes(existing[0].status)) {
+      return fail(res, 409, "De mentor moet de week eerst afchecken voor de docent ze nakijkt");
     }
 
     const validDocentId = await getValidDocentIdForWeek(connection, weekId, requestedDocentId);
@@ -766,9 +812,134 @@ async function sendMissingLogbookReminder(req, res) {
   }
 }
 
+// POST /api/logbooks/day — student slaat één logboekdag op (de week wordt aangemaakt indien nodig).
+async function saveLogbookDay(req, res) {
+  const studentId = Number(req.user?.id);
+  const weekNummer = Number(req.body.weekNummer ?? req.body.week_nummer);
+  const datum = req.body.datum;
+  const status = req.body.status === "geen_stagedag" ? "geen_stagedag" : "ingevuld";
+  const { titel, uitgevoerdeTaken, reflectie, problemen, leerpunten } = req.body;
+  const aantalUren = status === "geen_stagedag" ? 0 : Number(req.body.aantalUren ?? req.body.aantal_uren ?? 0);
+  // Optioneel: competenties die de student aan deze dag koppelt (array van competentie-id's).
+  const competenties = Array.isArray(req.body.competenties)
+    ? req.body.competenties.map(Number).filter((id) => Number.isInteger(id) && id > 0)
+    : null;
+
+  if (!weekNummer || !datum) return fail(res, 400, "weekNummer en datum zijn verplicht");
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    const [dossiers] = await conn.query(
+      "SELECT id FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1",
+      [studentId]
+    );
+    if (dossiers.length === 0) { await conn.rollback(); return fail(res, 404, "Geen stagedossier gevonden"); }
+    const dossierId = dossiers[0].id;
+
+    // Logboek pas invulbaar nadat de student de stageovereenkomst getekend heeft.
+    const [ovk] = await conn.query(
+      "SELECT student_getekend_op FROM stageovereenkomsten WHERE stagedossier_id = ? ORDER BY aangemaakt_op DESC LIMIT 1",
+      [dossierId]
+    );
+    if (!ovk[0] || !ovk[0].student_getekend_op) {
+      await conn.rollback();
+      return fail(res, 409, "Je kan pas een logboek invullen nadat je de stageovereenkomst getekend hebt");
+    }
+
+    // Week zoeken of aanmaken (week_start = maandag van de datum, week_einde = vrijdag).
+    const [weken] = await conn.query(
+      "SELECT id, status FROM logboek_weken WHERE stagedossier_id = ? AND week_nummer = ? LIMIT 1",
+      [dossierId, weekNummer]
+    );
+    let weekId, weekStatus;
+    if (weken.length === 0) {
+      const [w] = await conn.query(
+        `INSERT INTO logboek_weken (stagedossier_id, week_nummer, week_start, week_einde, status, aangemaakt_op, aangepast_op)
+         VALUES (?, ?, DATE_SUB(?, INTERVAL WEEKDAY(?) DAY), DATE_ADD(DATE_SUB(?, INTERVAL WEEKDAY(?) DAY), INTERVAL 4 DAY), 'in_opbouw', NOW(), NOW())`,
+        [dossierId, weekNummer, datum, datum, datum, datum]
+      );
+      weekId = w.insertId; weekStatus = "in_opbouw";
+    } else {
+      weekId = weken[0].id; weekStatus = weken[0].status;
+    }
+
+    const bewerkbaar = ["niet_gestart", "in_opbouw", "teruggestuurd_door_mentor", "teruggestuurd_door_docent"];
+    if (!bewerkbaar.includes(weekStatus)) {
+      await conn.rollback();
+      return fail(res, 409, "Deze week is al ingediend en kan niet meer aangepast worden");
+    }
+
+    // Dag upserten op (week, datum).
+    const [bestaand] = await conn.query(
+      "SELECT id FROM logboek_dagen WHERE logboek_week_id = ? AND datum = ? LIMIT 1",
+      [weekId, datum]
+    );
+    const competentiesJson = competenties && competenties.length > 0 ? JSON.stringify(competenties) : null;
+    if (bestaand.length > 0) {
+      await conn.query(
+        `UPDATE logboek_dagen SET status = ?, titel = ?, uitgevoerde_taken = ?, reflectie = ?, problemen = ?, leerpunten = ?, competenties = ?, aantal_uren = ?, aangepast_op = NOW() WHERE id = ?`,
+        [status, titel || null, uitgevoerdeTaken || null, reflectie || null, problemen || null, leerpunten || null, competentiesJson, aantalUren, bestaand[0].id]
+      );
+    } else {
+      await conn.query(
+        `INSERT INTO logboek_dagen (logboek_week_id, datum, status, titel, uitgevoerde_taken, reflectie, problemen, leerpunten, competenties, aantal_uren, aangemaakt_op, aangepast_op)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+        [weekId, datum, status, titel || null, uitgevoerdeTaken || null, reflectie || null, problemen || null, leerpunten || null, competentiesJson, aantalUren]
+      );
+    }
+
+    // Weektotaal herberekenen.
+    await conn.query(
+      "UPDATE logboek_weken SET totaal_uren = (SELECT COALESCE(SUM(aantal_uren),0) FROM logboek_dagen WHERE logboek_week_id = ?), aangepast_op = NOW() WHERE id = ?",
+      [weekId, weekId]
+    );
+
+    await conn.commit();
+    return ok(res, { weekId, weekNummer, datum, status }, "Logboekdag opgeslagen");
+  } catch (error) {
+    await conn.rollback();
+    return fail(res, 500, "Logboekdag opslaan mislukt", error.message);
+  } finally {
+    conn.release();
+  }
+}
+
+// PATCH /api/mentor/logbooks/days/:dayId/confirm — mentor bevestigt één logboekdag (story 31).
+async function mentorConfirmLogbookDay(req, res) {
+  const dayId = Number(req.params.dayId);
+  const mentorId = Number(req.user?.id);
+  if (!dayId) return fail(res, 400, "Ongeldig dag-id");
+
+  try {
+    const [rows] = await db.query(
+      `SELECT ld.id, ld.status, d.mentor_id
+       FROM logboek_dagen ld
+       JOIN logboek_weken lw ON lw.id = ld.logboek_week_id
+       JOIN stagedossiers d ON d.id = lw.stagedossier_id
+       WHERE ld.id = ? LIMIT 1`,
+      [dayId]
+    );
+    if (rows.length === 0) return fail(res, 404, "Logboekdag niet gevonden");
+    if (Number(rows[0].mentor_id) !== mentorId) return fail(res, 403, "Je bent niet de mentor van deze stagiair");
+    if (rows[0].status === "geen_stagedag") return fail(res, 400, "Een dag zonder stage kan niet bevestigd worden");
+
+    await db.query(
+      "UPDATE logboek_dagen SET mentor_bevestigd_op = NOW(), aangepast_op = NOW() WHERE id = ?",
+      [dayId]
+    );
+    return ok(res, { id: dayId }, "Logboekdag bevestigd");
+  } catch (error) {
+    return fail(res, 500, "Logboekdag bevestigen mislukt", error.message);
+  }
+}
+
 module.exports = {
   createLogbook,
+  saveLogbookDay,
   getLogbooksByStudent,
+  mentorConfirmLogbookDay,
   mentorCheckLogbookWeek,
   docentReviewLogbookWeek,
   studentAntwoordFeedback,

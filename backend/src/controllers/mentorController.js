@@ -75,26 +75,31 @@ async function getMentorContract(req, res) {
 async function tekenContract(req, res) {
   const mentorId  = Number(req.user?.id);
   const dossierId = Number(req.params.dossierId);
+  const tekenbevoegd = Boolean(req.body?.tekenbevoegd ?? req.body?.tekenBevoegd ?? req.body?.bevoegd);
+
+  if (!tekenbevoegd) {
+    return fail(res, 400, "Je moet eerst bevestigen dat je tekenbevoegd bent voor het stagebedrijf");
+  }
 
   try {
     // Security check
     const [[dossier]] = await db.query(
-      "SELECT id FROM stagedossiers WHERE id = ? AND mentor_id = ? LIMIT 1",
+      "SELECT id, student_id FROM stagedossiers WHERE id = ? AND mentor_id = ? LIMIT 1",
       [dossierId, mentorId]
     );
     if (!dossier) return fail(res, 403, "Geen toegang tot dit dossier");
 
     // Haal huidige status op
     const [[contract]] = await db.query(
-      "SELECT id, status, bedrijf_getekend_op FROM stageovereenkomsten WHERE stagedossier_id = ? LIMIT 1",
+      "SELECT id, status, student_getekend_op, bedrijf_getekend_op FROM stageovereenkomsten WHERE stagedossier_id = ? LIMIT 1",
       [dossierId]
     );
     if (!contract) return fail(res, 404, "Geen stageovereenkomst gevonden");
     if (contract.bedrijf_getekend_op) return fail(res, 409, "Contract is al getekend door mentor");
+    if (!contract.student_getekend_op) return fail(res, 409, "De student moet de stageovereenkomst eerst tekenen");
 
-    // Nieuwe status bepalen
-    const nieuweStatus =
-      contract.status === "getekend_door_student" ? "volledig_ondertekend" : "wacht_op_bedrijf";
+    // Student tekende al, dus na de mentor is de overeenkomst volledig ondertekend.
+    const nieuweStatus = "volledig_ondertekend";
 
     await db.query(
       `UPDATE stageovereenkomsten
@@ -102,6 +107,29 @@ async function tekenContract(req, res) {
        WHERE stagedossier_id = ?`,
       [nieuweStatus, dossierId]
     );
+
+    // Student en administratie verwittigen dat het stagebedrijf getekend heeft (story 28).
+    try {
+      if (dossier.student_id) {
+        await meld(dossier.student_id, {
+          titel: "Stagebedrijf ondertekende de overeenkomst",
+          bericht: "Je mentor ondertekende de stageovereenkomst namens het stagebedrijf.",
+          aangemaaktDoorId: mentorId,
+          stagedossierId: dossierId
+        });
+      }
+      const [admins] = await db.query("SELECT id FROM gebruikers WHERE hoofdrol = 'administratie' AND status = 'actief'");
+      for (const a of admins) {
+        await meld(a.id, {
+          titel: "Stagebedrijf ondertekende de overeenkomst",
+          bericht: "Het stagebedrijf ondertekende de stageovereenkomst; je kan ze nu controleren en registreren.",
+          aangemaaktDoorId: mentorId,
+          stagedossierId: dossierId
+        });
+      }
+    } catch (notifyError) {
+      console.error("Melding mentor tekenen mislukt:", notifyError.message);
+    }
 
     return ok(res, { status: nieuweStatus }, "Contract getekend door mentor");
   } catch (err) {
@@ -117,7 +145,7 @@ async function getAfspraken(req, res) {
 
   try {
     const [[row]] = await db.query(
-      `SELECT id, praktische_afspraken, praktische_afspraken_gedeeld_op
+      `SELECT id, praktische_afspraken, praktische_afspraken_velden, praktische_afspraken_gedeeld_op
        FROM stagedossiers
        WHERE id = ? AND mentor_id = ?
        LIMIT 1`,
@@ -136,17 +164,36 @@ async function getAfspraken(req, res) {
 async function updateAfspraken(req, res) {
   const mentorId          = Number(req.user?.id);
   const dossierId         = Number(req.params.dossierId);
-  const { afspraken }     = req.body;
+  const { afspraken, velden } = req.body;
 
-  if (!afspraken && afspraken !== "") return fail(res, 400, "Veld 'afspraken' ontbreekt");
+  // Story 29: de afspraken kunnen als losse velden komen (werkuren, thuiswerk, ...) of als één tekst.
+  let veldenJson = null;
+  let tekst = afspraken;
+  if (velden && typeof velden === "object") {
+    veldenJson = JSON.stringify(velden);
+    const labels = [
+      ["Werkuren", velden.werkuren],
+      ["Thuiswerk", velden.thuiswerk],
+      ["Eerste dag", velden.eersteDag ?? velden.eerste_dag],
+      ["Contactpersoon", velden.contactpersoon],
+      ["Benodigd materiaal", velden.materiaal],
+      ["Extra info", velden.extra]
+    ];
+    tekst = labels.filter(([, v]) => v && String(v).trim()).map(([k, v]) => `${k}: ${v}`).join("\n");
+  }
+
+  if ((tekst === undefined || tekst === null || String(tekst).trim() === "") && !veldenJson) {
+    return fail(res, 400, "Veld 'afspraken' of 'velden' ontbreekt");
+  }
 
   try {
     const [result] = await db.query(
       `UPDATE stagedossiers
        SET praktische_afspraken = ?,
+           praktische_afspraken_velden = ?,
            praktische_afspraken_gedeeld_op = NOW()
        WHERE id = ? AND mentor_id = ?`,
-      [afspraken, dossierId, mentorId]
+      [tekst || null, veldenJson, dossierId, mentorId]
     );
 
     if (result.affectedRows === 0) return fail(res, 403, "Geen toegang tot dit dossier");
