@@ -593,7 +593,7 @@ async function docentReviewLogbookWeek(req, res) {
 
   try {
     const [existing] = await connection.query(
-      "SELECT id FROM logboek_weken WHERE id = ? LIMIT 1",
+      "SELECT id, status FROM logboek_weken WHERE id = ? LIMIT 1",
       [weekId]
     );
 
@@ -611,6 +611,11 @@ async function docentReviewLogbookWeek(req, res) {
     );
     if (Number(docentKoppeling[0]?.stagebegeleider_id) !== requestedDocentId) {
       return fail(res, 403, "Je bent niet de stagebegeleider van deze student");
+    }
+
+    // De docent kijkt pas na nadat de mentor de week heeft afgecheckt.
+    if (!["afgecheckt_door_mentor", "goedgekeurd_door_docent", "teruggestuurd_door_docent"].includes(existing[0].status)) {
+      return fail(res, 409, "De mentor moet de week eerst afchecken voor de docent ze nakijkt");
     }
 
     const validDocentId = await getValidDocentIdForWeek(connection, weekId, requestedDocentId);

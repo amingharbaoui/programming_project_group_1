@@ -297,6 +297,11 @@ async function calculateResult(req, res) {
     if (!evaluatie) { await conn.rollback(); return fail(res, 404, "Evaluatie niet gevonden"); }
     if (!mayActAsDocent(evaluatie, role, userId)) { await conn.rollback(); return fail(res, 403, "Alleen de gekoppelde docent of administratie kan dit doen"); }
     if (evaluatie.status === "vrijgegeven") { await conn.rollback(); return fail(res, 409, "Resultaat is al vrijgegeven"); }
+    // Berekenen kan pas nadat student en mentor hun evaluatie indienden (status klaar_voor_docent of later).
+    if (!["klaar_voor_docent", "geregistreerd", "klaar_voor_vrijgave"].includes(evaluatie.status)) {
+      await conn.rollback();
+      return fail(res, 409, "De student en de mentor moeten eerst hun evaluatie indienen");
+    }
 
     const [rows] = await conn.query(
       `SELECT cs.competentie_id, cs.score, c.gewicht_percentage
@@ -411,20 +416,22 @@ async function releaseResult(req, res) {
 
     // Finale-gating: logboek moet afgewerkt zijn en de eindpresentatie moet gegeven zijn.
     const [openWeken] = await conn.query(
-      "SELECT COUNT(*) AS aantal FROM logboek_weken WHERE stagedossier_id = ? AND status = 'ingediend'",
+      `SELECT COUNT(*) AS aantal FROM logboek_weken
+       WHERE stagedossier_id = ?
+         AND status IN ('ingediend', 'afgecheckt_door_mentor', 'teruggestuurd_door_mentor', 'teruggestuurd_door_docent')`,
       [evaluatie.stagedossier_id]
     );
     if (openWeken[0].aantal > 0) {
       await conn.rollback();
-      return fail(res, 409, "Er staan nog logboekweken op 'ingediend' — die moeten eerst afgecheckt zijn voor je het resultaat vrijgeeft.");
+      return fail(res, 409, "Er zijn nog logboekweken die niet volledig nagekeken zijn — die moeten eerst afgehandeld zijn voor je het resultaat vrijgeeft.");
     }
     const [pres] = await conn.query(
       "SELECT status FROM planning_momenten WHERE stagedossier_id = ? AND type = 'eindpresentatie' ORDER BY id DESC LIMIT 1",
       [evaluatie.stagedossier_id]
     );
-    if (pres.length > 0 && pres[0].status !== "gegeven") {
+    if (pres.length === 0 || !["gegeven", "geweest"].includes(pres[0].status)) {
       await conn.rollback();
-      return fail(res, 409, "De eindpresentatie moet eerst plaatsgevonden hebben voor je het resultaat vrijgeeft.");
+      return fail(res, 409, "De eindpresentatie moet eerst gepland en gegeven zijn voor je het resultaat vrijgeeft.");
     }
 
     await conn.query(
