@@ -89,69 +89,52 @@ async function getDossierMeta(connection, dossierId) {
 
 
 async function getValidMentorIdForWeek(connection, weekId, requestedMentorId) {
-  const [rows] = await connection.query(
-    `
-    SELECT 
-      lw.mentor_id AS week_mentor_id,
-      d.mentor_id AS dossier_mentor_id
-    FROM logboek_weken lw
-    JOIN stagedossiers d ON d.id = lw.stagedossier_id
-    WHERE lw.id = ?
-    LIMIT 1
-    `,
-    [weekId]
-  );
-
-  const data = rows[0];
-  const candidates = [
-    requestedMentorId,
-    data?.week_mentor_id,
-    data?.dossier_mentor_id
-  ].filter(Boolean);
-
-  for (const id of candidates) {
-    const [valid] = await connection.query(
-      "SELECT gebruiker_id FROM mentoren WHERE gebruiker_id = ? LIMIT 1",
-      [id]
-    );
-
-    if (valid.length > 0) return id;
+  // Eerst de meegegeven mentor valideren — pas als dat geen geldige mentor is, de week ophalen.
+  const req = Number(requestedMentorId);
+  if (Number.isInteger(req) && req > 0) {
+    const [v] = await connection.query("SELECT gebruiker_id FROM mentoren WHERE gebruiker_id = ? LIMIT 1", [req]);
+    if (v.length > 0) return req;
   }
 
-  return null;
+  const [rows] = await connection.query(
+    `SELECT lw.mentor_id AS week_mentor_id, d.mentor_id AS dossier_mentor_id
+     FROM logboek_weken lw JOIN stagedossiers d ON d.id = lw.stagedossier_id
+     WHERE lw.id = ? LIMIT 1`,
+    [weekId]
+  );
+  const data = rows[0] || {};
+  const fallback = [data.week_mentor_id, data.dossier_mentor_id]
+    .map(Number).filter((x) => Number.isInteger(x) && x > 0);
+  if (fallback.length === 0) return null;
+
+  // Eén query om alle kandidaten ineens te valideren (i.p.v. een query per kandidaat).
+  const [geldig] = await connection.query("SELECT gebruiker_id FROM mentoren WHERE gebruiker_id IN (?)", [fallback]);
+  const geldigeSet = new Set(geldig.map((r) => Number(r.gebruiker_id)));
+  return fallback.find((id) => geldigeSet.has(id)) || null;
 }
 
 async function getValidDocentIdForWeek(connection, weekId, requestedDocentId) {
-  const [rows] = await connection.query(
-    `
-    SELECT 
-      lw.docent_id AS week_docent_id,
-      d.stagebegeleider_id AS dossier_docent_id
-    FROM logboek_weken lw
-    JOIN stagedossiers d ON d.id = lw.stagedossier_id
-    WHERE lw.id = ?
-    LIMIT 1
-    `,
-    [weekId]
-  );
-
-  const data = rows[0];
-  const candidates = [
-    requestedDocentId,
-    data?.week_docent_id,
-    data?.dossier_docent_id
-  ].filter(Boolean);
-
-  for (const id of candidates) {
-    const [valid] = await connection.query(
-      "SELECT gebruiker_id FROM medewerkers WHERE gebruiker_id = ? LIMIT 1",
-      [id]
-    );
-
-    if (valid.length > 0) return id;
+  // Eerst de meegegeven docent valideren — pas als dat geen geldige medewerker is, de week ophalen.
+  const req = Number(requestedDocentId);
+  if (Number.isInteger(req) && req > 0) {
+    const [v] = await connection.query("SELECT gebruiker_id FROM medewerkers WHERE gebruiker_id = ? LIMIT 1", [req]);
+    if (v.length > 0) return req;
   }
 
-  return null;
+  const [rows] = await connection.query(
+    `SELECT lw.docent_id AS week_docent_id, d.stagebegeleider_id AS dossier_docent_id
+     FROM logboek_weken lw JOIN stagedossiers d ON d.id = lw.stagedossier_id
+     WHERE lw.id = ? LIMIT 1`,
+    [weekId]
+  );
+  const data = rows[0] || {};
+  const fallback = [data.week_docent_id, data.dossier_docent_id]
+    .map(Number).filter((x) => Number.isInteger(x) && x > 0);
+  if (fallback.length === 0) return null;
+
+  const [geldig] = await connection.query("SELECT gebruiker_id FROM medewerkers WHERE gebruiker_id IN (?)", [fallback]);
+  const geldigeSet = new Set(geldig.map((r) => Number(r.gebruiker_id)));
+  return fallback.find((id) => geldigeSet.has(id)) || null;
 }
 
 async function createLogbook(req, res) {

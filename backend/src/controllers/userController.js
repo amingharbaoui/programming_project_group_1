@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 const { emailMelding } = require("../utils/notify");
+const { sendMail } = require("../utils/mail");
 
 function hashLocalPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
@@ -197,7 +198,16 @@ async function inviteMentor(req, res) {
       aangemaaktDoorId: Number(req.user?.id) || null
     });
 
-    return ok(res, { mentorId, bedrijfId, activatielink, emailStatus: "geregistreerd" }, "Mentor uitgenodigd");
+    // Echte e-mail naar de mentor (best-effort: faalt nooit hard als SMTP ontbreekt/foutloopt).
+    const volledigeLink = `${process.env.APP_URL || "http://localhost:5173"}${activatielink}`;
+    const mailResultaat = await sendMail({
+      to: email,
+      subject: "Uitnodiging als mentor — Stagify",
+      text: `Je bent uitgenodigd als mentor op Stagify.\n\nActiveer je account en kies een wachtwoord via:\n${volledigeLink}\n\nDeze link is 14 dagen geldig.`,
+      html: `<p>Je bent uitgenodigd als mentor op <strong>Stagify</strong>.</p><p>Activeer je account en kies een wachtwoord via:<br><a href="${volledigeLink}">${volledigeLink}</a></p><p>Deze link is 14 dagen geldig.</p>`
+    });
+
+    return ok(res, { mentorId, bedrijfId, activatielink, emailStatus: mailResultaat.sent ? "verzonden" : "geregistreerd" }, "Mentor uitgenodigd");
   } catch (error) {
     await conn.rollback();
     if (error.code === "ER_DUP_ENTRY") return fail(res, 409, "Dubbele invoer");
@@ -306,7 +316,7 @@ async function resendInvitation(req, res) {
     await conn.beginTransaction();
 
     const [rows] = await conn.query(
-      `SELECT m.gebruiker_id, g.status
+      `SELECT m.gebruiker_id, g.status, g.email
        FROM mentoren m JOIN gebruikers g ON g.id = m.gebruiker_id
        WHERE m.gebruiker_id = ? LIMIT 1`,
       [mentorGebruikerId]
@@ -333,7 +343,16 @@ async function resendInvitation(req, res) {
       aangemaaktDoorId: Number(req.user?.id) || null
     });
 
-    return ok(res, { mentorId: mentorGebruikerId, activatielink, emailStatus: "geregistreerd" }, "Uitnodiging opnieuw verstuurd");
+    // Echte e-mail opnieuw versturen (best-effort).
+    const volledigeLink = `${process.env.APP_URL || "http://localhost:5173"}${activatielink}`;
+    const mailResultaat = await sendMail({
+      to: rows[0].email,
+      subject: "Nieuwe activatielink — Stagify",
+      text: `Hier is je nieuwe activatielink voor Stagify:\n${volledigeLink}\n\nDeze link is 14 dagen geldig.`,
+      html: `<p>Hier is je nieuwe activatielink voor <strong>Stagify</strong>:<br><a href="${volledigeLink}">${volledigeLink}</a></p><p>Deze link is 14 dagen geldig.</p>`
+    });
+
+    return ok(res, { mentorId: mentorGebruikerId, activatielink, emailStatus: mailResultaat.sent ? "verzonden" : "geregistreerd" }, "Uitnodiging opnieuw verstuurd");
   } catch (error) {
     await conn.rollback();
     return fail(res, 500, "Uitnodiging opnieuw versturen mislukt", error.message);
