@@ -8,7 +8,6 @@ export const NAVIGATION = {
     { label: "Evaluatie",         path: "/student/evaluation",  icon: "ti-clipboard-check", lockGroup: "logboek_eval" },
     { label: "Stageovereenkomst", path: "/student/contract",    icon: "ti-writing",         lockGroup: "contract_docs" },
     { label: "Documenten",        path: "/student/documents",   icon: "ti-files",           lockGroup: "contract_docs" },
-    { label: "Planning",          path: "/student/planning",    icon: "ti-calendar-event" },
   ],
 
   [ROLES.COMMITTEE]: [
@@ -19,7 +18,6 @@ export const NAVIGATION = {
     { label: "Dossiers",    path: "/admin/dossiers",      icon: "ti-folder" },
     { label: "Gebruikers",  path: "/admin/users",         icon: "ti-users" },
     { label: "Competenties",path: "/admin/competencies",  icon: "ti-target" },
-    { label: "Instellingen",path: "/admin/settings",      icon: "ti-settings" },
   ],
 
   [ROLES.MENTOR]: [

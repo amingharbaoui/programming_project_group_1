@@ -41,13 +41,9 @@ export default function DossiersPage() {
   const [detailError, setDetailError] = useState("");
   const [actionBusy, setActionBusy] = useState("");
   const [actionMessage, setActionMessage] = useState("");
-  const [docenten, setDocenten] = useState([]);
 
   useEffect(() => {
     loadDossiers();
-    api.get("/users")
-      .then((r) => setDocenten((r.data.data || []).filter((u) => u.hoofdrol === "docent")))
-      .catch(() => {});
   }, [user.id]);
 
   async function loadDossiers() {
@@ -117,15 +113,6 @@ export default function DossiersPage() {
 
   function generateSummary() {
     runAction("eindoverzicht", () => api.post(`/admin/dossiers/${detail.id}/eindoverzicht`));
-  }
-
-  function registreerOvereenkomst() {
-    runAction("registreer", () => api.patch(`/admin/dossiers/${detail.id}/overeenkomst/registreer`));
-  }
-
-  function koppelDocent(docentId) {
-    if (!docentId) return;
-    runAction("assign", () => api.patch(`/admin/dossiers/${detail.id}/assign`, { stagebegeleiderId: Number(docentId) }));
   }
 
   function formatDossier(dossier) {
@@ -277,29 +264,12 @@ export default function DossiersPage() {
                   <button className="btn" disabled={!!actionBusy} onClick={sendReminder}>
                     {actionBusy === "reminder" ? "Bezig..." : "Herinnering sturen"}
                   </button>
-                  <button className="btn" disabled={!!actionBusy} onClick={registreerOvereenkomst}>
-                    {actionBusy === "registreer" ? "Bezig..." : "Overeenkomst registreren"}
-                  </button>
                   <button className="btn primary" disabled={!!actionBusy} onClick={markStartReady}>
                     {actionBusy === "startklaar" ? "Bezig..." : "Startklaar zetten"}
                   </button>
                   <button className="btn" disabled={!!actionBusy} onClick={generateSummary}>
                     {actionBusy === "eindoverzicht" ? "Bezig..." : "Eindoverzicht genereren"}
                   </button>
-                </div>
-
-                <div className="modal-actions" style={{ marginTop: "8px", alignItems: "center", gap: "8px" }}>
-                  <span style={{ fontSize: "13px", color: "var(--sub)" }}>Stagebegeleider koppelen:</span>
-                  <select
-                    disabled={!!actionBusy}
-                    defaultValue=""
-                    onChange={(e) => koppelDocent(e.target.value)}
-                  >
-                    <option value="" disabled>— kies docent —</option>
-                    {docenten.map((d) => (
-                      <option key={d.id} value={d.id}>{`${d.voornaam || ""} ${d.achternaam || ""}`.trim() || d.email}</option>
-                    ))}
-                  </select>
                 </div>
 
                 {actionMessage && (

@@ -103,19 +103,6 @@ export default function MentorLogbooksPage() {
     }
   }
 
-  async function bevestigDag(dayId) {
-    try {
-      setActionLoadingId(dayId);
-      await api.patch(`/mentor/logbooks/days/${dayId}/confirm`, {}, { headers: { "x-user-id": String(user.id) } });
-      const res = await api.get(`/mentor/logbooks/${detailId}`, { headers: { "x-user-id": String(user.id) } });
-      setWeeks(res.data.data || []);
-    } catch (err) {
-      alert(err.response?.data?.message || "Dag bevestigen mislukt");
-    } finally {
-      setActionLoadingId(null);
-    }
-  }
-
   const detailStudent = studenten.find((s) => s.id === detailId);
 
   // ─── TABEL ───
@@ -205,9 +192,6 @@ export default function MentorLogbooksPage() {
                   <div className="entry" key={d.id}>
                     <div className="e-dag">
                       {weekdagLang(d.datum)}{d.titel ? <span style={{ fontWeight: 400, color: "var(--sub)" }}>&nbsp;— {d.titel}</span> : null}
-                      {d.status !== "geen_stagedag" && (d.mentor_bevestigd_op
-                        ? <span className="status s-ok" style={{ marginLeft: 8 }}>Bevestigd</span>
-                        : <button className="btn sm" style={{ marginLeft: 8 }} disabled={actionLoadingId === d.id} onClick={() => bevestigDag(d.id)}>Bevestig dag</button>)}
                       <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--sub)" }}>{d.aantal_uren || 0}u</span>
                     </div>
                     {d.uitgevoerde_taken && <div className="e-veld"><b>Taken</b><span style={{ flex: 1 }}>{d.uitgevoerde_taken}</span></div>}
