@@ -13,25 +13,14 @@ Build + module-load zijn groen; onderstaande punten zijn **functionele** koppeli
 - Commissie: overzicht (filter + versie-kolom), detail, versievergelijking, **echte historiek** via
   `GET /api/committee/applications/:id/historiek`, afkeuren + aanpassingen vragen (incl. onderdeel).
 
-## ⚠️ Nog te koppelen — commissie-goedkeuringsflow (`ApplicationsPage.jsx`)
-De backend van `main` (`decideApplication`) verwacht een **ander contract** dan de huidige frontend stuurt:
-
-1. **Criteria-checklist apart opslaan.**
-   `main` leest de criteria uit tabel `voorstel_checklist` (gevuld via `PUT /api/committee/applications/:id/checklist`)
-   en weigert een **gewone** goedkeuring als niet alle verplichte criteria in orde zijn.
-   → Voor goedkeuren: eerst `PUT /applications/:id/checklist` aanroepen met de aangevinkte criteria,
-   dan pas `PATCH /applications/:id/decision`.
-   (De huidige frontend stuurt `criteria` + `alleCriteriaOk` mee in de decision-PATCH; dat negeert `main`.)
-
-2. **Goedkeuren met uitzondering.**
-   `main` verwacht `beslissing: "goedgekeurd_met_uitzondering"` (+ `uitzonderingMotivering`).
-   → De huidige frontend stuurt `beslissing: "goedgekeurd"` + `metUitzondering: true`; pas dit aan naar de
-   `goedgekeurd_met_uitzondering`-waarde.
-
-3. **Opgeslagen checklist tonen / decisions-historiek.**
-   - `GET /applications/:id/checklist` response van `main` controleren en de matrix-vinkjes ermee vullen
-     (veldnamen kunnen afwijken van `{criterium, is_in_orde}`).
-   - Optioneel: `GET /applications/:id/decisions` gebruiken voor een rijkere beslissingshistoriek.
+## ✅ OPGELOST — commissie-goedkeuringsflow (`ApplicationsPage.jsx`)
+De commissie-frontend is nu correct aan het backend-contract van `main` gekoppeld:
+1. **Criteria-checklist** wordt bij goedkeuren eerst opgeslagen via `PUT /committee/applications/:id/checklist`
+   (`items: [{criterium, isVerplicht, isInOrde}]`), daarna pas de beslissing — de backend leest die checklist.
+2. **Goedkeuren met uitzondering** stuurt nu `beslissing: "goedgekeurd_met_uitzondering"` + `uitzonderingMotivering`.
+3. **Opgeslagen checklist** wordt bij het openen correct terug ingeladen via `GET …/checklist`
+   (response `{items}`, label↔id-mapping). Goedkeuren via de UI werkt nu (was de blokkade in de doorstroom).
+   (Optioneel later: `GET …/decisions` voor een rijkere beslissingshistoriek.)
 
 ## ⚠️ Aandachtspunt — eindoverzicht serveren
 `GET /api/students/me/eindoverzicht.pdf` genereert de PDF on-the-fly (werkt onafhankelijk).

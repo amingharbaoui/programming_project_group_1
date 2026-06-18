@@ -362,22 +362,33 @@ function BeslisModal({ type, aanvraag, criteria, onSluit, onBeslissing }) {
     if (type === "aanpassingen" && !feedback.trim()) { setFout("Feedback is verplicht."); return; }
     if (type === "afkeuren" && !motivering.trim())   { setFout("Motivering is verplicht."); return; }
     if (type === "goedkeuren" && uitzondering && !uitzMot.trim()) { setFout("Motivering uitzondering is verplicht."); return; }
+    if (type === "goedkeuren" && !uitzondering && !allesCriteria) {
+      setFout("Niet alle criteria zijn aangevinkt. Vink alles af, of keur goed met een gemotiveerde uitzondering.");
+      return;
+    }
 
     setBezig(true);
     setFout("");
     try {
+      // Bij goedkeuren eerst de criteria-checklist opslaan — de backend leest die bij de beslissing.
+      if (type === "goedkeuren") {
+        const items = CRITERIA_DEFS.map((c) => ({
+          criterium: c.label,
+          isVerplicht: true,
+          isInOrde: !!criteria[c.id],
+        }));
+        await api.put(`/committee/applications/${aanvraag.id}/checklist`, { items });
+      }
+
       const beslissing = type === "aanpassingen" ? "aanpassingen_gevraagd"
                        : type === "afkeuren"     ? "afgekeurd"
-                       : "goedgekeurd";
+                       : (uitzondering ? "goedgekeurd_met_uitzondering" : "goedgekeurd");
       await api.patch(`/committee/applications/${aanvraag.id}/decision`, {
         beslissing,
-        feedback:               type === "aanpassingen" ? feedback   : null,
-        onderdeel:              type === "aanpassingen" ? onderdeel  : null,
-        motivering:             type !== "aanpassingen" ? motivering : null,
-        uitzonderingMotivering: uitzondering ? uitzMot : null,
-        metUitzondering:        type === "goedkeuren" && uitzondering,
-        criteria,
-        alleCriteriaOk:         allesCriteria,
+        feedback:               type === "aanpassingen" ? feedback : null,
+        onderdeel:              type === "aanpassingen" ? onderdeel : null,
+        motivering:             type === "afkeuren" ? motivering : null,
+        uitzonderingMotivering: (type === "goedkeuren" && uitzondering) ? uitzMot : null,
       });
       onBeslissing();
       onSluit();
@@ -645,8 +656,12 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
       .catch(() => {});
     api.get(`/committee/applications/${aanvraag.id}/checklist`)
       .then((r) => {
+        const items = r.data?.data?.items || [];
         const seed = {};
-        (r.data.data || []).forEach((c) => { seed[c.criterium] = !!c.is_in_orde; });
+        items.forEach((it) => {
+          const def = CRITERIA_DEFS.find((c) => c.label === it.criterium);
+          if (def) seed[def.id] = !!it.is_in_orde;
+        });
         if (Object.keys(seed).length > 0) setCriteria(seed);
       })
       .catch(() => {});
