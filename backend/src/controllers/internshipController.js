@@ -798,6 +798,19 @@ async function decideApplication(req, res) {
       return fail(res, 404, "Stagevoorstel niet gevonden");
     }
 
+    // Story 12/15: een gewone goedkeuring kan enkel als de checklist ingevuld is en alle verplichte criteria in orde zijn.
+    if (beslissing === "goedgekeurd") {
+      const [checklist] = await connection.query(
+        "SELECT is_verplicht, is_in_orde FROM voorstel_checklist WHERE stagevoorstel_versie_id = ?",
+        [voorstel.versie_id]
+      );
+      const verplichteNietInOrde = checklist.filter((c) => Number(c.is_verplicht) === 1 && Number(c.is_in_orde) !== 1);
+      if (checklist.length === 0 || verplichteNietInOrde.length > 0) {
+        await connection.rollback();
+        return fail(res, 400, "Vink eerst alle verplichte criteria af, of keur goed met uitzondering en motiveer waarom.");
+      }
+    }
+
     await connection.query(
       `
       INSERT INTO voorstel_beslissingen
