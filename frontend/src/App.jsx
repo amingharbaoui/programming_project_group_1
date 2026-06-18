@@ -19,8 +19,11 @@ import StudentDocumentsPage from "./features/student/pages/StudentDocumentsPage"
 import ApplicationsPage from "./features/committee/pages/ApplicationsPage";
 
 import DossiersPage from "./features/admin/pages/DossiersPage";
+import DossierDetailPage from "./features/admin/pages/DossierDetailPage";
+import ToewijzingenPage from "./features/admin/pages/ToewijzingenPage";
 import UsersPage from "./features/admin/pages/UsersPage";
 import CompetenciesPage from "./features/admin/pages/CompetenciesPage";
+import InstellingenPage from "./features/admin/pages/InstellingenPage";
 
 import MentorActivationPage from "./features/mentor/pages/MentorActivationPage";
 import MentorStudentsPage from "./features/mentor/pages/MentorStudentsPage";
@@ -121,8 +124,11 @@ export default function App() {
             <Route path="/committee/applications" element={<ApplicationsPage />} />
 
             <Route path="/admin/dossiers" element={<DossiersPage />} />
+            <Route path="/admin/dossiers/:id" element={<DossierDetailPage />} />
+            <Route path="/admin/toewijzingen" element={<ToewijzingenPage />} />
             <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/admin/competencies" element={<CompetenciesPage />} />
+            <Route path="/admin/instellingen" element={<InstellingenPage />} />
 
             <Route path="/mentor/students" element={<MentorStudentsPage />} />
             <Route path="/mentor/logbooks" element={<MentorLogbooksPage />} />

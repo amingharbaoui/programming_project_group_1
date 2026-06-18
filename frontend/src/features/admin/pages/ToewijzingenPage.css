@@ -1,0 +1,223 @@
+.page {
+  padding: 0 0 32px;
+}
+
+.page_header {
+  margin-bottom: 20px;
+}
+
+.page_header h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+  color: var(--dark);
+}
+
+.page_header p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--sub);
+  line-height: 1.5;
+}
+
+/* Badge */
+.tw_badge {
+  display: inline-block;
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 20px;
+  background: var(--amber-bg);
+  color: var(--amber);
+  vertical-align: middle;
+}
+
+/* State / empty */
+.tw_state {
+  padding: 28px 20px;
+  font-size: 13px;
+  color: var(--sub);
+}
+
+.tw_state_error {
+  color: var(--red);
+}
+
+.tw_empty {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.tw_empty_icon {
+  font-size: 36px;
+  color: var(--faint);
+  display: block;
+  margin-bottom: 10px;
+}
+
+.tw_empty h2 {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--dark);
+  margin-bottom: 6px;
+}
+
+.tw_empty p {
+  font-size: 13px;
+  color: var(--sub);
+}
+
+/* Cards */
+.tw_card {
+  margin-bottom: 14px;
+  padding: 18px 18px 8px;
+  overflow-x: auto;
+}
+
+.tw_section_title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--dark);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  letter-spacing: 0.2px;
+}
+
+.tw_icon_amber { color: var(--amber); font-size: 15px; }
+.tw_icon_green { color: var(--green); font-size: 15px; }
+
+/* Table */
+.tw_tbl {
+  min-width: 900px;
+}
+
+.tw_tbl th {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  color: var(--faint);
+}
+
+.tw_tbl td {
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+/* Urgent row (geen begeleider) */
+.tw_row_urgent td:first-child {
+  border-left: 2.5px solid var(--amber);
+}
+
+/* Student cell */
+.tw_student_cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 190px;
+}
+
+.tw_avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--red-light);
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.tw_student_info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tw_naam {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--dark);
+}
+
+.tw_sub {
+  font-size: 12px;
+  color: var(--faint);
+}
+
+/* Cell helpers */
+.tw_cell {
+  font-size: 13px;
+  color: var(--dark);
+}
+
+.tw_cell_muted {
+  font-size: 12px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+/* Docent cell */
+.tw_docent_cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tw_docent_avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  color: var(--gray);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+/* Modal select */
+.tw_modal_select {
+  width: 100%;
+  border: 0.5px solid var(--border);
+  border-radius: 7px;
+  padding: 9px 12px;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--dark);
+  background: var(--white);
+  outline: none;
+  cursor: pointer;
+  margin-top: 4px;
+}
+
+.tw_modal_select:focus {
+  border-color: var(--red);
+}
+
+/* Status badges */
+.tw_tbl .status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.tw_tbl .s_amber { background: var(--amber-bg); color: var(--amber); }
+.tw_tbl .s_ok    { background: var(--green-bg); color: var(--green); }
+.tw_tbl .s_info  { background: var(--blue-bg);  color: var(--blue);  }
+.tw_tbl .s_rood  { background: var(--red-light); color: var(--red);  }

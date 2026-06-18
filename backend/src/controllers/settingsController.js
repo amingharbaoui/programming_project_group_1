@@ -113,4 +113,28 @@ async function createDocumentType(req, res) {
   }
 }
 
-module.exports = { getSettings, updateStageRule, updateDocumentType, createDocumentType };
+
+// Reset documenttypes: verwijder custom types (is_vast=0), herstel vaste types naar seed-defaults.
+async function resetDocumentTypes(req, res) {
+  try {
+    // Nullify FK in documenten for custom types before deleting
+    await db.query(
+      "UPDATE documenten SET document_soort_id = NULL WHERE document_soort_id IN (SELECT id FROM document_soorten WHERE is_vast = 0)"
+    );
+    // Delete admin-added types
+    await db.query("DELETE FROM document_soorten WHERE is_vast = 0");
+    // Restore fixed types to seed defaults (is_verplicht + status)
+    await db.query(`
+      UPDATE document_soorten SET
+        is_verplicht = CASE id WHEN 4 THEN 0 ELSE 1 END,
+        status = 'actief',
+        aangepast_op = NOW()
+      WHERE is_vast = 1
+    `);
+    return ok(res, {}, "Documenttypes gereset naar standaardwaarden");
+  } catch (error) {
+    return fail(res, 500, "Reset mislukt", error.message);
+  }
+}
+
+module.exports = { getSettings, updateStageRule, updateDocumentType, createDocumentType, resetDocumentTypes };

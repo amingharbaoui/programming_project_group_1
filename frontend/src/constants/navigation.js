@@ -15,9 +15,11 @@ export const NAVIGATION = {
   ],
 
   [ROLES.ADMIN]: [
-    { label: "Dossiers",    path: "/admin/dossiers",      icon: "ti-folder" },
-    { label: "Gebruikers",  path: "/admin/users",         icon: "ti-users" },
-    { label: "Competenties",path: "/admin/competencies",  icon: "ti-target" },
+    { label: "Dossiers",     path: "/admin/dossiers",     icon: "ti-folder" },
+    { label: "Toewijzingen", path: "/admin/toewijzingen", icon: "ti-link" },
+    { label: "Gebruikers",   path: "/admin/users",        icon: "ti-users" },
+    { label: "Competenties", path: "/admin/competencies", icon: "ti-target" },
+    { label: "Instellingen", path: "/admin/instellingen", icon: "ti-settings" },
   ],
 
   [ROLES.MENTOR]: [
@@ -30,10 +32,10 @@ export const NAVIGATION = {
   ],
 
   [ROLES.DOCENT]: [
-    { label: "Studenten",  path: "/docent/students",    icon: "ti-users" },
-    { label: "Voorstellen",path: "/docent/proposals",   icon: "ti-file-text" },
-    { label: "Logboeken",  path: "/docent/logbooks",    icon: "ti-notebook" },
-    { label: "Evaluaties", path: "/docent/evaluations", icon: "ti-clipboard-check" },
-    { label: "Planning",   path: "/docent/planning",    icon: "ti-calendar-event" },
+    { label: "Studenten",   path: "/docent/students",    icon: "ti-users" },
+    { label: "Voorstellen", path: "/docent/proposals",   icon: "ti-file-text" },
+    { label: "Logboeken",   path: "/docent/logbooks",    icon: "ti-notebook" },
+    { label: "Evaluaties",  path: "/docent/evaluations", icon: "ti-clipboard-check" },
+    { label: "Planning",    path: "/docent/planning",    icon: "ti-calendar-event" },
   ],
 };
