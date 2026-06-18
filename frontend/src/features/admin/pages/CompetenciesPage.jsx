@@ -287,6 +287,39 @@ export default function CompetenciesPage() {
     }
   }
 
+  async function handleDupliceren() {
+    if (!profiel?.id) return;
+    setPublishLoading(true);
+    setPublishError("");
+    setPublishSuccess("");
+    try {
+      await api.post(`/competencies/profiles/${profiel.id}/duplicate`);
+      setPublishSuccess("Nieuwe conceptversie aangemaakt.");
+      fetchData();
+    } catch (err) {
+      setPublishError(err.response?.data?.message || "Nieuwe versie maken mislukt");
+    } finally {
+      setPublishLoading(false);
+    }
+  }
+
+  async function handleArchiveren() {
+    if (!profiel?.id) return;
+    if (!window.confirm("Dit competentieprofiel archiveren?")) return;
+    setPublishLoading(true);
+    setPublishError("");
+    setPublishSuccess("");
+    try {
+      await api.patch(`/competencies/profiles/${profiel.id}/archive`);
+      setPublishSuccess("Profiel gearchiveerd.");
+      fetchData();
+    } catch (err) {
+      setPublishError(err.response?.data?.message || "Archiveren mislukt");
+    } finally {
+      setPublishLoading(false);
+    }
+  }
+
   const aantalActief = competenties.filter((c) => c.is_actief).length;
 
   return (
@@ -333,11 +366,11 @@ export default function CompetenciesPage() {
             </div>
 
             <div className="competencies_hero_actions">
-              <button className="btn">
+              <button className="btn" onClick={handleDupliceren} disabled={publishLoading}>
                 <IconCopyPlus size={18} stroke={1.8} />
                 Nieuwe versie maken
               </button>
-              <button className="btn">
+              <button className="btn" onClick={handleArchiveren} disabled={publishLoading}>
                 <IconArchive size={18} stroke={1.8} />
                 Archiveren
               </button>
@@ -493,15 +526,15 @@ export default function CompetenciesPage() {
 
           <div className="card actions_card">
             <div className="card_title">Snelle acties</div>
-            <button className="btn full_width">
+            <button className="btn full_width" onClick={handleDupliceren} disabled={publishLoading}>
               <IconCopyPlus size={18} stroke={1.8} />
               Nieuwe versie maken
             </button>
-            <button className="btn full_width">
+            <button className="btn full_width" onClick={handleDupliceren} disabled={publishLoading}>
               <IconArchive size={18} stroke={1.8} />
               Dupliceren
             </button>
-            <button className="btn full_width danger_outline">
+            <button className="btn full_width danger_outline" onClick={handleArchiveren} disabled={publishLoading}>
               <IconTrash size={18} stroke={1.8} />
               Profiel archiveren
             </button>
