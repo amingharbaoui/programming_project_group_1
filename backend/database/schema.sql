@@ -334,6 +334,7 @@ CREATE TABLE `stagedossiers` (
   `totaal_uren` int NOT NULL,
   `verzekering_in_orde` tinyint(1) DEFAULT '0',
   `praktische_afspraken` text,
+  `praktische_afspraken_velden` json DEFAULT NULL,
   `praktische_afspraken_gedeeld_op` timestamp NULL DEFAULT NULL,
   `eindresultaat` decimal(4,2) DEFAULT NULL,
   `eindresultaat_vrijgegeven_op` timestamp NULL DEFAULT NULL,
