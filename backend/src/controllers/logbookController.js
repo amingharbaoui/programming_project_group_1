@@ -197,6 +197,16 @@ async function createLogbook(req, res) {
       return fail(res, 403, "Je mag alleen een logboek indienen voor je eigen stagedossier");
     }
 
+    // Logboek pas invulbaar nadat de student de stageovereenkomst getekend heeft.
+    const [ovk] = await connection.query(
+      "SELECT student_getekend_op FROM stageovereenkomsten WHERE stagedossier_id = ? ORDER BY aangemaakt_op DESC LIMIT 1",
+      [dossierId]
+    );
+    if (!ovk[0] || !ovk[0].student_getekend_op) {
+      await connection.rollback();
+      return fail(res, 409, "Je kan pas een logboek indienen nadat je de stageovereenkomst getekend hebt");
+    }
+
     const totaalUren = sumHours(finalDays);
 
     const [existingWeeks] = await connection.query(
@@ -837,6 +847,16 @@ async function saveLogbookDay(req, res) {
     );
     if (dossiers.length === 0) { await conn.rollback(); return fail(res, 404, "Geen stagedossier gevonden"); }
     const dossierId = dossiers[0].id;
+
+    // Logboek pas invulbaar nadat de student de stageovereenkomst getekend heeft.
+    const [ovk] = await conn.query(
+      "SELECT student_getekend_op FROM stageovereenkomsten WHERE stagedossier_id = ? ORDER BY aangemaakt_op DESC LIMIT 1",
+      [dossierId]
+    );
+    if (!ovk[0] || !ovk[0].student_getekend_op) {
+      await conn.rollback();
+      return fail(res, 409, "Je kan pas een logboek invullen nadat je de stageovereenkomst getekend hebt");
+    }
 
     // Week zoeken of aanmaken (week_start = maandag van de datum, week_einde = vrijdag).
     const [weken] = await conn.query(
