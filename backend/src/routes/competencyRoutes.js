@@ -5,8 +5,9 @@ const {
   updateCompetency,
   deleteCompetency,
   publishProfile,
+  createNewVersion,
   duplicateProfile,
-  archiveProfile
+  archiveProfile,
 } = require("../controllers/competencyController");
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
 
@@ -19,6 +20,7 @@ router.get("/", listCompetencies);
 
 // Beheer enkel voor administratie.
 router.post("/", requireRole("administratie"), createCompetency);
+router.post("/profiles/:id/new-version", requireRole("administratie"), createNewVersion);
 router.patch("/profiles/:id/publish", requireRole("administratie"), publishProfile);
 router.post("/profiles/:id/duplicate", requireRole("administratie"), duplicateProfile);
 router.patch("/profiles/:id/archive", requireRole("administratie"), archiveProfile);

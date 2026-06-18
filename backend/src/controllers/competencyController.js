@@ -233,6 +233,66 @@ async function deleteCompetency(req, res) {
   }
 }
 
+
+const DEFAULT_COMPETENTIES = [
+  { code: "LO1",  naam: "Beheersing van het planningsproces",          beschrijving: "De student plant en stuurt het eigen werkproces.",                          gewicht: 9.00,  volgorde: 1  },
+  { code: "LO2",  naam: "Ontwerpen van IT-oplossingen",                beschrijving: "De student analyseert en ontwerpt passende IT-oplossingen.",               gewicht: 11.00, volgorde: 2  },
+  { code: "LO3",  naam: "Implementatie van digitale producten",        beschrijving: "De student bouwt en test digitale producten.",                              gewicht: 12.00, volgorde: 3  },
+  { code: "LO4",  naam: "Integratie van technologie en infrastructuur",beschrijving: "De student integreert systemen en infrastructuur.",                         gewicht: 8.00,  volgorde: 4  },
+  { code: "LO5",  naam: "Onderzoekende houding",                       beschrijving: "De student verkent nieuwe technologieën en onderbouwt keuzes.",             gewicht: 9.00,  volgorde: 5  },
+  { code: "LO6",  naam: "Helder en transparant communiceren",          beschrijving: "De student communiceert duidelijk met mentor en docent.",                   gewicht: 10.00, volgorde: 6  },
+  { code: "LO7",  naam: "Probleemoplossend vermogen",                  beschrijving: "De student analyseert problemen en werkt naar een oplossing.",              gewicht: 11.00, volgorde: 7  },
+  { code: "LO8",  naam: "Persoonlijke ontwikkeling",                   beschrijving: "De student reflecteert op eigen functioneren.",                             gewicht: 9.00,  volgorde: 8  },
+  { code: "LO9",  naam: "Professionele attitude",                      beschrijving: "De student gedraagt zich professioneel in de bedrijfscontext.",             gewicht: 10.00, volgorde: 9  },
+  { code: "LO10", naam: "Ondernemend handelen",                        beschrijving: "De student toont initiatief en draagt actief bij.",                         gewicht: 8.00,  volgorde: 10 },
+  { code: "LO11", naam: "Ethisch en deontologisch handelen",           beschrijving: "De student handelt integer en respecteert privacy.",                        gewicht: 3.00,  volgorde: 11 },
+];
+
+// Reset profiel volledig: verwijder alle huidige competenties en herstel de 11 standaardcompetenties met standaardgewichten.
+async function createNewVersion(req, res) {
+  const profielId = Number(req.params.id);
+  if (!profielId) return fail(res, 400, "Ongeldig profiel-id");
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Verwijder alle huidige competenties (scores eerst vanwege FK constraint)
+    const [bestaande] = await conn.query(
+      "SELECT id FROM competenties WHERE competentie_profiel_id = ?",
+      [profielId]
+    );
+    for (const c of bestaande) {
+      await conn.query("DELETE FROM competentie_scores WHERE competentie_id = ?", [c.id]);
+    }
+    await conn.query(
+      "DELETE FROM competenties WHERE competentie_profiel_id = ?",
+      [profielId]
+    );
+
+    // Voeg de 11 standaardcompetenties opnieuw in
+    for (const c of DEFAULT_COMPETENTIES) {
+      await conn.query(
+        `INSERT INTO competenties
+          (competentie_profiel_id, code, naam, beschrijving, gewicht_percentage, volgorde, is_actief, aangemaakt_op, aangepast_op)
+         VALUES (?, ?, ?, ?, ?, ?, 1, NOW(), NOW())`,
+        [profielId, c.code, c.naam, c.beschrijving, c.gewicht, c.volgorde]
+      );
+    }
+
+    // Zet profiel terug op concept
+    await conn.query(
+      "UPDATE competentie_profielen SET status = 'concept', aangepast_op = NOW() WHERE id = ?",
+      [profielId]
+    );
+
+    await conn.commit();
+    return ok(res, { id: profielId }, "Profiel volledig gereset naar standaard");
+  } catch (error) {
+    await conn.rollback();
+    return fail(res, 500, "Reset mislukt", error.message);
+
+
 // Maakt een nieuwe (concept-)versie van een profiel met een kopie van alle competenties.
 // Wordt gebruikt door "Nieuwe versie maken" en "Dupliceren".
 async function duplicateProfile(req, res) {
@@ -332,6 +392,7 @@ module.exports = {
   updateCompetency,
   deleteCompetency,
   publishProfile,
+  createNewVersion,
   duplicateProfile,
-  archiveProfile
+  archiveProfile,
 };

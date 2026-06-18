@@ -16,7 +16,6 @@ Deze applicatie ondersteunt het volledige stageproces van studenten binnen EhB, 
 ## Authors
 
 - [@amingharbaoui](https://www.github.com/amingharbaoui)
-- [@imrane](https://www.github.com/imrane-bekkaoui)
 - [@david](https://www.github.com/davidvuy)
 - [@mohamad](https://www.github.com/mohamad-azhar)
 - [@nathan](https://www.github.com/Ehbnathanmadimba)

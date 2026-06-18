@@ -92,15 +92,14 @@
 	color: #e2001a;
 }
 
-.primary-btn {
-	background: #e2001a;
-	color: white;
-	border: none;
-	padding: 10px 14px;
-	border-radius: 10px;
-	cursor: pointer;
-	font-family: inherit;
-	font-weight: 600;
+.role-mentor {
+	background: #fff4e5;
+	color: #a16207;
+}
+
+.role-stagecommissie {
+	background: #f3f4f6;
+	color: #4b5563;
 }
 
 .btn {
@@ -120,4 +119,126 @@
 .btn.sm {
 	font-size: 12px;
 	padding: 4px 10px;
+}
+
+.btn-danger {
+	border-color: #fca5a5;
+	color: #dc2626;
+	background: #fff5f5;
+}
+
+.btn-danger:hover {
+	background: #fee2e2;
+}
+
+.btn-success {
+	border-color: #86c99a;
+	color: var(--green);
+	background: var(--green-bg);
+}
+
+.btn-success:hover {
+	background: #d2ead9;
+}
+
+.btn-danger-solid {
+	border-color: #dc2626;
+	color: white;
+	background: #dc2626;
+}
+
+.btn-danger-solid:hover {
+	background: #b91c1c;
+	color: white;
+}
+
+.btn-success-solid {
+	border-color: var(--green);
+	color: white;
+	background: var(--green);
+}
+
+.btn-success-solid:hover {
+	background: #164d27;
+	border-color: #164d27;
+	color: white;
+}
+
+.modal_box_sm {
+	max-width: 420px;
+}
+
+.modal_overlay_top {
+	z-index: 1100;
+}
+
+.modal_footer_spread {
+	justify-content: space-between;
+}
+
+.user_modal_info {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 14px 20px;
+	background: #f9f9f9;
+	border-bottom: 1px solid var(--border);
+}
+
+.user_avatar {
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	background: var(--red);
+	color: white;
+	font-size: 14px;
+	font-weight: 700;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex-shrink: 0;
+}
+
+.user_modal_meta {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+}
+
+.user_modal_naam {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 700;
+	color: var(--dark);
+}
+
+.input_disabled {
+	color: var(--sub) !important;
+	background: #f9f9f9 !important;
+	cursor: default;
+}
+
+.modal_field select {
+	border: 0.5px solid var(--border);
+	border-radius: 7px;
+	padding: 8px 10px;
+	font-family: var(--font);
+	font-size: 13px;
+	color: var(--dark);
+	background: var(--white);
+	outline: none;
+	width: 100%;
+}
+
+.modal_field select:focus {
+	border-color: var(--red);
+}
+
+.spin {
+	animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+	to { transform: rotate(360deg); }
 }

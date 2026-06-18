@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { IconLogin2 } from "@tabler/icons-react";
 import "./LoginPage.css";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -107,6 +108,7 @@ export default function LoginPage() {
 
           {/* Aanmelden knop */}
           <button type="submit" className="btn primary login_btn" disabled={loading}>
+            <IconLogin2 size={16} stroke={2} style={{ marginRight: 6 }} />
             {loading ? "Aanmelden..." : "Aanmelden"}
           </button>
 
