@@ -97,7 +97,7 @@ async function getEvaluationsForStudent(req, res) {
     const competenties = await getActiveCompetencies(db);
 
     const [evaluaties] = await db.query(
-      `SELECT id, type, status, verslag, eindpresentatie_score, competentie_score, eindcijfer,
+      `SELECT id, type, status, verslag, mentor_algemene_feedback, eindpresentatie_score, competentie_score, eindcijfer,
               student_ingediend_op, mentor_ingediend_op, docent_geregistreerd_op, vrijgegeven_op
        FROM evaluaties
        WHERE stagedossier_id = ?
@@ -209,6 +209,17 @@ async function saveScores(req, res) {
            ingediend = VALUES(ingediend), ingediend_op = VALUES(ingediend_op), aangepast_op = NOW()`,
         [evaluationId, competentieId, userId, role, scoreValue, s.motivering || s.motivatie || null, s.feedback || null, ingediend ? 1 : 0, ingediend ? new Date() : null]
       );
+    }
+
+    // Algemene praktijkfeedback van de mentor (story 33) — los van de per-competentie velden.
+    if (role === "mentor") {
+      const algemeneFeedback = req.body.algemeneFeedback ?? req.body.algemene_feedback;
+      if (algemeneFeedback !== undefined) {
+        await conn.query(
+          "UPDATE evaluaties SET mentor_algemene_feedback = ?, aangepast_op = NOW() WHERE id = ?",
+          [algemeneFeedback || null, evaluationId]
+        );
+      }
     }
 
     let nieuweStatus = evaluatie.status;

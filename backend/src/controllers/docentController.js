@@ -35,7 +35,10 @@ async function getDocentStudents(req, res) {
         (SELECT COUNT(*) FROM evaluaties e
           WHERE e.stagedossier_id = sd.id AND e.status = 'klaar_voor_docent') AS eval_te_registreren,
         (SELECT COUNT(*) FROM evaluaties e
-          WHERE e.stagedossier_id = sd.id AND e.status = 'klaar_voor_vrijgave') AS eval_te_vrijgeven
+          WHERE e.stagedossier_id = sd.id AND e.status = 'klaar_voor_vrijgave') AS eval_te_vrijgeven,
+        (SELECT e.deadline_docent FROM evaluaties e
+          WHERE e.stagedossier_id = sd.id AND e.status IN ('klaar_voor_docent','klaar_voor_vrijgave')
+          ORDER BY e.deadline_docent IS NULL, e.deadline_docent ASC LIMIT 1) AS actie_deadline
       FROM stagedossiers sd
       JOIN studenten   st ON st.gebruiker_id = sd.student_id
       JOIN gebruikers   g ON g.id             = st.gebruiker_id
@@ -55,7 +58,13 @@ async function getDocentStudents(req, res) {
       if (r.dossier_status === "resultaat_vrijgegeven" || r.dossier_status === "afgerond") return "Afgerond";
       return "—";
     };
-    const out = rows.map((r) => ({ ...r, volgende_actie: volgendeActie(r) }));
+    // Deadline bij de openstaande actie: de docent-deadline van de te-registreren/vrij te geven evaluatie,
+    // anders de einddatum van de stage als zachte deadline.
+    const out = rows.map((r) => ({
+      ...r,
+      volgende_actie: volgendeActie(r),
+      deadline: r.actie_deadline || r.einddatum || null
+    }));
 
     return ok(res, out, "Docent studenten opgehaald");
   } catch (err) {

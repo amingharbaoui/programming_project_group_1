@@ -84,7 +84,7 @@ async function listDocentPlanning(req, res) {
 
 async function createPlanningMoment(req, res, type) {
   const docentId = getUserId(req);
-  const { dossierId, stagedossierId, geplandOp, datum, locatie, verslag } = req.body;
+  const { dossierId, stagedossierId, geplandOp, datum, locatie, verslag, deelnemers } = req.body;
   const dossierIdFinal = Number(dossierId || stagedossierId);
   const geplandOpFinal = normalizeDateTime(geplandOp || datum);
 
@@ -99,10 +99,10 @@ async function createPlanningMoment(req, res, type) {
     const [result] = await db.query(
       `
       INSERT INTO planning_momenten
-        (stagedossier_id, type, status, gepland_op, locatie, voorgesteld_door_id, verslag, aangemaakt_op, aangepast_op)
-      VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        (stagedossier_id, type, status, gepland_op, locatie, voorgesteld_door_id, verslag, deelnemers, aangemaakt_op, aangepast_op)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
       `,
-      [dossierIdFinal, type, status, geplandOpFinal, locatie || null, docentId, verslag || null]
+      [dossierIdFinal, type, status, geplandOpFinal, locatie || null, docentId, verslag || null, deelnemers || null]
     );
 
     const planningId = result.insertId;
@@ -139,7 +139,7 @@ async function createPresentation(req, res) {
 async function updateDocentPlanning(req, res) {
   const docentId = getUserId(req);
   const planningId = Number(req.params.id);
-  const { geplandOp, datum, locatie, status, verslag } = req.body;
+  const { geplandOp, datum, locatie, status, verslag, deelnemers } = req.body;
   const geplandOpFinal = normalizeDateTime(geplandOp || datum);
 
   if (!planningId) return fail(res, 400, "Ongeldig planning-id");
@@ -165,6 +165,10 @@ async function updateDocentPlanning(req, res) {
   if (verslag !== undefined) {
     fields.push("pm.verslag = ?");
     values.push(verslag || null);
+  }
+  if (deelnemers !== undefined) {
+    fields.push("pm.deelnemers = ?");
+    values.push(deelnemers || null);
   }
 
   if (fields.length === 0) return fail(res, 400, "Geen wijzigingen meegegeven");
