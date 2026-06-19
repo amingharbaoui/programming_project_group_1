@@ -312,3 +312,56 @@
   align-items: center;
   gap: 6px;
 }
+
+/* ── Versies vergelijken tabel ── */
+.vgl-table {
+  display: flex;
+  flex-direction: column;
+}
+.vgl-head {
+  display: grid;
+  grid-template-columns: 140px 1fr 1fr;
+  gap: 12px;
+  padding: 6px 10px 10px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--sub);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 1.5px solid var(--border);
+}
+.vgl-row {
+  display: grid;
+  grid-template-columns: 140px 1fr 1fr;
+  gap: 12px;
+  padding: 9px 10px;
+  border-bottom: 0.5px solid var(--border);
+  align-items: baseline;
+}
+.vgl-row:last-child { border-bottom: none; }
+.vgl-row.gewijzigd {
+  background: #fffbeb;
+  border-radius: 6px;
+  border-bottom-color: transparent;
+  margin: 1px 0;
+}
+.vgl-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sub);
+}
+.vgl-row.gewijzigd .vgl-label { color: #92400e; }
+.vgl-val { font-size: 13px; color: var(--dark); line-height: 1.5; }
+.vgl-oud {
+  font-size: 13px;
+  color: #b45309;
+  text-decoration: line-through;
+  opacity: 0.75;
+  line-height: 1.5;
+}
+.vgl-nieuw {
+  font-size: 13px;
+  color: #16a34a;
+  font-weight: 600;
+  line-height: 1.5;
+}

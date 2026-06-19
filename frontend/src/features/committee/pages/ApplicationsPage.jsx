@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import api from "../../../services/api";
 import "../../../index.css";
 import "./ApplicationsPage.css";
+import Modal from "../../../components/ui/Modal";
 
 /* ── Criteria definitie ── */
 const CRITERIA_DEFS = [
@@ -400,133 +401,24 @@ function BeslisModal({ type, aanvraag, criteria, onSluit, onBeslissing }) {
   }
 
   const TITELS = {
-    aanpassingen: { icon: "ti-message-circle", titel: "Aanpassingen vragen" },
-    afkeuren:     { icon: "ti-x",              titel: "Stagevoorstel afkeuren" },
-    goedkeuren:   { icon: "ti-circle-check",   titel: "Stagevoorstel goedkeuren" },
+    aanpassingen: { icon: null,                titel: "Aanpassingen vragen" },
+    afkeuren:     { icon: null,                titel: "Stagevoorstel afkeuren" },
+    goedkeuren:   { icon: null,                 titel: "Stagevoorstel goedkeuren" },
   };
   const { icon, titel } = TITELS[type] || {};
 
   return (
-    <div className="popup-overlay">
-      <div className="popup" style={{ maxWidth: 560, width: "100%" }}>
-        <div className="popup-header" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <i className={`ti ${icon}`} style={{ fontSize: 18, color: "var(--sub)" }} />
-          <div style={{ flex: 1 }}>
-            <div className="card_title" style={{ margin: 0 }}>{titel}</div>
-            <div style={{ fontSize: 12, color: "var(--sub)" }}>
-              {aanvraag.student_voornaam} {aanvraag.student_achternaam} · {aanvraag.bedrijf_naam}
-            </div>
-          </div>
-          <button className="btn" onClick={onSluit}>✕</button>
-        </div>
-
-        <div className="popup-body">
-          {/* Samenvatting */}
-          <div className="kv"><span className="k">Student</span><span className="v">{aanvraag.student_voornaam} {aanvraag.student_achternaam}</span></div>
-          <div className="kv"><span className="k">Stagebedrijf</span><span className="v">{aanvraag.bedrijf_naam}</span></div>
-          <div className="kv"><span className="k">Periode</span><span className="v">{formatDate(aanvraag.startdatum)} – {formatDate(aanvraag.einddatum)} ({aanvraag.aantal_weken || "?"} weken)</span></div>
-
-          {/* Checklist-waarschuwing bij goedkeuren */}
-          {type === "goedkeuren" && !allesCriteria && (
-            <div className="banner amber" style={{ margin: "14px 0 4px" }}>
-              <i className="ti ti-alert-circle" />
-              <div>
-                <div className="b-title">Niet alle criteria zijn aangevinkt</div>
-                <div className="b-text">Je kan goedkeuren met een expliciet gemotiveerde uitzondering.</div>
-              </div>
-            </div>
-          )}
-
-          {/* Feedback / motivering */}
-          {type === "aanpassingen" && (
-            <>
-              <div className="form_group" style={{ marginTop: 14 }}>
-                <label className="form_label">Onderdeel</label>
-                <select
-                  className="form_input"
-                  value={onderdeel}
-                  onChange={(e) => setOnderdeel(e.target.value)}
-                >
-                  {ONDERDEEL_OPTIES.map((o) => <option key={o} value={o}>{o}</option>)}
-                </select>
-              </div>
-              <div className="form_group">
-                <label className="form_label">Feedback aan student <span style={{ color: "var(--red)" }}>*</span></label>
-                <textarea
-                  className="form_textarea"
-                  rows={4}
-                  placeholder="Welke aanpassingen zijn nodig?"
-                  value={feedback}
-                  onChange={(e) => setFeedback(e.target.value)}
-                />
-              </div>
-            </>
-          )}
-
-          {(type === "afkeuren") && (
-            <div className="form_group" style={{ marginTop: 14 }}>
-              <div className="banner rood" style={{ marginBottom: 12 }}>
-                <i className="ti ti-alert-triangle" />
-                <div>
-                  <div className="b-title">Afkeuring is definitief</div>
-                  <div className="b-text">Het voorstel wordt afgekeurd en kan niet meer beoordeeld worden. De student moet een nieuw voorstel starten.</div>
-                </div>
-              </div>
-              <label className="form_label">Motivering voor de student <span style={{ color: "var(--red)" }}>*</span></label>
-              <textarea
-                className="form_textarea"
-                rows={3}
-                placeholder="De student ziet deze motivering…"
-                value={motivering}
-                onChange={(e) => setMotivering(e.target.value)}
-              />
-            </div>
-          )}
-
-          {type === "goedkeuren" && (
-            <>
-              <div style={{ marginTop: 14 }}>
-                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
-                  <input
-                    type="checkbox"
-                    checked={uitzondering}
-                    onChange={(e) => setUitz(e.target.checked)}
-                    style={{ accentColor: "var(--red)" }}
-                  />
-                  Goedkeuren met uitzondering
-                </label>
-              </div>
-              {uitzondering && (
-                <div className="form_group" style={{ marginTop: 10 }}>
-                  <label className="form_label">Motivering uitzondering <span style={{ color: "var(--red)" }}>*</span></label>
-                  <textarea
-                    className="form_textarea"
-                    rows={3}
-                    placeholder="Waarom wordt er een uitzondering toegestaan?"
-                    value={uitzMot}
-                    onChange={(e) => setUitzMot(e.target.value)}
-                  />
-                </div>
-              )}
-            </>
-          )}
-
-          {fout && (
-            <div style={{ marginTop: 10, padding: "8px 12px", background: "var(--red-light)", borderRadius: 8, fontSize: 13, color: "var(--red)" }}>
-              {fout}
-            </div>
-          )}
-        </div>
-
-        <div className="actions" style={{ padding: "12px 20px", borderTop: "1px solid var(--border)" }}>
+    <Modal
+      open={true}
+      onClose={onSluit}
+      icon={icon}
+      titel={titel}
+      sub={`${aanvraag.student_voornaam} ${aanvraag.student_achternaam} · ${aanvraag.bedrijf_naam}`}
+      footer={
+        <>
           <button className="btn" onClick={onSluit} disabled={bezig}>Annuleren</button>
           {type === "afkeuren" ? (
-            <button
-              className="btn"
-              style={{ background: "var(--red)", borderColor: "var(--red)", color: "#fff" }}
-              disabled={bezig}
-              onClick={verstuur}
-            >
+            <button className="btn primary" disabled={bezig} onClick={verstuur}>
               <i className="ti ti-x" />
               {bezig ? "Bezig…" : "Afkeuren"}
             </button>
@@ -535,9 +427,73 @@ function BeslisModal({ type, aanvraag, criteria, onSluit, onBeslissing }) {
               {bezig ? "Bezig…" : type === "aanpassingen" ? "Aanpassingen vragen" : "Goedkeuren"}
             </button>
           )}
+        </>
+      }
+    >
+      <div className="kv"><span className="k">Student</span><span className="v">{aanvraag.student_voornaam} {aanvraag.student_achternaam}</span></div>
+      <div className="kv"><span className="k">Stagebedrijf</span><span className="v">{aanvraag.bedrijf_naam}</span></div>
+      <div className="kv"><span className="k">Periode</span><span className="v">{formatDate(aanvraag.startdatum)} – {formatDate(aanvraag.einddatum)} ({aanvraag.aantal_weken || "?"} weken)</span></div>
+
+      {type === "goedkeuren" && !allesCriteria && (
+        <div className="banner amber" style={{ marginTop: 12 }}>
+          <i className="ti ti-alert-circle" />
+          <div>
+            <div className="b-title">Niet alle criteria zijn aangevinkt</div>
+            <div className="b-text">Je kan goedkeuren met een expliciet gemotiveerde uitzondering.</div>
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+
+      {type === "aanpassingen" && (
+        <>
+          <div className="form_group" style={{ marginTop: 14 }}>
+            <label className="form_label">Onderdeel</label>
+            <select className="form_input" value={onderdeel} onChange={(e) => setOnderdeel(e.target.value)}>
+              {ONDERDEEL_OPTIES.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </div>
+          <div className="form_group">
+            <label className="form_label">Feedback aan student <span style={{ color: "var(--red)" }}>*</span></label>
+            <textarea className="form_textarea" rows={4} placeholder="Welke aanpassingen zijn nodig?" value={feedback} onChange={(e) => setFeedback(e.target.value)} />
+          </div>
+        </>
+      )}
+
+      {type === "afkeuren" && (
+        <div className="form_group" style={{ marginTop: 14 }}>
+          <div className="banner rood" style={{ marginBottom: 12 }}>
+            <i className="ti ti-alert-triangle" />
+            <div>
+              <div className="b-title">Afkeuring is definitief</div>
+              <div className="b-text">Het voorstel wordt afgekeurd en kan niet meer beoordeeld worden. De student moet een nieuw voorstel starten.</div>
+            </div>
+          </div>
+          <label className="form_label">Motivering voor de student <span style={{ color: "var(--red)" }}>*</span></label>
+          <textarea className="form_textarea" rows={3} placeholder="De student ziet deze motivering…" value={motivering} onChange={(e) => setMotivering(e.target.value)} />
+        </div>
+      )}
+
+      {type === "goedkeuren" && (
+        <>
+          <div style={{ marginTop: 14 }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}>
+              <input type="checkbox" checked={uitzondering} onChange={(e) => setUitz(e.target.checked)} style={{ accentColor: "var(--red)" }} />
+              Goedkeuren met uitzondering
+            </label>
+          </div>
+          {uitzondering && (
+            <div className="form_group" style={{ marginTop: 10 }}>
+              <label className="form_label">Motivering uitzondering <span style={{ color: "var(--red)" }}>*</span></label>
+              <textarea className="form_textarea" rows={3} placeholder="Waarom wordt er een uitzondering toegestaan?" value={uitzMot} onChange={(e) => setUitzMot(e.target.value)} />
+            </div>
+          )}
+        </>
+      )}
+
+      {fout && (
+        <div style={{ marginTop: 8, fontSize: 13, color: "var(--red)" }}>{fout}</div>
+      )}
+    </Modal>
   );
 }
 
@@ -574,49 +530,51 @@ function VergelijkModal({ aanvraagId, feedbackVorige, onSluit }) {
   const nieuw = versies[versies.length - 1] || null;
 
   return (
-    <div className="popup-overlay">
-      <div className="popup" style={{ maxWidth: 820, width: "100%" }}>
-        <div className="popup-header">
-          <div className="card_title">Versies vergelijken</div>
-          <button className="btn" onClick={onSluit}>✕</button>
-        </div>
-        <div className="popup-body">
-          {loading && <p style={{ color: "var(--sub)", fontSize: 13 }}>Versies laden…</p>}
-          {!loading && (!oud || !nieuw) && (
-            <p style={{ color: "var(--sub)", fontSize: 13 }}>Slechts één versie beschikbaar.</p>
-          )}
-          {!loading && oud && nieuw && (
-            <>
-              {feedbackVorige && (
-                <div style={{ marginBottom: 16, padding: "10px 14px", background: "var(--red-light)", borderRadius: 8, fontSize: 12.5, color: "var(--red)" }}>
-                  <strong>Eerdere feedback aan student:</strong> {feedbackVorige}
-                </div>
-              )}
-              <div style={{ display: "grid", gridTemplateColumns: "140px 1fr 1fr", gap: 8, marginBottom: 8 }}>
-                <span />
-                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--sub)", textTransform: "uppercase", letterSpacing: .3 }}>Versie {oud.versie_nummer} (oud)</span>
-                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--sub)", textTransform: "uppercase", letterSpacing: .3 }}>Versie {nieuw.versie_nummer} (nieuw)</span>
+    <Modal
+      wide
+      open={true}
+      onClose={onSluit}
+      icon="ti-git-compare"
+      titel="Versies vergelijken"
+      footer={<button className="btn" onClick={onSluit}>Sluiten</button>}
+    >
+      {loading && <p style={{ color: "var(--sub)", fontSize: 13 }}>Versies laden…</p>}
+      {!loading && (!oud || !nieuw) && (
+        <p style={{ color: "var(--sub)", fontSize: 13 }}>Slechts één versie beschikbaar.</p>
+      )}
+      {!loading && oud && nieuw && (
+        <>
+          {feedbackVorige && (
+            <div className="banner amber" style={{ marginBottom: 14 }}>
+              <i className="ti ti-message-circle" />
+              <div>
+                <div className="b-title">Eerdere feedback aan student</div>
+                <div className="b-text">{feedbackVorige}</div>
               </div>
-              {VERGELIJK_VELDEN.map(({ key, label, fmt }) => {
-                const oudVal  = fmt ? fmt(oud[key])  : (oud[key]  ?? "–");
-                const nieuwVal = fmt ? fmt(nieuw[key]) : (nieuw[key] ?? "–");
-                const gewijzigd = String(oud[key] ?? "") !== String(nieuw[key] ?? "");
-                return (
-                  <div key={key} style={{ display: "grid", gridTemplateColumns: "140px 1fr 1fr", gap: 8, padding: "7px 0", borderBottom: "0.5px solid var(--border)", background: gewijzigd ? "#fffbeb" : "transparent", borderRadius: gewijzigd ? 6 : 0, paddingLeft: gewijzigd ? 6 : 0 }}>
-                    <span style={{ fontSize: 12, fontWeight: 600, color: "var(--sub)" }}>{label}</span>
-                    <span style={{ fontSize: 13, color: gewijzigd ? "#92400e" : "var(--dark)", textDecoration: gewijzigd ? "line-through" : "none", opacity: gewijzigd ? .7 : 1 }}>{oudVal}</span>
-                    <span style={{ fontSize: 13, color: gewijzigd ? "#16a34a" : "var(--dark)", fontWeight: gewijzigd ? 600 : 400 }}>{nieuwVal}</span>
-                  </div>
-                );
-              })}
-            </>
+            </div>
           )}
-        </div>
-        <div className="actions" style={{ padding: "12px 20px", borderTop: "1px solid var(--border)" }}>
-          <button className="btn" onClick={onSluit}>Sluiten</button>
-        </div>
-      </div>
-    </div>
+          <div className="vgl-table">
+            <div className="vgl-head">
+              <span />
+              <span>Versie {oud.versie_nummer} (oud)</span>
+              <span>Versie {nieuw.versie_nummer} (nieuw)</span>
+            </div>
+            {VERGELIJK_VELDEN.map(({ key, label, fmt }) => {
+              const oudVal   = fmt ? fmt(oud[key])   : (oud[key]   ?? "–");
+              const nieuwVal = fmt ? fmt(nieuw[key]) : (nieuw[key] ?? "–");
+              const gewijzigd = String(oud[key] ?? "") !== String(nieuw[key] ?? "");
+              return (
+                <div key={key} className={`vgl-row${gewijzigd ? " gewijzigd" : ""}`}>
+                  <span className="vgl-label">{label}</span>
+                  <span className={gewijzigd ? "vgl-oud" : "vgl-val"}>{oudVal}</span>
+                  <span className={gewijzigd ? "vgl-nieuw" : "vgl-val"}>{nieuwVal}</span>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </Modal>
   );
 }
 
@@ -708,25 +666,16 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
           <i className="ti ti-arrow-left" /> Terug naar aanvragen
         </a>
 
-        <div className="page-header">
+        <div className="page-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <div>
             <h1>{paginaTitel}</h1>
-            <p>
-              {aanvraag.student_voornaam} {aanvraag.student_achternaam} · {aanvraag.bedrijf_naam}
-              {heeftMeerdereVersies && (
-                <>
-                  {" "}&nbsp;
-                  <button
-                    className="btn sm"
-                    style={{ marginLeft: 4, verticalAlign: "middle" }}
-                    onClick={() => setVergelijk(true)}
-                  >
-                    <i className="ti ti-git-compare" /> Versies vergelijken
-                  </button>
-                </>
-              )}
-            </p>
+            <p>{aanvraag.student_voornaam} {aanvraag.student_achternaam} · {aanvraag.bedrijf_naam}</p>
           </div>
+          {heeftMeerdereVersies && (
+            <button className="btn primary" onClick={() => setVergelijk(true)}>
+              <i className="ti ti-git-compare" /> Versies vergelijken
+            </button>
+          )}
         </div>
 
         <Steps status={status} aanvraag={aanvraag} />
@@ -894,19 +843,17 @@ function OverzichtView({ aanvragen, loading, fout, onVernieuwen, onOpen }) {
   ];
 
   function knopConfig(status) {
-    if (status === "ingediend")             return { label: "Beoordelen",          primary: true };
-    if (status === "heringediend")          return { label: "Opnieuw beoordelen",  primary: true };
+    if (status === "ingediend")             return { label: "Beoordelen",          primary: false };
+    if (status === "heringediend")          return { label: "Opnieuw beoordelen",  primary: false };
     if (status === "aanpassingen_gevraagd") return { label: "Feedback bekijken",   primary: false };
     return { label: "Bekijken", primary: false };
   }
 
   return (
     <div className="page-inner">
-      <div className="page-header">
-        <div>
-          <h1>Aanvragen</h1>
-        </div>
-        <button className="btn sm" onClick={onVernieuwen}>
+      <div className="page-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <h1>Aanvragen</h1>
+        <button className="btn primary" onClick={onVernieuwen}>
           <i className="ti ti-refresh" /> Vernieuwen
         </button>
       </div>
