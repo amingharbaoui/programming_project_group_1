@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { apiRequest } from "../../services/api";
 import logoWide from "../../assets/stageify-logo/stageify_logo_wide.png";
+import loginBg from "../../assets/backgrounds/login-bg.jpg";
 
 const ROLE_ROUTES = {
   student: "/student/internship",
@@ -54,7 +55,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="login_page">
+    <div
+      className="login_page login_bg"
+      style={{ backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${loginBg})` }}
+    >
       <div className="login_card">
 
         {/* Logo */}

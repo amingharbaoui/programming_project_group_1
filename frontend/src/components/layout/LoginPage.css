@@ -16,6 +16,21 @@
 	box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
 }
 
+/* Login-only: achtergrondfoto + inlogbox op ~3/10 van links */
+.login_bg {
+	justify-content: flex-start;
+	padding-left: 30vw;
+	background-size: cover;
+	background-position: center;
+	background-repeat: no-repeat;
+}
+@media (max-width: 760px) {
+	.login_bg {
+		justify-content: center;
+		padding-left: 24px;
+	}
+}
+
 .login_header {
 	text-align: center;
 	margin-bottom: 12px;
