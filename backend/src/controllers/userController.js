@@ -2,7 +2,7 @@ const crypto = require("crypto");
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 const { emailMelding } = require("../utils/notify");
-const { sendMail } = require("../utils/mail");
+const { sendMail, buildMailHtml } = require("../utils/mail");
 
 function hashLocalPassword(password) {
   const salt = crypto.randomBytes(16).toString("hex");
@@ -154,6 +154,16 @@ async function inviteMentor(req, res) {
     return fail(res, 400, "Voornaam, achternaam en e-mail zijn verplicht");
   }
 
+  // Admin e-mailadres ophalen als afzender
+  const adminId = Number(req.user?.id);
+  let adminEmail = null;
+  if (adminId) {
+    const [adminRows] = await db.query("SELECT email, voornaam, achternaam FROM gebruikers WHERE id = ? LIMIT 1", [adminId]);
+    if (adminRows[0]) {
+      adminEmail = `${adminRows[0].voornaam} ${adminRows[0].achternaam} <${adminRows[0].email}>`;
+    }
+  }
+
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -189,7 +199,7 @@ async function inviteMentor(req, res) {
 
     await conn.commit();
 
-    const activatielink = `/activeren?token=${token}`;
+    const activatielink = `/mentor/activate?token=${token}`;
     await emailMelding(mentorId, {
       titel: "Uitnodiging stageplatform",
       bericht: `Je bent uitgenodigd als mentor. Activeer je account via ${activatielink}`,
@@ -202,9 +212,17 @@ async function inviteMentor(req, res) {
     const volledigeLink = `${process.env.APP_URL || "http://localhost:5173"}${activatielink}`;
     const mailResultaat = await sendMail({
       to: email,
+      from: adminEmail || undefined,
       subject: "Uitnodiging als mentor — Stagify",
       text: `Je bent uitgenodigd als mentor op Stagify.\n\nActiveer je account en kies een wachtwoord via:\n${volledigeLink}\n\nDeze link is 14 dagen geldig.`,
-      html: `<p>Je bent uitgenodigd als mentor op <strong>Stagify</strong>.</p><p>Activeer je account en kies een wachtwoord via:<br><a href="${volledigeLink}">${volledigeLink}</a></p><p>Deze link is 14 dagen geldig.</p>`
+      html: buildMailHtml({
+        title: "Uitnodiging als mentor",
+        body: `<p>Hallo,</p>
+               <p>Je bent uitgenodigd om als <strong>mentor</strong> te fungeren op het stageplatform van <strong>Stagify</strong>.</p>
+               <p>Klik op de knop hieronder om je account te activeren en een wachtwoord in te stellen. Deze link is <strong>14 dagen</strong> geldig.</p>`,
+        buttonText: "Account activeren",
+        buttonUrl: volledigeLink,
+      })
     });
 
     return ok(res, { mentorId, bedrijfId, activatielink, emailStatus: mailResultaat.sent ? "verzonden" : "geregistreerd" }, "Mentor uitgenodigd");
@@ -334,7 +352,7 @@ async function resendInvitation(req, res) {
 
     await conn.commit();
 
-    const activatielink = `/activeren?token=${token}`;
+    const activatielink = `/mentor/activate?token=${token}`;
     await emailMelding(mentorGebruikerId, {
       titel: "Uitnodiging stageplatform (opnieuw verstuurd)",
       bericht: `Hier is je nieuwe activatielink: ${activatielink}`,
@@ -349,7 +367,14 @@ async function resendInvitation(req, res) {
       to: rows[0].email,
       subject: "Nieuwe activatielink — Stagify",
       text: `Hier is je nieuwe activatielink voor Stagify:\n${volledigeLink}\n\nDeze link is 14 dagen geldig.`,
-      html: `<p>Hier is je nieuwe activatielink voor <strong>Stagify</strong>:<br><a href="${volledigeLink}">${volledigeLink}</a></p><p>Deze link is 14 dagen geldig.</p>`
+      html: buildMailHtml({
+        title: "Nieuwe activatielink",
+        body: `<p>Hallo,</p>
+               <p>Hier is je nieuwe activatielink voor <strong>Stagify</strong>.</p>
+               <p>Klik op de knop hieronder om je account te activeren. Deze link is <strong>14 dagen</strong> geldig.</p>`,
+        buttonText: "Account activeren",
+        buttonUrl: volledigeLink,
+      })
     });
 
     return ok(res, { mentorId: mentorGebruikerId, activatielink, emailStatus: mailResultaat.sent ? "verzonden" : "geregistreerd" }, "Uitnodiging opnieuw verstuurd");
@@ -415,7 +440,7 @@ async function inviteUser(req, res) {
 
     await conn.commit();
 
-    const activatielink = `/activeren?token=${token}`;
+    const activatielink = `/mentor/activate?token=${token}`;
     await emailMelding(userId, {
       titel: "Uitnodiging stageplatform",
       bericht: `Je bent uitgenodigd op Stagify. Activeer je account via ${activatielink}`,
@@ -428,7 +453,14 @@ async function inviteUser(req, res) {
       to: email,
       subject: "Uitnodiging — Stagify",
       text: `Je bent uitgenodigd op Stagify.\n\nActiveer je account en kies een wachtwoord via:\n${volledigeLink}\n\nDeze link is 14 dagen geldig.`,
-      html: `<p>Je bent uitgenodigd op <strong>Stagify</strong>.</p><p>Activeer je account en kies een wachtwoord via:<br><a href="${volledigeLink}">${volledigeLink}</a></p><p>Deze link is 14 dagen geldig.</p>`
+      html: buildMailHtml({
+        title: "Uitnodiging op Stagify",
+        body: `<p>Hallo,</p>
+               <p>Je bent uitgenodigd op het stageplatform van <strong>Stagify</strong>.</p>
+               <p>Klik op de knop hieronder om je account te activeren en een wachtwoord in te stellen. Deze link is <strong>14 dagen</strong> geldig.</p>`,
+        buttonText: "Account activeren",
+        buttonUrl: volledigeLink,
+      })
     });
 
     return ok(res, { userId, rol, activatielink, emailStatus: mailResultaat.sent ? "verzonden" : "geregistreerd" }, "Gebruiker uitgenodigd");
