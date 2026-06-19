@@ -148,11 +148,19 @@ function isStageGestart(startdatum) {
   return vandaag >= start;
 }
 
-function isContractGeregistreerd(contract) {
+const DOSSIER_STATUSSEN_GEREGISTREERD = new Set([
+  "geregistreerd",
+  "stage_loopt",
+  "resultaat_vrijgegeven",
+  "afgerond",
+]);
+
+function isContractGeregistreerd(contract, dossierStatus) {
   return !!(
     contract?.opleiding_getekend_op ||
     contract?.geregistreerd_op ||
-    contract?.status === "geregistreerd"
+    contract?.status === "geregistreerd" ||
+    DOSSIER_STATUSSEN_GEREGISTREERD.has(dossierStatus)
   );
 }
 
@@ -174,7 +182,7 @@ export function berekenStudentAccess(voorstel, contract) {
     return { key: "teruggestuurd", startdatum, ...STUDENT_FASES.teruggestuurd };
   }
 
-  if (!isContractGeregistreerd(contract)) {
+  if (!isContractGeregistreerd(contract, dossierStatus)) {
     return { key: "validatie", startdatum, ...STUDENT_FASES.validatie };
   }
 
