@@ -1015,7 +1015,7 @@ export default function StudentLogbookPage() {
                 key={week.id}
                 week={week}
                 onBewerken={handleBewerken}
-                onVernieuwen={() => fetchWeken()}
+                onVernieuwen={() => { cacheDelete(`student_logbook_${user.id}`); fetchWeken(startDatum); }}
               />
             ))}
         </div>
