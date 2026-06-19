@@ -221,6 +221,116 @@ function MentorUitnodigingModal({ onClose, onSaved }) {
   );
 }
 
+function AlgemeneUitnodigingModal({ onClose, onSaved }) {
+  const [form, setForm] = useState({ voornaam: "", achternaam: "", email: "", rol: "docent" });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState("");
+  const [resultaat, setResultaat] = useState(null); // { activatielink, emailStatus }
+
+  function set(field, value) { setForm((f) => ({ ...f, [field]: value })); }
+
+  async function handleSubmit() {
+    if (!form.voornaam || !form.achternaam || !form.email) {
+      setErr("Voornaam, achternaam en e-mail zijn verplicht."); return;
+    }
+    setSaving(true); setErr("");
+    try {
+      const res = await api.post("/admin/users/invite", {
+        voornaam: form.voornaam,
+        achternaam: form.achternaam,
+        email: form.email,
+        rol: form.rol,
+      });
+      setResultaat(res.data?.data || {});
+    } catch (e) {
+      setErr(e.response?.data?.message || "Uitnodigen mislukt");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const volledigeLink = resultaat?.activatielink
+    ? `${window.location.origin}${resultaat.activatielink}`
+    : "";
+
+  return (
+    <div className="modal_overlay" onClick={onClose}>
+      <div className="modal_box" onClick={(e) => e.stopPropagation()}>
+        <div className="modal_header">
+          <span className="modal_title">Gebruiker uitnodigen</span>
+          <button className="icon_btn" onClick={onClose} type="button"><IconX size={16} stroke={1.8} /></button>
+        </div>
+
+        {!resultaat ? (
+          <>
+            <div className="modal_body">
+              <div className="modal_row">
+                <div className="modal_field">
+                  <label className="modal_label">Voornaam <span className="modal_required">*</span></label>
+                  <input className="modal_input" value={form.voornaam} onChange={(e) => set("voornaam", e.target.value)} />
+                </div>
+                <div className="modal_field">
+                  <label className="modal_label">Achternaam <span className="modal_required">*</span></label>
+                  <input className="modal_input" value={form.achternaam} onChange={(e) => set("achternaam", e.target.value)} />
+                </div>
+              </div>
+              <div className="modal_field">
+                <label className="modal_label">E-mail <span className="modal_required">*</span></label>
+                <input className="modal_input" type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
+              </div>
+              <div className="modal_field">
+                <label className="modal_label">Rol <span className="modal_required">*</span></label>
+                <select className="modal_input" value={form.rol} onChange={(e) => set("rol", e.target.value)}>
+                  <option value="docent">docent</option>
+                  <option value="administratie">administratie</option>
+                  <option value="stagecommissie">stagecommissie</option>
+                  <option value="student">student</option>
+                </select>
+              </div>
+              <p style={{ fontSize: 12, color: "var(--sub)", marginTop: 8 }}>
+                Een stagementor nodig je uit via "Stagementor uitnodigen" (met bedrijfsgegevens).
+              </p>
+              {err && <p className="modal_error">{err}</p>}
+            </div>
+            <div className="modal_footer">
+              <button className="btn" onClick={onClose} type="button" disabled={saving}>Annuleren</button>
+              <button className="btn primary" onClick={handleSubmit} disabled={saving} type="button">
+                {saving ? <IconLoader2 size={16} stroke={1.8} className="spin" /> : null}
+                <IconSend size={16} stroke={1.8} />
+                Uitnodiging versturen
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="modal_body">
+              <p style={{ margin: "0 0 10px", fontSize: 13.5, color: "var(--dark)" }}>
+                <strong>{form.voornaam} {form.achternaam}</strong> is uitgenodigd als {form.rol}.
+                {resultaat.emailStatus === "verzonden"
+                  ? " De activatielink is per e-mail verstuurd."
+                  : " Bezorg onderstaande activatielink aan de gebruiker:"}
+              </p>
+              {volledigeLink && (
+                <div className="modal_field">
+                  <label className="modal_label">Activatielink</label>
+                  <input className="modal_input" readOnly value={volledigeLink} onFocus={(e) => e.target.select()} />
+                  <button className="btn sm" style={{ marginTop: 6 }} type="button"
+                    onClick={() => navigator.clipboard?.writeText(volledigeLink)}>
+                    Kopiëren
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="modal_footer">
+              <button className="btn primary" onClick={onSaved} type="button">Klaar</button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function UsersPage() {
   const { user } = useAuth();
   const [users, setUsers] = useState([]);
@@ -229,6 +339,7 @@ export default function UsersPage() {
   const [wijzigenTarget, setWijzigenTarget] = useState(null);
   const [bevestigTarget, setBevestigTarget] = useState(null);
   const [uitnodigingOpen, setUitnodigingOpen] = useState(false);
+  const [algemeenOpen, setAlgemeenOpen] = useState(false);
   const [toast, setToast] = useState(null);
 
   useEffect(() => { loadUsers(); }, [user.id]);
@@ -303,6 +414,16 @@ export default function UsersPage() {
           }}
         />
       )}
+      {algemeenOpen && (
+        <AlgemeneUitnodigingModal
+          onClose={() => setAlgemeenOpen(false)}
+          onSaved={() => {
+            setAlgemeenOpen(false);
+            loadUsers();
+            showToast("Gebruiker uitgenodigd.");
+          }}
+        />
+      )}
 
       <div className="users-page">
         <div className="page_header">
@@ -311,10 +432,16 @@ export default function UsersPage() {
               <h1>Gebruikers</h1>
               <p>Beheer gebruikers, rollen en koppelingen binnen het stageplatform.</p>
             </div>
-            <button className="btn primary" onClick={() => setUitnodigingOpen(true)}>
-              <IconUserPlus size={14} stroke={2} />
-              Stagementor uitnodigen
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn" onClick={() => setAlgemeenOpen(true)}>
+                <IconUserPlus size={14} stroke={2} />
+                Gebruiker uitnodigen
+              </button>
+              <button className="btn primary" onClick={() => setUitnodigingOpen(true)}>
+                <IconUserPlus size={14} stroke={2} />
+                Stagementor uitnodigen
+              </button>
+            </div>
           </div>
         </div>
 
