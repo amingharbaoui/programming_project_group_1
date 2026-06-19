@@ -43,6 +43,7 @@ export default function DocentPlanningPage() {
   const [nieuwDossierId, setNieuwDossierId] = useState("");
   const [nieuwDatum, setNieuwDatum] = useState("");
   const [nieuwLocatie, setNieuwLocatie] = useState("");
+  const [nieuwDeelnemers, setNieuwDeelnemers] = useState("");
   const [fout, setFout] = useState("");
 
   const [gegevenId, setGegevenId] = useState(null);
@@ -52,8 +53,8 @@ export default function DocentPlanningPage() {
       setLoading(true);
       setError("");
       const [planRes, stuRes] = await Promise.all([
-        api.get("/docent/planning", { headers: { "x-user-id": String(user.id) } }),
-        api.get("/docent/students", { headers: { "x-user-id": String(user.id) } }),
+        api.get("/docent/planning"),
+        api.get("/docent/students"),
       ]);
       setPlanning(planRes.data.data || []);
       setStudenten(stuRes.data.data || []);
@@ -74,6 +75,7 @@ export default function DocentPlanningPage() {
     setFout("");
     setNieuwDatum("");
     setNieuwLocatie("");
+    setNieuwDeelnemers("");
     setNieuwDossierId(studenten[0]?.dossier_id ? String(studenten[0].dossier_id) : "");
   }
 
@@ -85,12 +87,15 @@ export default function DocentPlanningPage() {
     try {
       setBezig(true);
       setFout("");
-      const endpoint = tab === "Bedrijfsbezoek" ? "/docent/planning/visit" : "/docent/planning/presentation";
+      const isPresentatie = tab === "Eindpresentatie";
+      const endpoint = isPresentatie ? "/docent/planning/presentation" : "/docent/planning/visit";
       await api.post(endpoint, {
         dossierId: Number(nieuwDossierId),
         geplandOp: nieuwDatum,
         locatie: nieuwLocatie,
-      }, { headers: { "x-user-id": String(user.id) } });
+        // Story 42: deelnemers enkel relevant voor de eindpresentatie.
+        ...(isPresentatie ? { deelnemers: nieuwDeelnemers } : {}),
+      });
       setGelukt("Moment ingepland!");
       setNieuwModal(false);
       await loadPlanning();
@@ -106,9 +111,7 @@ export default function DocentPlanningPage() {
     const nieuweStatus = type === "bedrijfsbezoek" ? "geweest" : "gegeven";
     try {
       setGegevenId(id);
-      await api.patch("/docent/planning/" + id, { status: nieuweStatus }, {
-        headers: { "x-user-id": String(user.id) },
-      });
+      await api.patch("/docent/planning/" + id, { status: nieuweStatus });
       setGelukt(nieuweStatus === "geweest" ? "Gemarkeerd als geweest!" : "Gemarkeerd als gegeven!");
       await loadPlanning();
     } catch (err) {
@@ -164,6 +167,7 @@ export default function DocentPlanningPage() {
                 <th>Student</th>
                 <th>Datum</th>
                 <th>Locatie</th>
+                {tab === "Eindpresentatie" && <th>Deelnemers</th>}
                 <th>Status</th>
                 <th className="right">Acties</th>
               </tr>
@@ -174,6 +178,7 @@ export default function DocentPlanningPage() {
                   <td>{p.student_naam || "-"}</td>
                   <td>{formatDateTime(p.gepland_op)}</td>
                   <td>{p.locatie || "-"}</td>
+                  {tab === "Eindpresentatie" && <td>{p.deelnemers || "-"}</td>}
                   <td>
                     <span className={"status " + getStatusClass(p.status)}>
                       {getStatusLabel(p.status)}
@@ -227,6 +232,14 @@ export default function DocentPlanningPage() {
                   placeholder="bv. Bedrijfsadres of Online (Teams)"
                   value={nieuwLocatie} onChange={(e) => setNieuwLocatie(e.target.value)} />
               </div>
+              {tab === "Eindpresentatie" && (
+                <div className="form_group">
+                  <label className="form_label">Deelnemers</label>
+                  <input className="form_input" type="text"
+                    placeholder="bv. docent, mentor, medestudenten"
+                    value={nieuwDeelnemers} onChange={(e) => setNieuwDeelnemers(e.target.value)} />
+                </div>
+              )}
               {fout && <div style={{ fontSize: "12px", color: "var(--red)", marginBottom: "8px" }}>{fout}</div>}
               <button className="btn primary" style={{ width: "100%", justifyContent: "center" }}
                 disabled={bezig} onClick={planNieuw}>

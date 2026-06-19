@@ -27,6 +27,7 @@ import CompetenciesPage from "./features/admin/pages/CompetenciesPage";
 import InstellingenPage from "./features/admin/pages/InstellingenPage";
 
 import MentorActivationPage from "./features/mentor/pages/MentorActivationPage";
+import ActivationPage from "./features/auth/pages/ActivationPage";
 import MentorStudentsPage from "./features/mentor/pages/MentorStudentsPage";
 import MentorDossierPage from "./features/mentor/pages/MentorDossierPage";
 import MentorLogbooksPage from "./features/mentor/pages/MentorLogbooksPage";
@@ -112,6 +113,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/mentor/activate" element={<MentorActivationPage />} />
+          <Route path="/activeren" element={<ActivationPage />} />
 
           <Route element={<AppLayout />}>
             <Route path="/student" element={<MyInternshipPage />} />
