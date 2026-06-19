@@ -54,7 +54,6 @@ export default function MentorPlanningPage() {
       try {
         setLoading(true);
         const res = await api.get("/mentor/students", {
-          headers: { "x-user-id": String(user.id) },
         });
         const data = res.data.data || [];
         setStudenten(data);
@@ -81,7 +80,6 @@ export default function MentorPlanningPage() {
       setMomenten([]);
       setMelding({ id: null, tekst: "", type: "" });
       const res = await api.get(`/mentor/planning/${dossierId}`, {
-        headers: { "x-user-id": String(user.id) },
       });
       setMomenten(res.data.data || []);
     } catch {
@@ -96,7 +94,6 @@ export default function MentorPlanningPage() {
       setBezig(momentId);
       setMelding({ id: null, tekst: "", type: "" });
       await api.patch(`/mentor/planning/${momentId}/bevestig`, {}, {
-        headers: { "x-user-id": String(user.id) },
       });
       setMelding({ id: momentId, tekst: "Bedrijfsbezoek bevestigd! De docent en student kregen een melding.", type: "s_ok" });
       await loadPlanning(geselecteerdDossier);
@@ -113,7 +110,6 @@ export default function MentorPlanningPage() {
       setBezig(momentId);
       setMelding({ id: null, tekst: "", type: "" });
       await api.patch(`/mentor/planning/${momentId}/alternatief`, { bericht: alternatifTekst }, {
-        headers: { "x-user-id": String(user.id) },
       });
       setMelding({ id: momentId, tekst: "Alternatief voorstel verstuurd. De docent plant het bezoek opnieuw in.", type: "s_ok" });
       setAlternatifOpen(null);

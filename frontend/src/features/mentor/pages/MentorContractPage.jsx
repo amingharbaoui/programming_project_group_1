@@ -42,7 +42,6 @@ export default function MentorContractPage() {
       try {
         setLoading(true);
         const res = await api.get("/mentor/students", {
-          headers: { "x-user-id": String(user.id) },
         });
         const data = res.data.data || [];
         setStudenten(data);
@@ -67,7 +66,6 @@ export default function MentorContractPage() {
         setMelding("");
         setContract(null);
         const res = await api.get(`/mentor/contract/${geselecteerdDossier}`, {
-          headers: { "x-user-id": String(user.id) },
         });
         setContract(res.data.data);
       } catch (err) {
@@ -86,12 +84,10 @@ export default function MentorContractPage() {
       setMelding("");
       await api.patch(
         `/mentor/contract/${geselecteerdDossier}/teken`,
-        { tekenbevoegd: true },
-        { headers: { "x-user-id": String(user.id) } }
+        { tekenbevoegd: true }
       );
       // Herlaad contract
       const res = await api.get(`/mentor/contract/${geselecteerdDossier}`, {
-        headers: { "x-user-id": String(user.id) },
       });
       setContract(res.data.data);
       setMelding("Contract succesvol getekend!");
@@ -107,7 +103,6 @@ export default function MentorContractPage() {
     try {
       const res = await api.get(`/mentor/contract/${geselecteerdDossier}/pdf`, {
         responseType: "blob",
-        headers: { "x-user-id": String(user.id) },
       });
       const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
       const a = document.createElement("a");

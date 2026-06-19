@@ -30,7 +30,6 @@ export default function DocentStudentDossierPage() {
       setLoading(true);
       setError("");
       const res = await api.get("/docent/students/" + dossierId + "/dossier", {
-        headers: { "x-user-id": String(user.id) },
       });
       setData(res.data.data);
     } catch (err) {

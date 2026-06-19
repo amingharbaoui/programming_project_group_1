@@ -40,7 +40,7 @@ export default function MentorEvaluationPage() {
   useEffect(() => {
     async function init() {
       try {
-        const res = await api.get("/mentor/students", { headers: { "x-user-id": String(user.id) } });
+        const res = await api.get("/mentor/students");
         setStudenten(res.data.data || []);
       } catch (err) {
         setError(err.response?.data?.message || "Stagiairs ophalen mislukt");
@@ -57,7 +57,7 @@ export default function MentorEvaluationPage() {
         setLoadingEval(true);
         setError("");
         setMelding({ tekst: "", type: "" });
-        const res = await api.get(`/evaluations/${detailId}`, { headers: { "x-user-id": String(user.id) } });
+        const res = await api.get(`/evaluations/${detailId}`);
         const data = res.data.data;
         setEvalData(data);
         const ns = { tussentijds: {}, finaal: {} };
@@ -116,9 +116,9 @@ export default function MentorEvaluationPage() {
     try {
       setBezig(true);
       setMelding({ tekst: "", type: "" });
-      await api.post(`/evaluations/${huidigeEval.id}/scores`, { scores: scoresArr, ingediend }, { headers: { "x-user-id": String(user.id) } });
+      await api.post(`/evaluations/${huidigeEval.id}/scores`, { scores: scoresArr, ingediend });
       setMelding({ tekst: ingediend ? "Mentorinput ingediend!" : "Opgeslagen als concept.", type: "s-ok" });
-      const res = await api.get(`/evaluations/${detailId}`, { headers: { "x-user-id": String(user.id) } });
+      const res = await api.get(`/evaluations/${detailId}`);
       setEvalData(res.data.data);
     } catch (err) {
       setMelding({ tekst: err.response?.data?.message || "Opslaan mislukt", type: "s-rood" });

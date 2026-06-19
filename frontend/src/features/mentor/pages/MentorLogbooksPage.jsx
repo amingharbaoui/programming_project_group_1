@@ -48,7 +48,7 @@ export default function MentorLogbooksPage() {
   useEffect(() => {
     async function init() {
       try {
-        const res = await api.get("/mentor/students", { headers: { "x-user-id": String(user.id) } });
+        const res = await api.get("/mentor/students");
         setStudenten(res.data.data || []);
       } catch (err) {
         setError(err.response?.data?.message || "Stagiairs ophalen mislukt");
@@ -64,7 +64,7 @@ export default function MentorLogbooksPage() {
       try {
         setLoadingDetail(true);
         setError("");
-        const res = await api.get(`/mentor/logbooks/${detailId}`, { headers: { "x-user-id": String(user.id) } });
+        const res = await api.get(`/mentor/logbooks/${detailId}`);
         const data = res.data.data || [];
         setWeeks(data);
         const teCheck = data.find((w) => w.status === "ingediend") || data[data.length - 1];
@@ -93,8 +93,8 @@ export default function MentorLogbooksPage() {
       await api.patch(`/mentor/logbooks/${weekId}/check`, {
         feedback: feedbackByWeek[weekId] || "Week nagekeken door mentor.",
         herindieningNodig,
-      }, { headers: { "x-user-id": String(user.id) } });
-      const res = await api.get(`/mentor/logbooks/${detailId}`, { headers: { "x-user-id": String(user.id) } });
+      });
+      const res = await api.get(`/mentor/logbooks/${detailId}`);
       setWeeks(res.data.data || []);
     } catch (err) {
       alert(err.response?.data?.message || "Mentorcontrole mislukt");
@@ -106,8 +106,8 @@ export default function MentorLogbooksPage() {
   async function confirmDag(dayId) {
     try {
       setActionLoadingId(`dag-${dayId}`);
-      await api.patch(`/mentor/logbooks/days/${dayId}/confirm`, {}, { headers: { "x-user-id": String(user.id) } });
-      const res = await api.get(`/mentor/logbooks/${detailId}`, { headers: { "x-user-id": String(user.id) } });
+      await api.patch(`/mentor/logbooks/days/${dayId}/confirm`, {});
+      const res = await api.get(`/mentor/logbooks/${detailId}`);
       setWeeks(res.data.data || []);
     } catch (err) {
       alert(err.response?.data?.message || "Dag bevestigen mislukt");

@@ -44,7 +44,6 @@ export default function DocentLogbooksPage() {
     async function loadStudenten() {
       try {
         const res = await api.get("/docent/students", {
-          headers: { "x-user-id": String(user.id) },
         });
         const data = res.data.data || [];
         setStudenten(data);
@@ -68,7 +67,6 @@ export default function DocentLogbooksPage() {
       setError("");
       setWeeks([]);
       const response = await api.get(`/docent/logbooks/${sid}`, {
-        headers: { "x-user-id": String(user.id) },
       });
       setWeeks(response.data.data || []);
     } catch (err) {
@@ -93,7 +91,6 @@ export default function DocentLogbooksPage() {
         feedback: feedbackByWeek[weekId] || "Logboek nagekeken door docent.",
         herindieningNodig,
       }, {
-        headers: { "x-user-id": String(user.id) },
       });
       await loadLogbooks(studentId);
     } catch (err) {
@@ -108,7 +105,6 @@ export default function DocentLogbooksPage() {
       setRemindLoading(true);
       setRemindMelding({ weekNr: null, tekst: "", type: "" });
       await api.post(`/docent/logbooks/${studentId}/remind`, { weken: weekNr ? [weekNr] : [] }, {
-        headers: { "x-user-id": String(user.id) },
       });
       setRemindMelding({ weekNr, tekst: "Herinnering verstuurd naar student.", type: "s_ok" });
     } catch (err) {

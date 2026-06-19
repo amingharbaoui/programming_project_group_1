@@ -58,7 +58,6 @@ export default function DocentStudentsPage() {
       setLoading(true);
       setError("");
       const res = await api.get("/docent/students", {
-        headers: { "x-user-id": String(user.id) },
       });
       setStudenten(res.data.data || []);
     } catch (err) {

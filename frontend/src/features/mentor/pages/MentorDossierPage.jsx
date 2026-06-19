@@ -66,7 +66,7 @@ export default function MentorDossierPage() {
   const [bezigMoment, setBezigMoment] = useState(null);
   const [dossierOpen, setDossierOpen] = useState(false);
 
-  const H = { headers: { "x-user-id": String(user.id) } };
+  const H = {};
 
   useEffect(() => {
     async function init() {

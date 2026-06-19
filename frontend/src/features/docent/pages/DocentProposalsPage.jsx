@@ -38,7 +38,6 @@ export default function DocentProposalsPage() {
       setLoading(true);
       setError("");
       const res = await api.get("/docent/proposals", {
-        headers: { "x-user-id": String(user.id) },
       });
       setVoorstellen(res.data.data || []);
     } catch (err) {
@@ -53,7 +52,6 @@ export default function DocentProposalsPage() {
     setDetailLoading(true);
     try {
       const res = await api.get(`/docent/proposals/${v.stagevoorstel_id}`, {
-        headers: { "x-user-id": String(user.id) },
       });
       setDetail(res.data.data);
     } catch {

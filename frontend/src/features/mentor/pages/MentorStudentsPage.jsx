@@ -35,7 +35,6 @@ export default function MentorStudentsPage() {
     async function init() {
       try {
         const res = await api.get("/mentor/students", {
-          headers: { "x-user-id": String(user.id) },
         });
         setStudenten(res.data.data || []);
       } catch (err) {
