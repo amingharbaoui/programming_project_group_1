@@ -367,7 +367,6 @@ export default function StudentDocumentsPage() {
       wide
       open={!!preview}
       onClose={() => setPreview(null)}
-      icon="ti-eye"
       titel={preview?.naam ?? "Document"}
       footer={
         <a

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import api, { apiRequest } from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import { cacheGet, cacheSet, cacheDelete } from "../studentCache";
 import "./StudentEvaluationPage.css";
 import Modal from "../../../components/ui/Modal";
 import {
@@ -223,10 +224,12 @@ export default function StudentEvaluationPage() {
     setLoading(true);
     setFout(null);
     try {
-      const res = await apiRequest("GET", `/evaluations/${user.id}`);
-      setData(res.data);
-      // Init scores vanuit bestaande student-scores
-      const actief = getActieveEval(res.data?.evaluaties);
+      const KEY = `student_evaluation_${user.id}`;
+      const cached = cacheGet(KEY);
+      const data = cached ?? (await apiRequest("GET", `/evaluations/${user.id}`)).data;
+      if (!cached && data) cacheSet(KEY, data);
+      setData(data);
+      const actief = getActieveEval(data?.evaluaties);
       if (actief) {
         const init = {};
         (actief.scores || []).filter((s) => s.rol === "student").forEach((s) => {
@@ -306,6 +309,7 @@ export default function StudentEvaluationPage() {
         })),
       };
       await apiRequest("POST", `/evaluations/${actief.id}/scores`, payload);
+      cacheDelete(`student_evaluation_${user.id}`);
       setMelding({ type: "ok", tekst: "Zelfevaluatie succesvol ingediend." });
       await laadData();
     } catch (err) {

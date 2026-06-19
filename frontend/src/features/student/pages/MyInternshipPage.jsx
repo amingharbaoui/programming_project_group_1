@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { apiRequest } from "../../../services/api";
+import { cacheGet, cacheSet, cacheDelete } from "../studentCache";
 import "./MyInternshipPage.css";
 import Modal from "../../../components/ui/Modal";
 import {
@@ -263,50 +264,55 @@ export default function MyInternshipPage() {
 
   useEffect(() => {
     async function fetchData() {
+      // Internship
       try {
-        const res = await apiRequest("GET", "/internships/my");
-        if (res.data) setInternship(res.data);
+        const cached = cacheGet("student_internship");
+        const data = cached ?? (await apiRequest("GET", "/internships/my")).data;
+        if (!cached && data) cacheSet("student_internship", data);
+        if (data) setInternship(data);
       } catch {
         // geen voorstel
       } finally {
         setLoading(false);
       }
+      // Historiek
       try {
-        const res = await apiRequest("GET", "/internships/my/historiek");
-        if (Array.isArray(res.data)) setHistoriek(res.data);
-      } catch {
-        // geen historiek — ok
-      }
+        const cached = cacheGet("student_internship_historiek");
+        const data = cached ?? (await apiRequest("GET", "/internships/my/historiek")).data;
+        if (!cached && data) cacheSet("student_internship_historiek", data);
+        if (Array.isArray(data)) setHistoriek(data);
+      } catch {}
+      // Contract
       try {
-        const res = await apiRequest("GET", "/contracts/my");
-        const c = res.data;
+        const cached = cacheGet("student_contract");
+        const c = cached ?? (await apiRequest("GET", "/contracts/my")).data;
+        if (!cached && c) cacheSet("student_contract", c);
         setContractStudentGekend(!!c?.student_getekend_op);
-        // Volledig getekend = student + bedrijf (mentor) beide getekend; opleiding_getekend_op wordt niet gebruikt
         setVolledigGetekend(!!(c?.student_getekend_op && c?.bedrijf_getekend_op));
-      } catch {
-        // geen contract — ok
-      }
+      } catch {}
+      // Documenten
       try {
-        const [docsRes, soortenRes] = await Promise.all([
-          apiRequest("GET", "/documents/my"),
-          apiRequest("GET", "/documents/soorten"),
+        const cachedDocs    = cacheGet("student_documents");
+        const cachedSoorten = cacheGet("student_document_soorten");
+        const [docs, soorten] = await Promise.all([
+          cachedDocs    ? Promise.resolve(cachedDocs)    : apiRequest("GET", "/documents/my").then(r => r.data ?? []),
+          cachedSoorten ? Promise.resolve(cachedSoorten) : apiRequest("GET", "/documents/soorten").then(r => r.data ?? []),
         ]);
-        const docs = docsRes.data ?? [];
-        const soorten = (soortenRes.data ?? []).filter((s) => {
+        if (!cachedDocs)    cacheSet("student_documents", docs);
+        if (!cachedSoorten) cacheSet("student_document_soorten", soorten);
+        const gefilterd = soorten.filter((s) => {
           const t = (s.type ?? "").toLowerCase();
           const n = (s.naam ?? "").toLowerCase();
           return !VERBERG_DOC.has(t) && !VERBERG_DOC.has(n);
         });
-        const alleGoed = soorten.length > 0 && soorten.every((s) => {
+        const alleGoed = gefilterd.length > 0 && gefilterd.every((s) => {
           const actief = docs
             .filter((d) => d.document_soort_id === s.id)
             .sort((a, b) => (b.versie_nummer ?? 0) - (a.versie_nummer ?? 0))[0];
           return actief && !DOC_ACTIE_STATUS.has(actief.status);
         });
         setDocsOk(alleGoed);
-      } catch {
-        // docs niet beschikbaar
-      }
+      } catch {}
     }
     fetchData();
   }, []);
@@ -321,8 +327,10 @@ export default function MyInternshipPage() {
     setIntrekFout(null);
     try {
       await apiRequest("PATCH", "/internships/my/intrekken");
+      cacheDelete("student_internship", "student_internship_historiek");
       setIntrekModal(false);
       const res = await apiRequest("GET", "/internships/my");
+      if (res.data) cacheSet("student_internship", res.data);
       setInternship(res.data || null);
     } catch (err) {
       setIntrekFout(err.response?.data?.message || "Intrekken mislukt.");

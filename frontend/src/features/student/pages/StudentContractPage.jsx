@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import api, { apiRequest } from "../../../services/api";
+import { cacheGet, cacheSet, cacheDelete } from "../studentCache";
 import "./StudentContractPage.css";
 import Modal from "../../../components/ui/Modal";
 import {
@@ -91,8 +92,10 @@ export default function StudentContractPage() {
     setLoading(true);
     setFout(null);
     try {
-      const res = await apiRequest("GET", "/contracts/my");
-      setContract(res.data);
+      const cached = cacheGet("student_contract");
+      const data = cached ?? (await apiRequest("GET", "/contracts/my")).data;
+      if (!cached && data) cacheSet("student_contract", data);
+      setContract(data);
     } catch (err) {
       setFout(err.response?.data?.message || "Stageovereenkomst kon niet geladen worden.");
     } finally {
@@ -106,6 +109,7 @@ export default function StudentContractPage() {
     setFout(null);
     try {
       const res = await apiRequest("POST", "/contracts/sign");
+      cacheDelete("student_contract");
       await laadContract();
       setAkkoord(false);
       setSuccesmelding(formatDatumTijd(res.data.getekendOp));

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { apiRequest } from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import { cacheGet, cacheSet, cacheDelete } from "../studentCache";
 import "./Logboek.css";
 import Modal from "../../../components/ui/Modal";
 import {
@@ -673,12 +674,15 @@ export default function StudentLogbookPage() {
   /* Weken ophalen van backend */
   async function fetchWeken(sd = null) {
     try {
-      const res = await apiRequest("GET", `/logbooks/${user.id}`);
-      const data = Array.isArray(res.data) ? res.data : [];
-      setWeken(data);
+      const KEY = `student_logbook_${user.id}`;
+      const cached = cacheGet(KEY);
+      const data = cached ?? (() => apiRequest("GET", `/logbooks/${user.id}`).then(r => Array.isArray(r.data) ? r.data : []))();
+      const resolved = data instanceof Promise ? await data : data;
+      if (!cached) cacheSet(KEY, resolved);
+      setWeken(resolved);
 
       if (!editWeek) {
-        const maxWeek = data.length > 0 ? Math.max(...data.map((w) => w.week_nummer)) : 0;
+        const maxWeek = resolved.length > 0 ? Math.max(...resolved.map((w) => w.week_nummer)) : 0;
         setLogbook(defaultLogbook(maxWeek + 1, sd));
       }
     } catch (err) {
@@ -694,14 +698,17 @@ export default function StudentLogbookPage() {
     async function init() {
       let sd = null;
 
-      // Stagevoorstel + contract parallel ophalen
+      // Stagevoorstel + contract parallel ophalen (met cache)
+      const cachedIntern   = cacheGet("student_internship");
+      const cachedContract = cacheGet("student_contract");
       const [internRes, contractRes] = await Promise.allSettled([
-        apiRequest("GET", "/internships/my"),
-        apiRequest("GET", "/contracts/my"),
+        cachedIntern   ? Promise.resolve({ data: cachedIntern })   : apiRequest("GET", "/internships/my"),
+        cachedContract ? Promise.resolve({ data: cachedContract }) : apiRequest("GET", "/contracts/my"),
       ]);
 
       if (internRes.status === "fulfilled" && internRes.value?.data) {
         const data = internRes.value.data;
+        if (!cachedIntern) cacheSet("student_internship", data);
         setVoorstelStatus(data.status);
         const rawStart = data.startdatum ?? data.startDatum;
         const rawEind  = data.einddatum  ?? data.eindDatum;
@@ -712,8 +719,10 @@ export default function StudentLogbookPage() {
         if (rawEind) setEindDatum(new Date(rawEind));
       }
 
-      if (contractRes.status === "fulfilled" && contractRes.value?.data?.student_getekend_op) {
-        setContractGetekend(true);
+      if (contractRes.status === "fulfilled" && contractRes.value?.data) {
+        const c = contractRes.value.data;
+        if (!cachedContract) cacheSet("student_contract", c);
+        if (c?.student_getekend_op) setContractGetekend(true);
       }
 
       setLoadingGate(false);
@@ -772,6 +781,7 @@ export default function StudentLogbookPage() {
     setSaving(true);
 
     try {
+      cacheDelete(`student_logbook_${user.id}`);
       await apiRequest("POST", "/logbooks", {
         stagedossierId: logbook.stagedossierId,
         weekNummer: Number(logbook.weekNummer),

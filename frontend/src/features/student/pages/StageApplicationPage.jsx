@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../../../services/api";
+import { cacheGet, cacheSet, cacheDelete } from "../studentCache";
 import "./StageApplicationPage.css";
 import Modal from "../../../components/ui/Modal";
 import {
@@ -38,8 +39,8 @@ export default function StageApplicationPage() {
   useEffect(() => {
     async function laadBestaand() {
       try {
-        const res = await apiRequest("GET", "/internships/my");
-        const data = res.data;
+        const cached = cacheGet("student_internship");
+        const data = cached ?? (await apiRequest("GET", "/internships/my")).data;
         if (!data) return;
 
         const laadbaar = ["concept", "aanpassingen_gevraagd"];
@@ -78,6 +79,7 @@ export default function StageApplicationPage() {
     setSavingDraft(true);
     setError(null);
     try {
+      cacheDelete("student_internship");
       await apiRequest("POST", "/internships/draft", {
         bedrijfNaam:          form.bedrijfNaam,
         bedrijfsafdeling:     form.bedrijfAfdeling,
@@ -133,6 +135,7 @@ export default function StageApplicationPage() {
     const isHerindienen = huidigStatus === "aanpassingen_gevraagd";
     const endpoint = isHerindienen ? "/internships/my/herindienen" : "/internships";
     try {
+      cacheDelete("student_internship", "student_internship_historiek");
       await apiRequest("POST", endpoint, {
         bedrijfNaam:          form.bedrijfNaam,
         bedrijfsafdeling:     form.bedrijfAfdeling,

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { apiRequest } from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import { cacheGet, cacheSet } from "../studentCache";
 
 const TYPE_LABEL = {
   bedrijfsbezoek: "Bedrijfsbezoek",
@@ -28,8 +29,10 @@ export default function StudentPlanningPage() {
       try {
         setLoading(true);
         setError("");
-        const body = await apiRequest("GET", "/planning/my");
-        setMomenten(body.data || []);
+        const cached = cacheGet("student_planning");
+        const data = cached ?? (await apiRequest("GET", "/planning/my")).data ?? [];
+        if (!cached) cacheSet("student_planning", data);
+        setMomenten(data);
       } catch (err) {
         setError(err.response?.data?.message || "Planning ophalen mislukt");
       } finally {
