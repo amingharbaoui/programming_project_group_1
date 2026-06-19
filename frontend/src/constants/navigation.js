@@ -2,7 +2,6 @@ import { ROLES } from "./roles";
 
 export const NAVIGATION = {
   [ROLES.STUDENT]: [
-    { label: "Stageaanvraag",     path: "/student/application", icon: "ti-file-plus" },
     { label: "Mijn stage",        path: "/student/internship",  icon: "ti-briefcase" },
     { label: "Logboek",           path: "/student/logbook",     icon: "ti-notebook",        lockGroup: "logboek_eval" },
     { label: "Evaluatie",         path: "/student/evaluation",  icon: "ti-clipboard-check", lockGroup: "logboek_eval" },
