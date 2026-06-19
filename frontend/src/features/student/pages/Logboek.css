@@ -269,14 +269,18 @@
 	font-size: 12px;
 	font-family: var(--font);
 	cursor: pointer;
-	transition: background 0.12s, border-color 0.12s, color 0.12s;
+	transition: background 0.12s, border-color 0.12s, color 0.12s, max-width 0.15s;
 	text-align: left;
-	max-width: 200px;
+	max-width: 160px;
+	overflow: hidden;
 }
 
 .lo-chip:hover:not(:disabled) {
 	border-color: var(--dark);
 	background: var(--muted);
+	color: var(--dark);
+	max-width: 280px;
+	z-index: 1;
 }
 
 .lo-chip.actief {
@@ -300,11 +304,15 @@
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	max-width: 130px;
 }
 
 .lo-chip.actief .lo-naam {
 	color: #d1d5db;
+}
+
+.lo-chip:hover:not(:disabled) .lo-naam,
+.lo-chip:hover:not(:disabled) .lo-code {
+	color: var(--dark);
 }
 
 /* ---------- Uren voortgangsbalk ---------- */

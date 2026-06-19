@@ -203,9 +203,9 @@ function AntwoordBlok({ week, onAntwoordOpgeslagen }) {
   }
 
   return (
-    <div style={{ marginTop: 8 }}>
+    <div style={{ margin: "12px 0" }}>
       {week.student_antwoord && !open && (
-        <div className="fb-blok" style={{ borderLeftColor: "var(--blue, #3b82f6)" }}>
+        <div className="fb-blok" style={{ borderLeftColor: "var(--blue, #3b82f6)", marginBottom: 12 }}>
           <div className="fb-wie" style={{ color: "var(--blue, #3b82f6)" }}>
             Jouw antwoord
           </div>
@@ -214,8 +214,7 @@ function AntwoordBlok({ week, onAntwoordOpgeslagen }) {
       )}
       {!open && (
         <button
-          className="btn ghost sm"
-          style={{ paddingLeft: 0, fontSize: 12.5 }}
+          className="btn sm"
           onClick={() => { setOpen(true); setOpgeslagen(false); }}
         >
           <IconMessage size={13} />
@@ -539,7 +538,6 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
                       type="button"
                       className={`lo-chip${geselecteerd ? " actief" : ""}`}
                       onClick={() => toggleCompetentie(lo.code)}
-                      title={lo.naam}
                     >
                       <span className="lo-code">{lo.code}</span>
                       <span className="lo-naam">{lo.naam}</span>

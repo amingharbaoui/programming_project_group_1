@@ -234,8 +234,10 @@ function Historiek({ items }) {
       {lijst
         ? lijst.map((ev, i) => (
             <div key={i} className={`versie${ev.actief ? " actief" : ""}`}>
-              <span className="v-dot"></span>
-              <span className="v-wat"><b>{ev.wat}</b></span>
+              <div className="v-left">
+                <span className="v-dot"></span>
+                <span className="v-wat"><b>{ev.wat}</b></span>
+              </div>
               <span className="v-tijd">{fmt(ev.tijd)}</span>
             </div>
           ))
@@ -403,17 +405,14 @@ export default function MyInternshipPage() {
       {currentStatus === "afgekeurd" && (
         <>
           <ProgressBar status={currentStatus} contractGetekend={false} />
-          <div className="banner rood">
-            <i className="ti ti-x"></i>
-            <div>
+          <div className="banner rood" style={{ alignItems: "center" }}>
+            <div style={{ flex: 1 }}>
               <div className="b-title">Voorstel afgekeurd</div>
               {decisionMessage && <div className="b-text">"{decisionMessage}"</div>}
-              <div style={{ marginTop: 10 }}>
-                <button className="btn primary sm" onClick={() => navigate("/student/application")}>
-                  <IconPlus size={13} /> Nieuw voorstel starten
-                </button>
-              </div>
             </div>
+            <button className="btn primary sm" onClick={() => navigate("/student/application")}>
+              <IconPlus size={13} /> Nieuw voorstel starten
+            </button>
           </div>
           <Historiek items={historiek} />
         </>
@@ -423,17 +422,15 @@ export default function MyInternshipPage() {
       {currentStatus === "ingetrokken" && (
         <>
           <ProgressBar status={currentStatus} contractGetekend={false} />
-          <div className="banner rood">
+          <div className="banner rood" style={{ alignItems: "center" }}>
             <i className="ti ti-arrow-back-up"></i>
-            <div>
+            <div style={{ flex: 1 }}>
               <div className="b-title">Voorstel ingetrokken</div>
               <div className="b-text">Je stagevoorstel werd ingetrokken. De stagecommissie behandelt dit voorstel niet meer. Je kan een nieuw voorstel starten.</div>
-              <div style={{ marginTop: 10 }}>
-                <button className="btn primary sm" onClick={() => navigate("/student/application")}>
-                  <IconPlus size={13} /> Nieuw voorstel starten
-                </button>
-              </div>
             </div>
+            <button className="btn primary sm" onClick={() => navigate("/student/application")}>
+              <IconPlus size={13} /> Nieuw voorstel starten
+            </button>
           </div>
           <Historiek items={historiek} />
         </>

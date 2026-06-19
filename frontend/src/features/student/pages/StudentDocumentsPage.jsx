@@ -301,49 +301,31 @@ export default function StudentDocumentsPage() {
       })()}
 
       {/* Verplichte documenten */}
-      <section className="docs-section">
-        <div className="card_title docs-section-title">
-          <i className="ti ti-file" style={{ fontSize: 16 }}></i>
+      <div className="card">
+        <div className="card_title">
+          <IconFile size={16} />
           Verplichte documenten
         </div>
-
         {soorten.length === 0 ? (
-          <div className="card"><p style={{ fontSize: 13, color: "var(--sub)" }}>Geen verplichte documenten gevonden.</p></div>
+          <p style={{ fontSize: 13, color: "var(--sub)" }}>Geen verplichte documenten gevonden.</p>
         ) : (
-          <div className="doc-verplicht-lijst">
-            {soorten.map((soort) => {
-              const docsVoorSoort = groeperPerSoort(soort.id);
-              const deadline = deadlineVoorDocument(soort, docsVoorSoort, contractData);
-
-              return (
-                <div className="doc-verplicht-item" key={soort.id}>
-                  <div className="doc-verplicht-card">
-                    {soort.type === "stageovereenkomst" ? (
-                      <OvereenkomstRij contract={contractData} navigate={navigate} />
-                    ) : (
-                      <DocumentKaart
-                        soort={soort}
-                        documenten={docsVoorSoort}
-                        onUpload={laadData}
-                        onFout={setUploadFout}
-                        onBekijken={(url, naam) => setPreview({ url, naam })}
-                      />
-                    )}
-                  </div>
-                  <div className="doc-deadline">
-                    {deadline && (
-                      <>
-                        <i className="ti ti-clock"></i>
-                        <span>{deadline}</span>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          soorten.map((soort) => {
+            const docsVoorSoort = groeperPerSoort(soort.id);
+            return soort.type === "stageovereenkomst" ? (
+              <OvereenkomstRij key={soort.id} contract={contractData} navigate={navigate} />
+            ) : (
+              <DocumentKaart
+                key={soort.id}
+                soort={soort}
+                documenten={docsVoorSoort}
+                onUpload={laadData}
+                onFout={setUploadFout}
+                onBekijken={(url, naam) => setPreview({ url, naam })}
+              />
+            );
+          })
         )}
-      </section>
+      </div>
 
       {/* Eigen documenten */}
       <div className="card">

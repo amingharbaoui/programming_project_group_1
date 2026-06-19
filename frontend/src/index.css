@@ -242,9 +242,7 @@ h1 {
 /* Pagina wrapper */
 .page-inner,
 .page_inner {
-	max-width: 980px;
-	margin: 0 auto;
-	padding: 24px;
+	padding: 0 0 32px;
 }
 
 /* Paginakoptekst met titel + beschrijving */
@@ -255,19 +253,19 @@ h1 {
 
 .page-header h1,
 .page_header h1 {
-	margin: 0 0 4px;
+	margin: 0;
 	font-size: 26px;
 	font-weight: 700;
 	color: var(--dark);
-	letter-spacing: -0.5px;
+	letter-spacing: -0.4px;
 }
 
 .page-header p,
 .page_header p {
-	margin: 0;
+	margin: 6px 0 0;
 	font-size: 13px;
 	color: var(--sub);
-	margin-top: 3px;
+	line-height: 1.5;
 }
 
 /* Kaarttitel */
@@ -476,6 +474,6 @@ h1 {
 .banner.amber .b-text { color: #9a6c2a; }
 .banner.groen { background: var(--green-bg); border-color: #bfe3cb; color: var(--green); }
 .banner.groen .b-text { color: #3a7a4f; }
-.banner.blauw { background: var(--white); border: 1.5px solid #0a0a0a; color: #0a0a0a; box-shadow: 0 4px 14px rgba(0,0,0,.10); }
+.banner.blauw { background: var(--white); border: 1.5px solid #0a0a0a; color: #0a0a0a; }
 .banner.blauw .b-text { color: #0a0a0a; }
 

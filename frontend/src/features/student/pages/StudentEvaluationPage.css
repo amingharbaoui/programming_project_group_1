@@ -1,8 +1,5 @@
 .ev-page {
-  max-width: 760px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+  /* page-inner handles layout */
 }
 
 /* ── Meldingen ── */
@@ -13,6 +10,7 @@
   padding: 10px 14px;
   border-radius: 8px;
   font-size: 13.5px;
+  margin-bottom: 12px;
 }
 .melding-fout { background: var(--red-light); color: var(--red); }
 .melding-ok   { background: #edfaf3; color: #16a34a; }
@@ -30,20 +28,6 @@
 }
 .laadbericht { padding: 20px; font-size: 13.5px; color: var(--sub); }
 
-/* ── Banners ── */
-.banner {
-  display: flex;
-  gap: 12px;
-  align-items: flex-start;
-  padding: 14px 16px;
-  border-radius: 10px;
-  font-size: 13px;
-}
-.banner.blauw  { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
-.banner.groen  { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
-.banner.amber  { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
-.b-title { font-weight: 600; margin-bottom: 3px; }
-.b-text  { line-height: 1.6; }
 
 /* ── Eval-track ── */
 .eval-track {
@@ -77,14 +61,15 @@
 /* ── Schaallegenda ── */
 .scale-legend {
   display: flex;
-  gap: 14px;
+  gap: 18px;
   flex-wrap: wrap;
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--sub);
   background: var(--muted, #f7f7f5);
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 14px;
+  margin-bottom: 12px;
 }
 .scale-legend strong { color: var(--dark); }
 
@@ -119,20 +104,20 @@
 }
 .mtx-row {
   display: grid;
-  grid-template-columns: 40px minmax(0,1fr) 58px 58px 58px 26px;
+  grid-template-columns: 46px minmax(0,1fr) 64px 64px 64px 24px;
   align-items: center;
-  gap: 6px;
-  padding: 0 14px;
-  min-height: 44px;
+  gap: 10px;
+  padding: 0 20px;
+  min-height: 52px;
   border-bottom: 0.5px solid var(--border);
 }
 .mtx-row:last-child { border-bottom: none; }
 .mtx-row.klik { cursor: pointer; transition: background .12s; }
 .mtx-row.klik:hover { background: var(--muted); }
-.mtx-head { min-height: 34px; background: #fafaf8; }
+.mtx-head { min-height: 40px; background: #fafaf8; }
 .mtx-head span { font-size: 10.5px; color: var(--sub); letter-spacing: .3px; }
 .m-code { font-size: 10.5px; font-weight: 700; color: var(--faint, #bbb); }
-.m-naam { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.m-naam { font-size: 13px; font-weight: 500; line-height: 1.4; }
 .m-sc   { text-align: center; font-size: 12.5px; font-weight: 600; }
 .m-sc.leeg { color: #d8d8d4; font-weight: 400; }
 .pil {
@@ -147,17 +132,6 @@
 .pil.eind { background: var(--red); color: #fff; }
 .m-chev { color: var(--faint); font-size: 15px; text-align: right; }
 
-/* ── Competentie-modal (popup-comp) ── */
-.popup-comp { max-width: 480px; }
-
-/* ── Kleine knop ── */
-.btn.primary.sm, .btn.sm {
-  font-size: 12.5px;
-  padding: 6px 12px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
 
 /* ── Print ── */
 @media print {

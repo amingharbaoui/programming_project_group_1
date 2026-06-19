@@ -170,7 +170,7 @@ export default function StageApplicationPage() {
       </div>
 
       {heeftConcept && (
-        <div className="card" style={{ marginBottom: 0 }}>
+        <div className="card">
           <div className="card_title" style={{ color: "var(--blue)" }}>
             <IconInfoCircle size={16} style={{ color: "var(--blue)" }} />
             Concept geladen

@@ -313,15 +313,12 @@ export default function StudentContractPage() {
             <IconWriting size={16} />
             Ondertekenen
           </div>
-          <p style={{ fontSize: 13, color: "var(--sub)", marginBottom: 14, lineHeight: 1.6 }}>
-            Door te ondertekenen bevestig je dat je de stageovereenkomst hebt gelezen en akkoord gaat met de inhoud ervan.
-          </p>
-          <label className="akkoord-label">
-            <input type="checkbox" checked={akkoord} onChange={(e) => setAkkoord(e.target.checked)} />
-            Ik ga akkoord met de stageovereenkomst
-          </label>
-          <div className="actions">
-            <button className="btn primary" disabled={!akkoord || bezig} onClick={handleOndertekenen}>
+          <div className="akkoord-row">
+            <label className="akkoord-label">
+              <input type="checkbox" checked={akkoord} onChange={(e) => setAkkoord(e.target.checked)} />
+              Door te ondertekenen bevestig je dat je de stageovereenkomst hebt gelezen en akkoord gaat met de inhoud ervan.
+            </label>
+            <button className="btn primary" disabled={!akkoord || bezig} onClick={handleOndertekenen} style={{ flexShrink: 0 }}>
               <IconWriting size={15} />
               {bezig ? "Bezig…" : "Digitaal ondertekenen"}
             </button>

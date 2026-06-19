@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import api, { apiRequest } from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 import "./StudentEvaluationPage.css";
+import Modal from "../../../components/ui/Modal";
 import {
   IconClipboardCheck, IconCircleCheck, IconAlertCircle,
-  IconClock, IconSend, IconDeviceFloppy, IconTrophy,
-  IconChevronRight, IconX, IconPrinter, IconLock, IconPencil,
-  IconCheck, IconHourglass, IconDownload,
+  IconSend, IconDeviceFloppy, IconTrophy,
+  IconChevronRight, IconPrinter, IconLock, IconPencil,
+  IconCheck, IconDownload,
 } from "@tabler/icons-react";
 
 const SCORE_LBL = ["", "Onvoldoende", "Matig", "Voldoende", "Goed", "Uitstekend"];
@@ -52,7 +53,7 @@ function EvalTrack({ tussentijds, finale }) {
   };
 
   return (
-    <div className="card" style={{ marginBottom: 0 }}>
+    <div className="card">
       <div className="eval-track">
         {stappen.map((s, i) => (
           <div key={i} style={{ display: "contents" }}>
@@ -154,56 +155,52 @@ function CompModal({ competentie, huidigScore, huidigMot, onSave, onSluit }) {
   }
 
   return (
-    <div className="popup-overlay">
-      <div className="popup popup-comp">
-        <div className="popup-header">
-          <div className="card_title">
-            <IconClipboardCheck size={16} />
-            {competentie.code} · {competentie.naam}
-          </div>
-          <button className="btn" onClick={onSluit}><IconX size={16} /></button>
-        </div>
-        <div className="popup-body">
-          {competentie.beschrijving && (
-            <p style={{ fontSize: 13, color: "var(--sub)", marginBottom: 14 }}>{competentie.beschrijving}</p>
-          )}
-
-          <div className="form_label" style={{ marginBottom: 6 }}>Jouw score</div>
-          <div className="scale" style={{ marginBottom: 12 }}>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                className={`scale-btn${score && n <= score ? " selected" : ""}`}
-                onClick={() => setScore(n)}
-              >
-                {n}
-              </button>
-            ))}
-            <span className="scale-lbl">{score ? SCORE_LBL[score] : ""}</span>
-          </div>
-
-          <div className="form_group">
-            <label className="form_label">
-              Motivering <span style={{ color: "var(--red)" }}>*</span>
-            </label>
-            <textarea
-              className="form_textarea"
-              rows={3}
-              placeholder="Verwijs naar concrete voorbeelden uit je logboek"
-              value={motivering}
-              onChange={(e) => setMotivering(e.target.value)}
-            />
-          </div>
-        </div>
-        <div className="actions">
+    <Modal
+      open={true}
+      onClose={onSluit}
+      icon="ti-clipboard-check"
+      titel={`${competentie.code} · ${competentie.naam}`}
+      footer={
+        <>
           <button className="btn" onClick={onSluit}>Annuleren</button>
           <button className="btn primary" onClick={handleSave}>
             <IconDeviceFloppy size={16} />
             Opslaan
           </button>
-        </div>
+        </>
+      }
+    >
+      {competentie.beschrijving && (
+        <p style={{ marginBottom: 14 }}>{competentie.beschrijving}</p>
+      )}
+
+      <div className="form_label" style={{ marginBottom: 6 }}>Jouw score</div>
+      <div className="scale" style={{ marginBottom: 12 }}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button
+            key={n}
+            className={`scale-btn${score && n <= score ? " selected" : ""}`}
+            onClick={() => setScore(n)}
+          >
+            {n}
+          </button>
+        ))}
+        <span className="scale-lbl">{score ? SCORE_LBL[score] : ""}</span>
       </div>
-    </div>
+
+      <div className="form_group">
+        <label className="form_label">
+          Motivering <span style={{ color: "var(--red)" }}>*</span>
+        </label>
+        <textarea
+          className="form_textarea"
+          rows={3}
+          placeholder="Verwijs naar concrete voorbeelden uit je logboek"
+          value={motivering}
+          onChange={(e) => setMotivering(e.target.value)}
+        />
+      </div>
+    </Modal>
   );
 }
 
@@ -318,17 +315,17 @@ export default function StudentEvaluationPage() {
     }
   }
 
-  if (loading) return <div className="ev-page"><div className="laadbericht">Evaluaties laden…</div></div>;
+  if (loading) return <div className="page-inner"><div className="laadbericht">Evaluaties laden…</div></div>;
 
   if (fout) return (
-    <div className="ev-page">
+    <div className="page-inner">
       <div className="melding melding-fout"><IconAlertCircle size={15} /> {fout}</div>
     </div>
   );
 
   if (!data || !data.evaluaties || data.evaluaties.length === 0) {
     return (
-      <div className="ev-page">
+      <div className="page-inner">
         <div className="page-header"><h1>Evaluatie</h1><p>Competentieprofiel · Toegepaste Informatica 2025–2026</p></div>
         <div className="card">
           <div className="geen-data">
@@ -358,7 +355,7 @@ export default function StudentEvaluationPage() {
   const docentScoreMap  = buildScoreMap(actief, "docent");
 
   return (
-    <div className="ev-page">
+    <div className="page-inner">
 
       {openComp && (
         <CompModal
@@ -435,7 +432,7 @@ export default function StudentEvaluationPage() {
           </div>
 
           {/* Voortgang + indienen */}
-          <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div className="card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <span style={{ fontSize: 12.5, color: "var(--sub)" }}>
               <strong>{ingevuld}/{totaal}</strong> competenties ingevuld
             </span>
