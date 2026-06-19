@@ -330,13 +330,17 @@
   letter-spacing: 0.4px;
   border-bottom: 1.5px solid var(--border);
 }
+.vgl-head span:nth-child(2),
+.vgl-head span:nth-child(3) {
+  text-align: center;
+}
 .vgl-row {
   display: grid;
   grid-template-columns: 140px 1fr 1fr;
   gap: 12px;
   padding: 9px 10px;
   border-bottom: 0.5px solid var(--border);
-  align-items: baseline;
+  align-items: center;
 }
 .vgl-row:last-child { border-bottom: none; }
 .vgl-row.gewijzigd {
@@ -351,17 +355,19 @@
   color: var(--sub);
 }
 .vgl-row.gewijzigd .vgl-label { color: #92400e; }
-.vgl-val { font-size: 13px; color: var(--dark); line-height: 1.5; }
+.vgl-val { font-size: 13px; color: var(--dark); line-height: 1.5; text-align: center; }
 .vgl-oud {
   font-size: 13px;
   color: #b45309;
   text-decoration: line-through;
   opacity: 0.75;
   line-height: 1.5;
+  text-align: center;
 }
 .vgl-nieuw {
   font-size: 13px;
   color: #16a34a;
   font-weight: 600;
   line-height: 1.5;
+  text-align: center;
 }

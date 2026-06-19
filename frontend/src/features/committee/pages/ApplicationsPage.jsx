@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import api from "../../../services/api";
+import { cacheGet, cacheSet, cacheDelete } from "../committeeCache";
 import "../../../index.css";
 import "./ApplicationsPage.css";
 import Modal from "../../../components/ui/Modal";
@@ -391,6 +392,12 @@ function BeslisModal({ type, aanvraag, criteria, onSluit, onBeslissing }) {
         motivering:             type === "afkeuren" ? motivering : null,
         uitzonderingMotivering: (type === "goedkeuren" && uitzondering) ? uitzMot : null,
       });
+      cacheDelete(
+        "committee_applications",
+        `committee_historiek_${aanvraag.id}`,
+        `committee_checklist_${aanvraag.id}`,
+        `committee_versions_${aanvraag.id}`,
+      );
       onBeslissing();
       onSluit();
     } catch (err) {
@@ -534,7 +541,6 @@ function VergelijkModal({ aanvraagId, feedbackVorige, onSluit }) {
       wide
       open={true}
       onClose={onSluit}
-      icon="ti-git-compare"
       titel="Versies vergelijken"
       footer={<button className="btn" onClick={onSluit}>Sluiten</button>}
     >
@@ -600,8 +606,11 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
   useEffect(() => {
     if (status === "heringediend" && heeftMeerdereVersies) {
       setVLaden(true);
+      const KEY = `committee_versions_${aanvraag.id}`;
+      const cached = cacheGet(KEY);
+      if (cached) { setVersies(cached); setVLaden(false); return; }
       api.get(`/committee/applications/${aanvraag.id}/versions`)
-        .then((r) => setVersies(r.data.data || []))
+        .then((r) => { const d = r.data.data || []; cacheSet(KEY, d); setVersies(d); })
         .catch(() => {})
         .finally(() => setVLaden(false));
     }
@@ -609,20 +618,31 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
 
   // Echte historiek + eerder opgeslagen criteriaresultaten laden.
   useEffect(() => {
-    api.get(`/committee/applications/${aanvraag.id}/historiek`)
-      .then((r) => setHistoriek(r.data.data || []))
-      .catch(() => {});
-    api.get(`/committee/applications/${aanvraag.id}/checklist`)
-      .then((r) => {
-        const items = r.data?.data?.items || [];
-        const seed = {};
-        items.forEach((it) => {
-          const def = CRITERIA_DEFS.find((c) => c.label === it.criterium);
-          if (def) seed[def.id] = !!it.is_in_orde;
-        });
-        if (Object.keys(seed).length > 0) setCriteria(seed);
-      })
-      .catch(() => {});
+    const HKEY = `committee_historiek_${aanvraag.id}`;
+    const cachedH = cacheGet(HKEY);
+    if (cachedH) { setHistoriek(cachedH); }
+    else {
+      api.get(`/committee/applications/${aanvraag.id}/historiek`)
+        .then((r) => { const d = r.data.data || []; cacheSet(HKEY, d); setHistoriek(d); })
+        .catch(() => {});
+    }
+
+    const CKEY = `committee_checklist_${aanvraag.id}`;
+    const cachedC = cacheGet(CKEY);
+    if (cachedC) { setCriteria(cachedC); }
+    else {
+      api.get(`/committee/applications/${aanvraag.id}/checklist`)
+        .then((r) => {
+          const items = r.data?.data?.items || [];
+          const seed = {};
+          items.forEach((it) => {
+            const def = CRITERIA_DEFS.find((c) => c.label === it.criterium);
+            if (def) seed[def.id] = !!it.is_in_orde;
+          });
+          if (Object.keys(seed).length > 0) { cacheSet(CKEY, seed); setCriteria(seed); }
+        })
+        .catch(() => {});
+    }
   }, [aanvraag.id]);
 
   function toggleCrit(id, val) {
@@ -972,8 +992,10 @@ export default function ApplicationsPage() {
     try {
       setLoading(true);
       setFout("");
-      const res = await api.get("/committee/applications");
-      setAanvragen(res.data.data || []);
+      const cached = cacheGet("committee_applications");
+      const data = cached ?? (await api.get("/committee/applications")).data.data ?? [];
+      if (!cached) cacheSet("committee_applications", data);
+      setAanvragen(data);
     } catch (err) {
       setFout(err.response?.data?.message || err.message || "Aanvragen ophalen mislukt");
     } finally {
@@ -991,8 +1013,10 @@ export default function ApplicationsPage() {
   async function naBeslissing() {
     // Herlaad de lijst en update ook het geselecteerde item
     try {
+      cacheDelete("committee_applications");
       const res = await api.get("/committee/applications");
       const lijst = res.data.data || [];
+      cacheSet("committee_applications", lijst);
       setAanvragen(lijst);
       // Update geselecteerd item met nieuwe status
       if (geselecteerd) {
@@ -1019,7 +1043,7 @@ export default function ApplicationsPage() {
       aanvragen={aanvragen}
       loading={loading}
       fout={fout}
-      onVernieuwen={laadAanvragen}
+      onVernieuwen={() => { cacheDelete("committee_applications"); laadAanvragen(); }}
       onOpen={openAanvraag}
     />
   );
