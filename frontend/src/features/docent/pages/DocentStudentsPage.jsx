@@ -36,6 +36,15 @@ function getLogboekLabel(status) {
   return status || "-";
 }
 
+function formatDeadline(value) {
+  if (!value) return null;
+  return new Date(value).toLocaleDateString("nl-BE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
 export default function DocentStudentsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -122,6 +131,7 @@ export default function DocentStudentsPage() {
                 <th>Mentor</th>
                 <th>Logboek</th>
                 <th>Fase</th>
+                <th>Volgende actie</th>
                 <th className="right">Acties</th>
               </tr>
             </thead>
@@ -154,6 +164,24 @@ export default function DocentStudentsPage() {
                     <span className={`status ${getDossierFaseClass(s.dossier_status)}`}>
                       {getDossierFaseLabel(s.dossier_status)}
                     </span>
+                  </td>
+
+                  <td>
+                    {s.volgende_actie ? (
+                      <>
+                        <span>{s.volgende_actie}</span>
+                        {(s.deadline || s.actie_deadline) && (
+                          <>
+                            <br />
+                            <span className="muted" style={{ fontSize: "12px" }}>
+                              tegen {formatDeadline(s.deadline || s.actie_deadline)}
+                            </span>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <span className="muted">—</span>
+                    )}
                   </td>
 
                   <td className="right">

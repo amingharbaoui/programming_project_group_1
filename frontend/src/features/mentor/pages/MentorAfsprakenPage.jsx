@@ -11,6 +11,18 @@ function formatDate(value) {
   });
 }
 
+// Story 29: praktische afspraken als losse velden i.p.v. één vrij tekstveld.
+const AFSPRAAK_VELDEN = [
+  { key: "werkuren", label: "Werkuren", placeholder: "Bv. 09:00 – 17:00" },
+  { key: "thuiswerk", label: "Thuiswerk", placeholder: "Bv. 2 dagen per week" },
+  { key: "eersteDag", label: "Eerste werkdag", placeholder: "Bv. 02/02/2026" },
+  { key: "contactpersoon", label: "Contactpersoon", placeholder: "Naam + functie" },
+  { key: "materiaal", label: "Benodigd materiaal", placeholder: "Bv. laptop, badge" },
+  { key: "extra", label: "Extra info", placeholder: "Overige afspraken" },
+];
+
+const LEGE_VELDEN = { werkuren: "", thuiswerk: "", eersteDag: "", contactpersoon: "", materiaal: "", extra: "" };
+
 export default function MentorAfsprakenPage() {
   const { user } = useAuth();
 
@@ -23,16 +35,15 @@ export default function MentorAfsprakenPage() {
   const [bezig, setBezig]                       = useState(false);
   const [melding, setMelding]                   = useState({ tekst: "", type: "" });
   const [editMode, setEditMode]                 = useState(false);
-  const [editWaarde, setEditWaarde]             = useState("");
+  const [veldenOpgeslagen, setVeldenOpgeslagen] = useState(null);
+  const [veldenEdit, setVeldenEdit]             = useState({ ...LEGE_VELDEN });
 
   // Laad studenten van de mentor
   useEffect(() => {
     async function loadStudenten() {
       try {
         setLoading(true);
-        const res = await api.get("/mentor/students", {
-          headers: { "x-user-id": String(user.id) },
-        });
+        const res = await api.get("/mentor/students");
         const data = res.data.data || [];
         setStudenten(data);
         if (data.length > 0) {
@@ -56,15 +67,25 @@ export default function MentorAfsprakenPage() {
         setMelding({ tekst: "", type: "" });
         setEditMode(false);
         const res = await api.get(
-          `/mentor/dossier/${geselecteerdDossier}/afspraken`,
-          { headers: { "x-user-id": String(user.id) } }
+          `/mentor/dossier/${geselecteerdDossier}/afspraken`
         );
         const row = res.data.data;
         setAfspraken(row?.praktische_afspraken || "");
         setGedeeldOp(row?.praktische_afspraken_gedeeld_op || null);
+        // Story 29: losse velden uit de opgeslagen JSON halen (indien aanwezig).
+        let velden = null;
+        if (row?.praktische_afspraken_velden) {
+          try {
+            velden = typeof row.praktische_afspraken_velden === "string"
+              ? JSON.parse(row.praktische_afspraken_velden)
+              : row.praktische_afspraken_velden;
+          } catch { velden = null; }
+        }
+        setVeldenOpgeslagen(velden);
       } catch (err) {
         setAfspraken("");
         setGedeeldOp(null);
+        setVeldenOpgeslagen(null);
       } finally {
         setAfsprakenLoading(false);
       }
@@ -73,14 +94,18 @@ export default function MentorAfsprakenPage() {
   }, [geselecteerdDossier]);
 
   function startEdit() {
-    setEditWaarde(afspraken);
+    setVeldenEdit({ ...LEGE_VELDEN, ...(veldenOpgeslagen || {}) });
     setEditMode(true);
     setMelding({ tekst: "", type: "" });
   }
 
   function annuleer() {
     setEditMode(false);
-    setEditWaarde("");
+    setVeldenEdit({ ...LEGE_VELDEN });
+  }
+
+  function wijzigVeld(key, waarde) {
+    setVeldenEdit((vorig) => ({ ...vorig, [key]: waarde }));
   }
 
   async function opslaan() {
@@ -89,11 +114,14 @@ export default function MentorAfsprakenPage() {
       setMelding({ tekst: "", type: "" });
       await api.patch(
         `/mentor/dossier/${geselecteerdDossier}/afspraken`,
-        { afspraken: editWaarde },
-        { headers: { "x-user-id": String(user.id) } }
+        { velden: veldenEdit }
       );
-      setAfspraken(editWaarde);
-      setGedeeldOp(new Date().toISOString());
+      // De PATCH geeft enkel { dossierId } terug; haal de canonieke (opgebouwde) tekst opnieuw op.
+      const res = await api.get(`/mentor/dossier/${geselecteerdDossier}/afspraken`);
+      const row = res.data?.data;
+      setAfspraken(row?.praktische_afspraken || "");
+      setVeldenOpgeslagen({ ...veldenEdit });
+      setGedeeldOp(row?.praktische_afspraken_gedeeld_op || new Date().toISOString());
       setEditMode(false);
       setMelding({ tekst: "Afspraken opgeslagen!", type: "s_ok" });
     } catch (err) {
@@ -204,17 +232,29 @@ export default function MentorAfsprakenPage() {
             </>
           ) : (
             <>
-              <div className="form_group">
-                <label className="form_label">Afspraken</label>
-                <textarea
-                  className="form_input"
-                  rows={8}
-                  value={editWaarde}
-                  onChange={(e) => setEditWaarde(e.target.value)}
-                  style={{ resize: "vertical" }}
-                  placeholder="Voer hier de praktische afspraken in..."
-                />
-              </div>
+              {AFSPRAAK_VELDEN.map((veld) => (
+                <div className="form_group" key={veld.key}>
+                  <label className="form_label">{veld.label}</label>
+                  {veld.key === "extra" ? (
+                    <textarea
+                      className="form_input"
+                      rows={3}
+                      value={veldenEdit[veld.key]}
+                      onChange={(e) => wijzigVeld(veld.key, e.target.value)}
+                      style={{ resize: "vertical" }}
+                      placeholder={veld.placeholder}
+                    />
+                  ) : (
+                    <input
+                      className="form_input"
+                      type="text"
+                      value={veldenEdit[veld.key]}
+                      onChange={(e) => wijzigVeld(veld.key, e.target.value)}
+                      placeholder={veld.placeholder}
+                    />
+                  )}
+                </div>
+              ))}
 
               {melding.tekst && (
                 <div style={{ marginBottom: "10px" }}>

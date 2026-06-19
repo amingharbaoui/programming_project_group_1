@@ -60,15 +60,21 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
   const studentScoresMap = {};
   const mentorScoresMap = {};
   const docentScoresBestaand = {};
+  const docentMotiveringenBestaand = {};
   if (evaluatie) {
     for (const s of evaluatie.scores || []) {
       if (s.rol === "student") studentScoresMap[s.competentie_id] = s.score;
       if (s.rol === "mentor") mentorScoresMap[s.competentie_id] = s.score;
-      if (s.rol === "docent") docentScoresBestaand[s.competentie_id] = s.score;
+      if (s.rol === "docent") {
+        docentScoresBestaand[s.competentie_id] = s.score;
+        if (s.motivering) docentMotiveringenBestaand[s.competentie_id] = s.motivering;
+      }
     }
   }
 
   const [docentScores, setDocentScores] = useState({ ...docentScoresBestaand });
+  const [docentMotiveringen, setDocentMotiveringen] = useState({ ...docentMotiveringenBestaand });
+  const [verslag, setVerslag] = useState(evaluatie?.verslag ?? "");
   const [eindpresentatieScore, setEindpresentatieScore] = useState(evaluatie?.eindpresentatie_score ?? null);
   const [bezig, setBezig]   = useState(false);
   const [melding, setMelding] = useState({ tekst: "", type: "" });
@@ -77,12 +83,18 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
   // Reset scores als evaluatie verandert
   useEffect(() => {
     const nieuw = {};
+    const nieuweMot = {};
     if (evaluatie) {
       for (const s of evaluatie.scores || []) {
-        if (s.rol === "docent") nieuw[s.competentie_id] = s.score;
+        if (s.rol === "docent") {
+          nieuw[s.competentie_id] = s.score;
+          if (s.motivering) nieuweMot[s.competentie_id] = s.motivering;
+        }
       }
     }
     setDocentScores(nieuw);
+    setDocentMotiveringen(nieuweMot);
+    setVerslag(evaluatie?.verslag ?? "");
     setEindpresentatieScore(evaluatie?.eindpresentatie_score ?? null);
     setMelding({ tekst: "", type: "" });
     setVrijgaveMelding({ tekst: "", type: "" });
@@ -97,7 +109,7 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
     const scoresArr = competenties.map((c) => ({
       competentieId: c.id,
       score: docentScores[c.id] || null,
-      motivering: "",
+      motivering: docentMotiveringen[c.id] || "",
     }));
     try {
       setBezig(true);
@@ -146,7 +158,7 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
     const scoresArr = competenties.map((c) => ({
       competentieId: c.id,
       score: docentScores[c.id] || null,
-      motivering: "",
+      motivering: docentMotiveringen[c.id] || "",
     }));
     try {
       setBezig(true);
@@ -159,7 +171,10 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
       // Dan berekenen
       await api.post(
         `/evaluations/${evaluatie.id}/calculate`,
-        { eindpresentatieScore: activeType === "finaal" ? eindpresentatieScore : null },
+        {
+          eindpresentatieScore: activeType === "finaal" ? eindpresentatieScore : null,
+          verslag: verslag?.trim() ? verslag.trim() : null,
+        },
         {}
       );
       setMelding({ tekst: "Evaluatie geregistreerd!", type: "s_ok" });
@@ -214,14 +229,33 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
               </td>
               <td style={{ textAlign: kanInvullen ? "left" : "center" }}>
                 {kanInvullen ? (
-                  <ScoreKnoppen
-                    waarde={docentScores[c.id] || null}
-                    onChange={(val) =>
-                      setDocentScores((prev) => ({ ...prev, [c.id]: val }))
-                    }
-                  />
+                  <>
+                    <ScoreKnoppen
+                      waarde={docentScores[c.id] || null}
+                      onChange={(val) =>
+                        setDocentScores((prev) => ({ ...prev, [c.id]: val }))
+                      }
+                    />
+                    <input
+                      className="form_input"
+                      type="text"
+                      value={docentMotiveringen[c.id] || ""}
+                      onChange={(e) =>
+                        setDocentMotiveringen((prev) => ({ ...prev, [c.id]: e.target.value }))
+                      }
+                      placeholder="Motivering (optioneel)"
+                      style={{ marginTop: 6, fontSize: "12px", padding: "4px 6px" }}
+                    />
+                  </>
                 ) : (
-                  <ScoreDisplay waarde={docentScores[c.id]} />
+                  <>
+                    <ScoreDisplay waarde={docentScores[c.id]} />
+                    {docentMotiveringenBestaand[c.id] && (
+                      <div style={{ fontSize: "11.5px", color: "var(--sub)", marginTop: 4 }}>
+                        {docentMotiveringenBestaand[c.id]}
+                      </div>
+                    )}
+                  </>
                 )}
               </td>
             </tr>
@@ -242,6 +276,22 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
       {melding.tekst && (
         <div style={{ marginTop: "10px" }}>
           <span className={`status ${melding.type}`}>{melding.tekst}</span>
+        </div>
+      )}
+
+      {kanInvullen && (
+        <div className="form_group" style={{ marginTop: "14px" }}>
+          <label className="form_label">
+            Verslag van de {activeType === "tussentijds" ? "tussentijdse bespreking" : "finale bespreking"} (optioneel)
+          </label>
+          <textarea
+            className="form_input"
+            rows={4}
+            value={verslag}
+            onChange={(e) => setVerslag(e.target.value)}
+            style={{ resize: "vertical" }}
+            placeholder="Noteer hier de bespreking met student en mentor..."
+          />
         </div>
       )}
 
