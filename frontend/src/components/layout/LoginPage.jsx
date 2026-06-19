@@ -20,6 +20,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [toonWw, setToonWw] = useState(false);
+  const [pwFocus, setPwFocus] = useState(false);
   const [fout, setFout] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -99,17 +100,21 @@ export default function LoginPage() {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onFocus={() => setPwFocus(true)}
+                onBlur={() => setPwFocus(false)}
                 required
               />
-              <button
-                type="button"
-                className="pw_toggle"
-                onClick={() => setToonWw((v) => !v)}
-                aria-label={toonWw ? "Wachtwoord verbergen" : "Wachtwoord tonen"}
-                title={toonWw ? "Wachtwoord verbergen" : "Wachtwoord tonen"}
-              >
-                {toonWw ? <IconEyeOff size={18} stroke={2} /> : <IconEye size={18} stroke={2} />}
-              </button>
+              {pwFocus && (
+                <button
+                  type="button"
+                  className="pw_toggle"
+                  onMouseDown={(e) => { e.preventDefault(); setToonWw((v) => !v); }}
+                  aria-label={toonWw ? "Wachtwoord verbergen" : "Wachtwoord tonen"}
+                  title={toonWw ? "Wachtwoord verbergen" : "Wachtwoord tonen"}
+                >
+                  {toonWw ? <IconEyeOff size={18} stroke={2} /> : <IconEye size={18} stroke={2} />}
+                </button>
+              )}
             </div>
           </div>
 
