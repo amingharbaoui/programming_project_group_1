@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { apiRequest } from "../../services/api";
 import logoWide from "../../assets/stageify-logo/stageify_logo_wide.png";
-import loginBg from "../../assets/backgrounds/login-bg.jpg";
+import loginBg from "../../assets/backgrounds/login-bg.webp";
 
 const ROLE_ROUTES = {
   student: "/student/internship",
