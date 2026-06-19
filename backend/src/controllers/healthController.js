@@ -3,7 +3,7 @@ const db = require("../config/db");
 function getHealth(req, res) {
   res.json({
     status: "ok",
-    message: "Stageify backend is running"
+    message: "Stagify backend is running"
   });
 }
 

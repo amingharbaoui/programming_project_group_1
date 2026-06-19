@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { IconLogin2 } from "@tabler/icons-react";
+import { IconLogin2, IconEye, IconEyeOff } from "@tabler/icons-react";
 import "./LoginPage.css";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -19,6 +19,7 @@ export default function LoginPage() {
   const { loginUser } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [toonWw, setToonWw] = useState(false);
   const [fout, setFout] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -61,7 +62,7 @@ export default function LoginPage() {
             <img
               className="login_logo"
               src={logoWide}
-              alt="Stageify logo"
+              alt="Stagify logo"
             />
           </div>
         </div>
@@ -90,15 +91,26 @@ export default function LoginPage() {
             <label className="form_label" htmlFor="password">
               Wachtwoord <span className="required">*</span>
             </label>
-            <input
-              id="password"
-              type="password"
-              className="form_input login_input"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
+            <div className="pw_wrap">
+              <input
+                id="password"
+                type={toonWw ? "text" : "password"}
+                className="form_input login_input pw_input"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+              />
+              <button
+                type="button"
+                className="pw_toggle"
+                onClick={() => setToonWw((v) => !v)}
+                aria-label={toonWw ? "Wachtwoord verbergen" : "Wachtwoord tonen"}
+                title={toonWw ? "Wachtwoord verbergen" : "Wachtwoord tonen"}
+              >
+                {toonWw ? <IconEyeOff size={18} stroke={2} /> : <IconEye size={18} stroke={2} />}
+              </button>
+            </div>
           </div>
 
           {/* Foutmelding */}

@@ -9,7 +9,7 @@
 const crypto = require("crypto");
 const db = require("../src/config/db");
 
-const DEMO_WACHTWOORD = "Stagify!2026";
+const DEMO_WACHTWOORD = "Demo!2026";
 function hash(pw) {
   const salt = crypto.randomBytes(16).toString("hex");
   const d = crypto.pbkdf2Sync(String(pw), salt, 120000, 32, "sha256").toString("hex");

@@ -14,7 +14,7 @@ export default function Navbar({ onToggle }) {
 
   const items = NAVIGATION[user.role] || [];
   const currentItem = items.find((item) => location.pathname.startsWith(item.path));
-  const pageTitle = currentItem?.label || "Stageify";
+  const pageTitle = currentItem?.label || "Stagify";
 
   const initials = user.name
     ? user.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()

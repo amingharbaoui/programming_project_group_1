@@ -195,10 +195,10 @@ export default function Sidebar({ collapsed }) {
       {/* Brand */}
       <div className="brand">
         <div className="brand-full">
-          <img src={stageifyLogo} alt="Stageify" className="brand-logo" />
+          <img src={stageifyLogo} alt="Stagify" className="brand-logo" />
         </div>
         <div className="brand-compact">
-          <img src={stageifyIcon} alt="Stageify" className="brand-icon-img" />
+          <img src={stageifyIcon} alt="Stagify" className="brand-icon-img" />
         </div>
       </div>
 

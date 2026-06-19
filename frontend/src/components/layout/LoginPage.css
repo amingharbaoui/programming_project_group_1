@@ -159,6 +159,41 @@
 	border-color: #dcdfe4;
 }
 
+/* Wachtwoordveld met oog-toggle (login + activatie) */
+.pw_wrap {
+	position: relative;
+	display: flex;
+	align-items: center;
+}
+.pw_input {
+	width: 100%;
+	padding-right: 40px;
+}
+/* Native browser-reveal verbergen zodat er maar één (eigen) oogje is */
+.pw_input::-ms-reveal,
+.pw_input::-ms-clear {
+	display: none;
+}
+.pw_toggle {
+	position: absolute;
+	right: 8px;
+	top: 50%;
+	transform: translateY(-50%);
+	background: none;
+	border: none;
+	padding: 4px;
+	margin: 0;
+	cursor: pointer;
+	color: #8a93a3;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	line-height: 0;
+}
+.pw_toggle:hover {
+	color: var(--red, #c8102e);
+}
+
 .login_footer {
 	margin-top: 16px;
 	text-align: center;

@@ -18,6 +18,7 @@ export default function MentorActivationPage() {
   const [code, setCode] = useState("");
   const [ww1, setWw1] = useState("");
   const [ww2, setWw2] = useState("");
+  const [toonWw, setToonWw] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -119,26 +120,48 @@ export default function MentorActivationPage() {
               <label className="form_label">
                 Kies een wachtwoord <span style={{ color: "var(--red)" }}>*</span>
               </label>
-              <input
-                className="form_input"
-                type="password"
-                placeholder="min. 8 tekens"
-                value={ww1}
-                onChange={(e) => setWw1(e.target.value)}
-              />
+              <div className="pw_wrap">
+                <input
+                  className="form_input pw_input"
+                  type={toonWw ? "text" : "password"}
+                  placeholder="min. 8 tekens"
+                  value={ww1}
+                  onChange={(e) => setWw1(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="pw_toggle"
+                  onClick={() => setToonWw((v) => !v)}
+                  aria-label={toonWw ? "Wachtwoord verbergen" : "Wachtwoord tonen"}
+                  title={toonWw ? "Wachtwoord verbergen" : "Wachtwoord tonen"}
+                >
+                  <i className={toonWw ? "ti ti-eye-off" : "ti ti-eye"} />
+                </button>
+              </div>
             </div>
 
             <div className="form_group">
               <label className="form_label">
                 Herhaal wachtwoord <span style={{ color: "var(--red)" }}>*</span>
               </label>
-              <input
-                className="form_input"
-                type="password"
-                placeholder="••••••••"
-                value={ww2}
-                onChange={(e) => setWw2(e.target.value)}
-              />
+              <div className="pw_wrap">
+                <input
+                  className="form_input pw_input"
+                  type={toonWw ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={ww2}
+                  onChange={(e) => setWw2(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="pw_toggle"
+                  onClick={() => setToonWw((v) => !v)}
+                  aria-label={toonWw ? "Wachtwoord verbergen" : "Wachtwoord tonen"}
+                  title={toonWw ? "Wachtwoord verbergen" : "Wachtwoord tonen"}
+                >
+                  <i className={toonWw ? "ti ti-eye-off" : "ti ti-eye"} />
+                </button>
+              </div>
             </div>
 
             {fout && (
