@@ -13,22 +13,15 @@
 	background: var(--white);
 	border-radius: 14px;
 	padding: 24px 26px 20px;
-	box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35), 0 4px 16px rgba(0, 0, 0, 0.18);
+	border: 0.5px solid rgba(255, 255, 255, 0.15);
 }
 
-/* Login-only: achtergrondfoto + inlogbox op ~3/10 van links */
+/* Login-only: achtergrondfoto */
 .login_bg {
-	justify-content: flex-start;
-	padding-left: 30vw;
 	background-size: cover;
 	background-position: center;
 	background-repeat: no-repeat;
-}
-@media (max-width: 760px) {
-	.login_bg {
-		justify-content: center;
-		padding-left: 24px;
-	}
 }
 
 .login_header {
