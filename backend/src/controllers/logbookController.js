@@ -539,7 +539,17 @@ async function mentorCheckLogbookWeek(req, res) {
     mentorFeedback,
     herindieningNodig,
     blokkade
-  } = req.body;
+  } = req.body || {};
+
+  if (req.body?.status !== undefined || req.body?.action !== undefined) {
+    return fail(res, 400, "Ongeldige invoer: gebruik herindieningNodig (true of false), geen status of action");
+  }
+  if (herindieningNodig !== undefined && typeof herindieningNodig !== "boolean") {
+    return fail(res, 400, "Ongeldige waarde voor herindieningNodig: true of false verwacht");
+  }
+  if (blokkade !== undefined && typeof blokkade !== "boolean") {
+    return fail(res, 400, "Ongeldige waarde voor blokkade: true of false verwacht");
+  }
 
   const needsResubmission = Boolean(herindieningNodig);
   if (needsResubmission && !((feedback || mentorFeedback) && String(feedback || mentorFeedback).trim())) {
@@ -630,7 +640,17 @@ async function docentReviewLogbookWeek(req, res) {
     docentFeedback,
     herindieningNodig,
     blokkade
-  } = req.body;
+  } = req.body || {};
+
+  if (req.body?.status !== undefined || req.body?.action !== undefined) {
+    return fail(res, 400, "Ongeldige invoer: gebruik herindieningNodig (true of false), geen status of action");
+  }
+  if (herindieningNodig !== undefined && typeof herindieningNodig !== "boolean") {
+    return fail(res, 400, "Ongeldige waarde voor herindieningNodig: true of false verwacht");
+  }
+  if (blokkade !== undefined && typeof blokkade !== "boolean") {
+    return fail(res, 400, "Ongeldige waarde voor blokkade: true of false verwacht");
+  }
 
   const needsResubmission = Boolean(herindieningNodig);
   if (needsResubmission && !((feedback || docentFeedback) && String(feedback || docentFeedback).trim())) {
@@ -983,6 +1003,10 @@ async function saveLogbookDay(req, res) {
 
   if (!weekNummer || !datum) return fail(res, 400, "weekNummer en datum zijn verplicht");
 
+  if (!Number.isFinite(aantalUren) || aantalUren < 0 || aantalUren > 12) {
+    return fail(res, 400, "Aantal uren per dag moet tussen 0 en 12 liggen");
+  }
+
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -1153,9 +1177,9 @@ async function updateLogbookEntry(req, res) {
     }
     if (b.aantalUren !== undefined || b.aantal_uren !== undefined) {
       const uren = Number(b.aantalUren ?? b.aantal_uren ?? 0);
-      if (uren < 0) {
+      if (!Number.isFinite(uren) || uren < 0 || uren > 12) {
         await connection.rollback();
-        return fail(res, 400, "Aantal uren kan niet negatief zijn");
+        return fail(res, 400, "Aantal uren per dag moet tussen 0 en 12 liggen");
       }
       setVeld("aantal_uren", uren);
     }
