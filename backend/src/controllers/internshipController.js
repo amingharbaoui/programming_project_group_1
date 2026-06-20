@@ -147,7 +147,7 @@ async function createInternship(req, res) {
     startdatum,
     einddatum,
     urenPerWeek
-  } = req.body;
+  } = req.body || {};
 
   const finalBedrijfNaam = bedrijfNaam || bedrijfsnaam;
   const finalUrenPerWeek = Number(urenPerWeek ?? 38);
@@ -337,7 +337,7 @@ async function saveDraft(req, res) {
     bedrijfNaam, bedrijfsnaam, bedrijfsafdeling, bedrijfsadres,
     mentorNaam, mentorEmail, mentorTelefoon, mentorFunctie,
     stagefunctie, opdrachtomschrijving, startdatum, einddatum, urenPerWeek
-  } = req.body;
+  } = req.body || {};
 
   const finalBedrijfNaam = bedrijfNaam || bedrijfsnaam || null;
   const finalUrenPerWeek = Number(urenPerWeek || 38);
@@ -453,7 +453,7 @@ async function resubmitInternship(req, res) {
     bedrijfNaam, bedrijfsnaam, bedrijfsafdeling, bedrijfsadres,
     mentorNaam, mentorEmail, mentorTelefoon, mentorFunctie,
     stagefunctie, opdrachtomschrijving, startdatum, einddatum, urenPerWeek
-  } = req.body;
+  } = req.body || {};
 
   const finalBedrijfNaam = bedrijfNaam || bedrijfsnaam;
   const finalUrenPerWeek = Number(urenPerWeek || 38);
@@ -1306,7 +1306,7 @@ async function getAdminDossierById(req, res) {
 
 async function updateAdminDossierStatus(req, res) {
   const dossierId = Number(req.params.id);
-  const { status, verzekeringInOrde, praktischeAfspraken } = req.body;
+  const { status, verzekeringInOrde, praktischeAfspraken } = req.body || {};
 
   // Status gelijkgetrokken naar de NL-enum van het schema. Engelse waarden worden voor de
   // zekerheid nog vertaald, zodat een oudere frontend niet stuk gaat.
