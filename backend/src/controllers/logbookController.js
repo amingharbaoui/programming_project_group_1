@@ -249,6 +249,18 @@ async function createLogbook(req, res) {
       return fail(res, 409, "Je kan pas een logboek indienen zodra je stagedossier startklaar geregistreerd is");
     }
 
+    // En pas vanaf de effectieve startdatum van de stage — zo blijft de backend gelijk met wat de student in de app ziet.
+    if (dossier.startdatum) {
+      const start = new Date(dossier.startdatum);
+      const vandaag = new Date();
+      vandaag.setHours(0, 0, 0, 0);
+      start.setHours(0, 0, 0, 0);
+      if (!Number.isNaN(start.getTime()) && vandaag < start) {
+        await connection.rollback();
+        return fail(res, 409, "Je logboek opent pas vanaf de startdatum van je stage");
+      }
+    }
+
     const totaalUren = sumHours(finalDays);
 
     const [existingWeeks] = await connection.query(
@@ -1012,7 +1024,7 @@ async function saveLogbookDay(req, res) {
     await conn.beginTransaction();
 
     const [dossiers] = await conn.query(
-      "SELECT id, status FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1",
+      "SELECT id, status, startdatum FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1",
       [studentId]
     );
     if (dossiers.length === 0) { await conn.rollback(); return fail(res, 404, "Geen stagedossier gevonden"); }
@@ -1032,6 +1044,18 @@ async function saveLogbookDay(req, res) {
     if (teVroeg.includes(dossiers[0].status)) {
       await conn.rollback();
       return fail(res, 409, "Je kan pas een logboek invullen zodra je stagedossier startklaar geregistreerd is");
+    }
+
+    // En pas vanaf de effectieve startdatum — gelijk met wat de student in de app ziet (logboek opent op de startdatum).
+    if (dossiers[0].startdatum) {
+      const start = new Date(dossiers[0].startdatum);
+      const vandaag = new Date();
+      vandaag.setHours(0, 0, 0, 0);
+      start.setHours(0, 0, 0, 0);
+      if (!Number.isNaN(start.getTime()) && vandaag < start) {
+        await conn.rollback();
+        return fail(res, 409, "Je logboek opent pas vanaf de startdatum van je stage");
+      }
     }
 
     // Week zoeken of aanmaken (week_start = maandag van de datum, week_einde = vrijdag).
