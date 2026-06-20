@@ -988,7 +988,7 @@ async function saveLogbookDay(req, res) {
     await conn.beginTransaction();
 
     const [dossiers] = await conn.query(
-      "SELECT id FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1",
+      "SELECT id, status FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1",
       [studentId]
     );
     if (dossiers.length === 0) { await conn.rollback(); return fail(res, 404, "Geen stagedossier gevonden"); }
@@ -1002,6 +1002,12 @@ async function saveLogbookDay(req, res) {
     if (!ovk[0] || !ovk[0].student_getekend_op) {
       await conn.rollback();
       return fail(res, 409, "Je kan pas een logboek invullen nadat je de stageovereenkomst getekend hebt");
+    }
+
+    const teVroeg = ["wacht_op_student", "wacht_op_bedrijf", "in_controle_bij_administratie", "document_afgekeurd"];
+    if (teVroeg.includes(dossiers[0].status)) {
+      await conn.rollback();
+      return fail(res, 409, "Je kan pas een logboek invullen zodra je stagedossier startklaar geregistreerd is");
     }
 
     // Week zoeken of aanmaken (week_start = maandag van de datum, week_einde = vrijdag).
