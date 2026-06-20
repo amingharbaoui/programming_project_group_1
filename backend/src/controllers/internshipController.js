@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 const { meld, emailMelding } = require("../utils/notify");
+const { sendMail } = require("../utils/mail");
 const { buildSimplePdf } = require("../utils/pdf");
 
 function getUserId(req, fallbackId) {
@@ -985,6 +986,24 @@ async function createDossierAfterApproval(connection, stagevoorstelId) {
          VALUES (?, ?, ?, 1, 'verstuurd', ?, DATE_ADD(NOW(), INTERVAL 14 DAY))`,
         [mentorId, data.bedrijf_id, data.mentor_functie || "Mentor", token]
       );
+
+      // De nieuwe mentor uitnodigen. De in-app melding loopt mee in dezelfde transactie (de mentor
+      // bestaat dan al), de e-mail is best-effort en breekt de goedkeuring nooit.
+      const activatielink = `/mentor/activate?token=${token}`;
+      await connection.query(
+        `INSERT INTO systeem_meldingen (ontvanger_id, type, ernst, titel, bericht, status, kanaal, aangemaakt_op)
+         VALUES (?, 'herinnering', 'medium', ?, ?, 'nieuw', 'in_app', NOW())`,
+        [mentorId, "Uitnodiging als mentor", `Je bent uitgenodigd als mentor. Activeer je account via ${activatielink}`]
+      );
+      try {
+        await sendMail({
+          to: data.mentor_email,
+          subject: "Uitnodiging als mentor — Stagify",
+          text: `Je bent uitgenodigd als mentor op Stagify.\n\nActiveer je account en kies een wachtwoord via:\n${process.env.APP_URL || "http://localhost:5173"}${activatielink}\n\nDeze link is 14 dagen geldig.`,
+        });
+      } catch (mailError) {
+        console.error("Mentor-uitnodigingsmail mislukt:", mailError.message);
+      }
     }
   }
   if (!mentorId) {
