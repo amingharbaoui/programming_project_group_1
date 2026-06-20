@@ -1197,6 +1197,7 @@ async function getAdminDossiers(req, res) {
 
 async function getAdminDossierById(req, res) {
   const dossierId = Number(req.params.id);
+  if (!Number.isInteger(dossierId)) return fail(res, 404, "Dossier niet gevonden");
 
   try {
     const [rows] = await db.query(
