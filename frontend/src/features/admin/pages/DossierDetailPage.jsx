@@ -228,7 +228,7 @@ export default function DossierDetailPage() {
   async function doRegistreer() {
     setActionLoading(true);
     try {
-      await api.patch(`/admin/dossiers/${id}/startklaar`);
+      await api.patch(`/admin/dossiers/${id}/overeenkomst/registreer`);
       showToast("Stageovereenkomst geregistreerd — dossier compleet en startklaar.");
       setModal(null);
       load();

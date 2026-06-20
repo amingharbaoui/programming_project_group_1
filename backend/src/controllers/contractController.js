@@ -176,6 +176,17 @@ async function registerOvereenkomst(req, res) {
       return fail(res, 409, "De overeenkomst is nog niet door alle partijen ondertekend");
     }
 
+    const [docs] = await conn.query(
+      `SELECT COUNT(*) AS openstaand
+       FROM documenten doc JOIN document_soorten ds ON ds.id = doc.document_soort_id
+       WHERE doc.stagedossier_id = ? AND ds.is_verplicht = 1 AND doc.status NOT IN ('goedgekeurd', 'geregistreerd')`,
+      [dossierId]
+    );
+    if (docs[0].openstaand > 0) {
+      await conn.rollback();
+      return fail(res, 400, `Dossier nog niet startklaar: ${docs[0].openstaand} verplichte document(en) nog niet goedgekeurd`);
+    }
+
     await conn.query(
       `UPDATE stageovereenkomsten
        SET status = 'geregistreerd',
@@ -187,9 +198,9 @@ async function registerOvereenkomst(req, res) {
       [adminId, adminId, o.id]
     );
 
-    // Verzekering in orde op het dossier.
+    // Verzekering in orde + dossier startklaar registreren.
     await conn.query(
-      "UPDATE stagedossiers SET verzekering_in_orde = 1, aangepast_op = NOW() WHERE id = ?",
+      "UPDATE stagedossiers SET status = 'geregistreerd', verzekering_in_orde = 1, aangepast_op = NOW() WHERE id = ?",
       [dossierId]
     );
 
