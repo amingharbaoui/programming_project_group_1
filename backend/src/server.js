@@ -5,6 +5,8 @@ const path = require("path");
 const fs = require("fs");
 const db = require("./config/db");
 const { verifyToken } = require("./utils/token");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 const healthRoutes = require("./routes/healthRoutes");
 const authRoutes = require("./routes/authRoutes");
@@ -29,8 +31,11 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Toegestane origins zijn env-gedreven (komma-gescheiden), met de lokale frontend als default.
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || "http://localhost:5173")
+  .split(",").map((o) => o.trim()).filter(Boolean);
 app.use(cors({
-  origin: "http://localhost:5173",
+  origin: ALLOWED_ORIGINS,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "x-user-id"]
 }));
@@ -48,6 +53,29 @@ app.use("/uploads", (req, res, next) => {
   if (!fs.existsSync(filePath)) return next();
   res.sendFile(filePath);
 });
+
+// Security headers op de API-responses. Bewust ná de upload-handler zodat geserveerde
+// bestanden (PDF/afbeeldingen in de frontend-iframe) niet door frame-/CORP-regels geblokkeerd worden.
+app.use(helmet({
+  contentSecurityPolicy: false, // JSON-API; CSP hoort op de frontend-HTML
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
+
+// Rate-limiting (env-gedreven, genereuze dev-defaults — zet strenger in productie).
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_MAX || 2000),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.AUTH_RATE_LIMIT_MAX || 100),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/api", apiLimiter);
+app.use("/api/auth/login", authLimiter);
 
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
