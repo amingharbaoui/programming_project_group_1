@@ -76,7 +76,7 @@ async function findLatestDossierForStudent(connection, studentId) {
 async function getDossierMeta(connection, dossierId) {
   const [rows] = await connection.query(
     `
-    SELECT id, student_id, mentor_id, stagebegeleider_id, status
+    SELECT id, student_id, mentor_id, stagebegeleider_id, status, aantal_weken, startdatum, einddatum
     FROM stagedossiers
     WHERE id = ?
     LIMIT 1
@@ -176,8 +176,8 @@ async function createLogbook(req, res) {
 
   for (const day of finalDays) {
     const uren = Number(day.aantalUren || day.aantal_uren || 0);
-    if (uren < 0) {
-      return fail(res, 400, "Aantal uren per dag kan niet negatief zijn");
+    if (!Number.isFinite(uren) || uren < 0 || uren > 12) {
+      return fail(res, 400, "Aantal uren per dag moet tussen 0 en 12 liggen");
     }
   }
 
@@ -217,6 +217,19 @@ async function createLogbook(req, res) {
     if (dossier.student_id !== studentId) {
       await connection.rollback();
       return fail(res, 403, "Je mag alleen een logboek indienen voor je eigen stagedossier");
+    }
+
+    if (dossier.aantal_weken && finalWeekNummer > Number(dossier.aantal_weken)) {
+      await connection.rollback();
+      return fail(res, 400, `Weeknummer ${finalWeekNummer} valt buiten de stageperiode (max ${dossier.aantal_weken} weken)`);
+    }
+    if (dossier.startdatum && finalWeekEinde < normalizeDate(dossier.startdatum)) {
+      await connection.rollback();
+      return fail(res, 400, "De logboekweek valt voor de start van de stage");
+    }
+    if (dossier.einddatum && finalWeekStart > normalizeDate(dossier.einddatum)) {
+      await connection.rollback();
+      return fail(res, 400, "De logboekweek valt na het einde van de stage");
     }
 
     // Logboek pas invulbaar nadat de student de stageovereenkomst getekend heeft.
