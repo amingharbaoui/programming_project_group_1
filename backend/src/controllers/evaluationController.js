@@ -435,6 +435,7 @@ async function releaseResult(req, res) {
     if (!evaluatie) { await conn.rollback(); return fail(res, 404, "Evaluatie niet gevonden"); }
     if (!mayActAsDocent(evaluatie, role, userId)) { await conn.rollback(); return fail(res, 403, "Alleen de gekoppelde docent of administratie kan vrijgeven"); }
     if (evaluatie.type === "tussentijds") { await conn.rollback(); return fail(res, 409, "Een tussentijdse evaluatie wordt niet vrijgegeven — enkel de finale evaluatie levert een vrij te geven eindresultaat."); }
+    if (evaluatie.status === "vrijgegeven") { await conn.rollback(); return fail(res, 409, "Het resultaat is al vrijgegeven"); }
     if (evaluatie.status !== "klaar_voor_vrijgave") { await conn.rollback(); return fail(res, 409, "Resultaat moet eerst berekend worden voor het vrijgegeven kan worden"); }
 
     // Finale-gating: logboek moet afgewerkt zijn en de eindpresentatie moet gegeven zijn.
