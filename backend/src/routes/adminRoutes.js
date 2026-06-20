@@ -9,9 +9,9 @@ const {
   sendContractReminder
 } = require("../controllers/internshipController");
 const { getSettings, updateStageRule, updateDocumentType, createDocumentType, resetDocumentTypes, deleteDocumentType } = require("../controllers/settingsController");
-const { inviteMentor, inviteUser } = require("../controllers/userController");
+const { inviteMentor, inviteUser, resendInvitation } = require("../controllers/userController");
 const { approveDocument, rejectDocument } = require("../controllers/documentController");
-const { adminDownloadContractPdf } = require("../controllers/contractController");
+const { adminDownloadContractPdf, registerOvereenkomst } = require("../controllers/contractController");
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
 
 const router = express.Router();
@@ -23,6 +23,7 @@ router.get("/dossiers/:id", getAdminDossierById);
 router.patch("/dossiers/:id/status", updateAdminDossierStatus);
 router.patch("/dossiers/:id/assign", assignDossier);
 router.patch("/dossiers/:id/startklaar", registerDossierStartklaar);
+router.patch("/dossiers/:id/overeenkomst/registreer", registerOvereenkomst);
 router.post("/dossiers/:id/eindoverzicht", generateEindoverzicht);
 router.post("/dossiers/:id/reminder", sendContractReminder);
 router.get("/dossiers/:id/contract-pdf", adminDownloadContractPdf);
@@ -35,6 +36,7 @@ router.delete("/document-types/:id", deleteDocumentType);
 router.post("/document-types/reset", resetDocumentTypes);
 
 router.post("/invitations", inviteMentor);
+router.post("/invitations/:id/resend", resendInvitation);
 router.post("/users/invite", inviteUser);
 
 router.patch("/documents/:id/approve", approveDocument);

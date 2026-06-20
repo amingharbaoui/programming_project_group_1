@@ -8,6 +8,7 @@ export const STUDENT_PATH_KEYS = {
   "/student/documents": "documenten",
   "/student/logbook": "logboek",
   "/student/evaluation": "evaluatie",
+  "/student/planning": "logboek",
 };
 
 export const STUDENT_FASES = {

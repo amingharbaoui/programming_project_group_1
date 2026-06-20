@@ -1,8 +1,10 @@
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 const { meld, emailMelding } = require("../utils/notify");
+const { sendMail } = require("../utils/mail");
 const { buildSimplePdf } = require("../utils/pdf");
 
 function getUserId(req, fallbackId) {
@@ -145,13 +147,25 @@ async function createInternship(req, res) {
     startdatum,
     einddatum,
     urenPerWeek
-  } = req.body;
+  } = req.body || {};
 
   const finalBedrijfNaam = bedrijfNaam || bedrijfsnaam;
-  const finalUrenPerWeek = Number(urenPerWeek || 38);
+  const finalUrenPerWeek = Number(urenPerWeek ?? 38);
 
   if (!finalBedrijfNaam || !mentorNaam || !mentorEmail || !stagefunctie || !opdrachtomschrijving || !startdatum || !einddatum) {
     return fail(res, 400, "Verplichte velden ontbreken");
+  }
+
+  const startDate = new Date(startdatum);
+  const endDate = new Date(einddatum);
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    return fail(res, 400, "Ongeldige start- of einddatum");
+  }
+  if (startDate > endDate) {
+    return fail(res, 400, "De startdatum moet voor de einddatum liggen");
+  }
+  if (!Number.isFinite(finalUrenPerWeek) || finalUrenPerWeek <= 0 || finalUrenPerWeek > 60) {
+    return fail(res, 400, "Uren per week moet tussen 1 en 60 liggen");
   }
 
   const connection = await db.getConnection();
@@ -169,6 +183,15 @@ async function createInternship(req, res) {
     if (!stageRegel) {
       await connection.rollback();
       return fail(res, 400, "Geen actieve stage_regel gevonden");
+    }
+
+    if (stageRegel.stagevenster_start && startDate < new Date(stageRegel.stagevenster_start)) {
+      await connection.rollback();
+      return fail(res, 400, "De startdatum valt buiten het stagevenster van de opleiding");
+    }
+    if (stageRegel.stagevenster_einde && endDate > new Date(stageRegel.stagevenster_einde)) {
+      await connection.rollback();
+      return fail(res, 400, "De einddatum valt buiten het stagevenster van de opleiding");
     }
 
     const aantalWeken = calculateWeeks(startdatum, einddatum);
@@ -314,7 +337,7 @@ async function saveDraft(req, res) {
     bedrijfNaam, bedrijfsnaam, bedrijfsafdeling, bedrijfsadres,
     mentorNaam, mentorEmail, mentorTelefoon, mentorFunctie,
     stagefunctie, opdrachtomschrijving, startdatum, einddatum, urenPerWeek
-  } = req.body;
+  } = req.body || {};
 
   const finalBedrijfNaam = bedrijfNaam || bedrijfsnaam || null;
   const finalUrenPerWeek = Number(urenPerWeek || 38);
@@ -430,7 +453,7 @@ async function resubmitInternship(req, res) {
     bedrijfNaam, bedrijfsnaam, bedrijfsafdeling, bedrijfsadres,
     mentorNaam, mentorEmail, mentorTelefoon, mentorFunctie,
     stagefunctie, opdrachtomschrijving, startdatum, einddatum, urenPerWeek
-  } = req.body;
+  } = req.body || {};
 
   const finalBedrijfNaam = bedrijfNaam || bedrijfsnaam;
   const finalUrenPerWeek = Number(urenPerWeek || 38);
@@ -911,6 +934,8 @@ async function createDossierAfterApproval(connection, stagevoorstelId) {
       s.academiejaar,
 
       v.mentor_email,
+      v.mentor_naam,
+      v.mentor_functie,
       v.startdatum,
       v.einddatum,
       v.aantal_weken,
@@ -939,7 +964,60 @@ async function createDossierAfterApproval(connection, stagevoorstelId) {
     throw new Error("Geen stagebegeleider gevonden voor stagedossier");
   }
 
-  const mentorId = await getMentorIdByEmail(connection, data.mentor_email) || await getDefaultMentorId(connection);
+  let mentorId = await getMentorIdByEmail(connection, data.mentor_email);
+  if (!mentorId && data.mentor_email) {
+    const [bestaand] = await connection.query("SELECT id, hoofdrol FROM gebruikers WHERE email = ? LIMIT 1", [data.mentor_email]);
+    if (bestaand.length > 0) {
+      if (bestaand[0].hoofdrol !== "mentor") {
+        throw new Error(`Het e-mailadres ${data.mentor_email} hoort bij een gebruiker die geen mentor is en kan niet als mentor gekoppeld worden`);
+      }
+      mentorId = bestaand[0].id;
+      const mentorRecordToken = crypto.randomBytes(24).toString("hex");
+      await connection.query(
+        `INSERT INTO mentoren (gebruiker_id, bedrijf_id, functie, mag_stageovereenkomst_tekenen, uitnodiging_status, uitnodiging_token, uitnodiging_vervalt_op)
+         VALUES (?, ?, ?, 1, 'verstuurd', ?, DATE_ADD(NOW(), INTERVAL 14 DAY))`,
+        [mentorId, data.bedrijf_id, data.mentor_functie || "Mentor", mentorRecordToken]
+      );
+    } else {
+      const naam = String(data.mentor_naam || "").trim();
+      const spatie = naam.indexOf(" ");
+      const voornaam = spatie > 0 ? naam.slice(0, spatie) : (naam || "Mentor");
+      const achternaam = spatie > 0 ? naam.slice(spatie + 1) : "";
+      const [u] = await connection.query(
+        `INSERT INTO gebruikers (voornaam, achternaam, email, auth_provider, hoofdrol, status, aangemaakt_op, aangepast_op)
+         VALUES (?, ?, ?, 'local', 'mentor', 'uitgenodigd', NOW(), NOW())`,
+        [voornaam, achternaam, data.mentor_email]
+      );
+      mentorId = u.insertId;
+      const token = crypto.randomBytes(24).toString("hex");
+      await connection.query(
+        `INSERT INTO mentoren (gebruiker_id, bedrijf_id, functie, mag_stageovereenkomst_tekenen, uitnodiging_status, uitnodiging_token, uitnodiging_vervalt_op)
+         VALUES (?, ?, ?, 1, 'verstuurd', ?, DATE_ADD(NOW(), INTERVAL 14 DAY))`,
+        [mentorId, data.bedrijf_id, data.mentor_functie || "Mentor", token]
+      );
+
+      // De nieuwe mentor uitnodigen. De in-app melding loopt mee in dezelfde transactie (de mentor
+      // bestaat dan al), de e-mail is best-effort en breekt de goedkeuring nooit.
+      const activatielink = `/mentor/activate?token=${token}`;
+      await connection.query(
+        `INSERT INTO systeem_meldingen (ontvanger_id, type, ernst, titel, bericht, status, kanaal, aangemaakt_op)
+         VALUES (?, 'herinnering', 'medium', ?, ?, 'nieuw', 'in_app', NOW())`,
+        [mentorId, "Uitnodiging als mentor", `Je bent uitgenodigd als mentor. Activeer je account via ${activatielink}`]
+      );
+      try {
+        await sendMail({
+          to: data.mentor_email,
+          subject: "Uitnodiging als mentor — Stagify",
+          text: `Je bent uitgenodigd als mentor op Stagify.\n\nActiveer je account en kies een wachtwoord via:\n${process.env.APP_URL || "http://localhost:5173"}${activatielink}\n\nDeze link is 14 dagen geldig.`,
+        });
+      } catch (mailError) {
+        console.error("Mentor-uitnodigingsmail mislukt:", mailError.message);
+      }
+    }
+  }
+  if (!mentorId) {
+    mentorId = await getDefaultMentorId(connection);
+  }
 
   const dossiernummer = `DOS-${new Date().getFullYear()}-${String(stagevoorstelId).padStart(4, "0")}`;
 
@@ -1237,7 +1315,7 @@ async function getAdminDossierById(req, res) {
 
 async function updateAdminDossierStatus(req, res) {
   const dossierId = Number(req.params.id);
-  const { status, verzekeringInOrde, praktischeAfspraken } = req.body;
+  const { status, verzekeringInOrde, praktischeAfspraken } = req.body || {};
 
   // Status gelijkgetrokken naar de NL-enum van het schema. Engelse waarden worden voor de
   // zekerheid nog vertaald, zodat een oudere frontend niet stuk gaat.
@@ -1317,6 +1395,19 @@ async function assignDossier(req, res) {
   try {
     const [d] = await db.query("SELECT id, student_id FROM stagedossiers WHERE id = ? LIMIT 1", [dossierId]);
     if (d.length === 0) return fail(res, 404, "Dossier niet gevonden");
+
+    if (docentId != null) {
+      const [g] = await db.query("SELECT hoofdrol, status FROM gebruikers WHERE id = ? LIMIT 1", [Number(docentId)]);
+      if (g.length === 0 || g[0].hoofdrol !== "docent" || g[0].status !== "actief") {
+        return fail(res, 400, "Ongeldige stagebegeleider: kies een actieve docent");
+      }
+    }
+    if (mentorId != null) {
+      const [g] = await db.query("SELECT hoofdrol, status FROM gebruikers WHERE id = ? LIMIT 1", [Number(mentorId)]);
+      if (g.length === 0 || g[0].hoofdrol !== "mentor" || !["actief", "uitgenodigd"].includes(g[0].status)) {
+        return fail(res, 400, "Ongeldige mentor: kies een geldige mentor");
+      }
+    }
 
     const fields = [];
     const vals = [];

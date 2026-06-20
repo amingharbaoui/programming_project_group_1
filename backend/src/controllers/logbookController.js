@@ -76,7 +76,7 @@ async function findLatestDossierForStudent(connection, studentId) {
 async function getDossierMeta(connection, dossierId) {
   const [rows] = await connection.query(
     `
-    SELECT id, student_id, mentor_id, stagebegeleider_id, status
+    SELECT id, student_id, mentor_id, stagebegeleider_id, status, aantal_weken, startdatum, einddatum
     FROM stagedossiers
     WHERE id = ?
     LIMIT 1
@@ -176,8 +176,8 @@ async function createLogbook(req, res) {
 
   for (const day of finalDays) {
     const uren = Number(day.aantalUren || day.aantal_uren || 0);
-    if (uren < 0) {
-      return fail(res, 400, "Aantal uren per dag kan niet negatief zijn");
+    if (!Number.isFinite(uren) || uren < 0 || uren > 12) {
+      return fail(res, 400, "Aantal uren per dag moet tussen 0 en 12 liggen");
     }
   }
 
@@ -217,6 +217,19 @@ async function createLogbook(req, res) {
     if (dossier.student_id !== studentId) {
       await connection.rollback();
       return fail(res, 403, "Je mag alleen een logboek indienen voor je eigen stagedossier");
+    }
+
+    if (dossier.aantal_weken && finalWeekNummer > Number(dossier.aantal_weken)) {
+      await connection.rollback();
+      return fail(res, 400, `Weeknummer ${finalWeekNummer} valt buiten de stageperiode (max ${dossier.aantal_weken} weken)`);
+    }
+    if (dossier.startdatum && finalWeekEinde < normalizeDate(dossier.startdatum)) {
+      await connection.rollback();
+      return fail(res, 400, "De logboekweek valt voor de start van de stage");
+    }
+    if (dossier.einddatum && finalWeekStart > normalizeDate(dossier.einddatum)) {
+      await connection.rollback();
+      return fail(res, 400, "De logboekweek valt na het einde van de stage");
     }
 
     // Logboek pas invulbaar nadat de student de stageovereenkomst getekend heeft.
@@ -526,7 +539,17 @@ async function mentorCheckLogbookWeek(req, res) {
     mentorFeedback,
     herindieningNodig,
     blokkade
-  } = req.body;
+  } = req.body || {};
+
+  if (req.body?.status !== undefined || req.body?.action !== undefined) {
+    return fail(res, 400, "Ongeldige invoer: gebruik herindieningNodig (true of false), geen status of action");
+  }
+  if (herindieningNodig !== undefined && typeof herindieningNodig !== "boolean") {
+    return fail(res, 400, "Ongeldige waarde voor herindieningNodig: true of false verwacht");
+  }
+  if (blokkade !== undefined && typeof blokkade !== "boolean") {
+    return fail(res, 400, "Ongeldige waarde voor blokkade: true of false verwacht");
+  }
 
   const needsResubmission = Boolean(herindieningNodig);
   if (needsResubmission && !((feedback || mentorFeedback) && String(feedback || mentorFeedback).trim())) {
@@ -617,7 +640,17 @@ async function docentReviewLogbookWeek(req, res) {
     docentFeedback,
     herindieningNodig,
     blokkade
-  } = req.body;
+  } = req.body || {};
+
+  if (req.body?.status !== undefined || req.body?.action !== undefined) {
+    return fail(res, 400, "Ongeldige invoer: gebruik herindieningNodig (true of false), geen status of action");
+  }
+  if (herindieningNodig !== undefined && typeof herindieningNodig !== "boolean") {
+    return fail(res, 400, "Ongeldige waarde voor herindieningNodig: true of false verwacht");
+  }
+  if (blokkade !== undefined && typeof blokkade !== "boolean") {
+    return fail(res, 400, "Ongeldige waarde voor blokkade: true of false verwacht");
+  }
 
   const needsResubmission = Boolean(herindieningNodig);
   if (needsResubmission && !((feedback || docentFeedback) && String(feedback || docentFeedback).trim())) {
@@ -970,12 +1003,16 @@ async function saveLogbookDay(req, res) {
 
   if (!weekNummer || !datum) return fail(res, 400, "weekNummer en datum zijn verplicht");
 
+  if (!Number.isFinite(aantalUren) || aantalUren < 0 || aantalUren > 12) {
+    return fail(res, 400, "Aantal uren per dag moet tussen 0 en 12 liggen");
+  }
+
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
 
     const [dossiers] = await conn.query(
-      "SELECT id FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1",
+      "SELECT id, status FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1",
       [studentId]
     );
     if (dossiers.length === 0) { await conn.rollback(); return fail(res, 404, "Geen stagedossier gevonden"); }
@@ -989,6 +1026,12 @@ async function saveLogbookDay(req, res) {
     if (!ovk[0] || !ovk[0].student_getekend_op) {
       await conn.rollback();
       return fail(res, 409, "Je kan pas een logboek invullen nadat je de stageovereenkomst getekend hebt");
+    }
+
+    const teVroeg = ["wacht_op_student", "wacht_op_bedrijf", "in_controle_bij_administratie", "document_afgekeurd"];
+    if (teVroeg.includes(dossiers[0].status)) {
+      await conn.rollback();
+      return fail(res, 409, "Je kan pas een logboek invullen zodra je stagedossier startklaar geregistreerd is");
     }
 
     // Week zoeken of aanmaken (week_start = maandag van de datum, week_einde = vrijdag).
@@ -1110,9 +1153,10 @@ async function updateLogbookEntry(req, res) {
       await connection.rollback();
       return fail(res, 403, "Je mag alleen je eigen logboekdagen aanpassen");
     }
-    if (entry.week_status === "afgesloten") {
+    const bewerkbaar = ["niet_gestart", "in_opbouw", "teruggestuurd_door_mentor", "teruggestuurd_door_docent"];
+    if (!bewerkbaar.includes(entry.week_status)) {
       await connection.rollback();
-      return fail(res, 409, "Deze week is afgesloten en kan niet meer aangepast worden");
+      return fail(res, 409, "Deze week is al ingediend of nagekeken en kan niet meer aangepast worden");
     }
 
     const b = req.body || {};
@@ -1133,9 +1177,9 @@ async function updateLogbookEntry(req, res) {
     }
     if (b.aantalUren !== undefined || b.aantal_uren !== undefined) {
       const uren = Number(b.aantalUren ?? b.aantal_uren ?? 0);
-      if (uren < 0) {
+      if (!Number.isFinite(uren) || uren < 0 || uren > 12) {
         await connection.rollback();
-        return fail(res, 400, "Aantal uren kan niet negatief zijn");
+        return fail(res, 400, "Aantal uren per dag moet tussen 0 en 12 liggen");
       }
       setVeld("aantal_uren", uren);
     }

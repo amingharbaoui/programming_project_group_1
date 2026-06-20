@@ -218,8 +218,6 @@ export default function StudentEvaluationPage() {
   const [melding, setMelding]     = useState(null);
   const [openComp, setOpenComp]   = useState(null); // competentie object
 
-  useEffect(() => { laadData(); }, []);
-
   async function laadData() {
     setLoading(true);
     setFout(null);
@@ -243,6 +241,8 @@ export default function StudentEvaluationPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => { laadData(); }, []);
 
   function getActieveEval(evaluaties) {
     if (!evaluaties) return null;

@@ -435,6 +435,7 @@ async function releaseResult(req, res) {
     if (!evaluatie) { await conn.rollback(); return fail(res, 404, "Evaluatie niet gevonden"); }
     if (!mayActAsDocent(evaluatie, role, userId)) { await conn.rollback(); return fail(res, 403, "Alleen de gekoppelde docent of administratie kan vrijgeven"); }
     if (evaluatie.type === "tussentijds") { await conn.rollback(); return fail(res, 409, "Een tussentijdse evaluatie wordt niet vrijgegeven — enkel de finale evaluatie levert een vrij te geven eindresultaat."); }
+    if (evaluatie.status === "vrijgegeven") { await conn.rollback(); return fail(res, 409, "Het resultaat is al vrijgegeven"); }
     if (evaluatie.status !== "klaar_voor_vrijgave") { await conn.rollback(); return fail(res, 409, "Resultaat moet eerst berekend worden voor het vrijgegeven kan worden"); }
 
     // Finale-gating: logboek moet afgewerkt zijn en de eindpresentatie moet gegeven zijn.
@@ -447,6 +448,18 @@ async function releaseResult(req, res) {
     if (openWeken[0].aantal > 0) {
       await conn.rollback();
       return fail(res, 409, "Er zijn nog logboekweken die niet volledig nagekeken zijn — die moeten eerst afgehandeld zijn voor je het resultaat vrijgeeft.");
+    }
+    const [dossierRij] = await conn.query("SELECT aantal_weken FROM stagedossiers WHERE id = ? LIMIT 1", [evaluatie.stagedossier_id]);
+    const aantalWeken = Number(dossierRij[0]?.aantal_weken || 0);
+    if (aantalWeken > 0) {
+      const [goedWeken] = await conn.query(
+        "SELECT COUNT(*) AS aantal FROM logboek_weken WHERE stagedossier_id = ? AND status = 'goedgekeurd_door_docent'",
+        [evaluatie.stagedossier_id]
+      );
+      if (goedWeken[0].aantal < aantalWeken) {
+        await conn.rollback();
+        return fail(res, 409, `Niet alle logboekweken zijn nagekeken: ${goedWeken[0].aantal} van ${aantalWeken} goedgekeurd.`);
+      }
     }
     const [pres] = await conn.query(
       "SELECT status FROM planning_momenten WHERE stagedossier_id = ? AND type = 'eindpresentatie' ORDER BY id DESC LIMIT 1",

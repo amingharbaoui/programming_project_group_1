@@ -121,6 +121,17 @@ async function updateUser(req, res) {
     return fail(res, 400, "Je kan je eigen rol niet wijzigen");
   }
 
+  // Een rol mag niet naar een andere rolfamilie wisselen: dat zou student-/mentor-/medewerkerrijen
+  // inconsistent maken. Voor zo'n wissel hoort een nieuwe gebruiker via de uitnodigingsflow.
+  if (hoofdrol !== undefined) {
+    const [huidig] = await db.query("SELECT hoofdrol FROM gebruikers WHERE id = ? LIMIT 1", [id]);
+    if (huidig.length === 0) return fail(res, 404, "Gebruiker niet gevonden");
+    const familie = (rol) => (rol === "student" ? "student" : rol === "mentor" ? "mentor" : "medewerker");
+    if (familie(hoofdrol) !== familie(huidig[0].hoofdrol)) {
+      return fail(res, 409, "Een gebruiker kan niet naar een andere rolfamilie (student, mentor, medewerker) gewijzigd worden. Maak hiervoor een nieuwe gebruiker aan via een uitnodiging.");
+    }
+  }
+
   const fields = [];
   const values = [];
 
@@ -152,6 +163,9 @@ async function inviteMentor(req, res) {
 
   if (!voornaam || !achternaam || !email) {
     return fail(res, 400, "Voornaam, achternaam en e-mail zijn verplicht");
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return fail(res, 400, "Ongeldig e-mailadres");
   }
 
   // Admin e-mailadres ophalen als afzender
@@ -404,6 +418,7 @@ async function inviteUser(req, res) {
   const rol = String(req.body.rol ?? req.body.hoofdrol ?? "").trim();
 
   if (!voornaam || !achternaam || !email) return fail(res, 400, "Voornaam, achternaam en e-mail zijn verplicht");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail(res, 400, "Ongeldig e-mailadres");
   if (!GELDIGE_INVITE_ROLLEN.includes(rol)) {
     return fail(res, 400, `Ongeldige rol. Kies uit: ${GELDIGE_INVITE_ROLLEN.join(", ")}`);
   }
@@ -440,7 +455,7 @@ async function inviteUser(req, res) {
 
     await conn.commit();
 
-    const activatielink = `/mentor/activate?token=${token}`;
+    const activatielink = `/activeren?token=${token}`;
     await emailMelding(userId, {
       titel: "Uitnodiging stageplatform",
       bericht: `Je bent uitgenodigd op Stagify. Activeer je account via ${activatielink}`,

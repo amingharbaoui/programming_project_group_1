@@ -11,11 +11,11 @@ export function cacheGet(key) {
 }
 
 export function cacheSet(key, data) {
-  try { localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })); } catch {}
+  try { localStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })); } catch { /* genegeerd */ }
 }
 
 export function cacheDelete(...keys) {
-  keys.forEach((k) => { try { localStorage.removeItem(k); } catch {} });
+  keys.forEach((k) => { try { localStorage.removeItem(k); } catch { /* genegeerd */ } });
 }
 
 export function cacheClearMentor() {

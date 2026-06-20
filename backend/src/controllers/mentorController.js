@@ -110,6 +110,11 @@ async function tekenContract(req, res) {
       [nieuweStatus, dossierId]
     );
 
+    await db.query(
+      "UPDATE stagedossiers SET status = 'in_controle_bij_administratie', aangepast_op = NOW() WHERE id = ? AND status IN ('wacht_op_student','wacht_op_bedrijf')",
+      [dossierId]
+    );
+
     // Student en administratie verwittigen dat het stagebedrijf getekend heeft (story 28).
     try {
       if (dossier.student_id) {
