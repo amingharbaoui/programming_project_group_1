@@ -1129,9 +1129,10 @@ async function updateLogbookEntry(req, res) {
       await connection.rollback();
       return fail(res, 403, "Je mag alleen je eigen logboekdagen aanpassen");
     }
-    if (entry.week_status === "afgesloten") {
+    const bewerkbaar = ["niet_gestart", "in_opbouw", "teruggestuurd_door_mentor", "teruggestuurd_door_docent"];
+    if (!bewerkbaar.includes(entry.week_status)) {
       await connection.rollback();
-      return fail(res, 409, "Deze week is afgesloten en kan niet meer aangepast worden");
+      return fail(res, 409, "Deze week is al ingediend of nagekeken en kan niet meer aangepast worden");
     }
 
     const b = req.body || {};
