@@ -50,6 +50,7 @@ async function getMentorStudents(req, res) {
 async function getMentorContract(req, res) {
   const mentorId  = Number(req.user?.id);
   const dossierId = Number(req.params.dossierId);
+  if (!Number.isInteger(dossierId)) return fail(res, 404, "Dossier niet gevonden");
 
   try {
     // Security: controleer of dit dossier van deze mentor is
@@ -76,6 +77,7 @@ async function getMentorContract(req, res) {
 async function tekenContract(req, res) {
   const mentorId  = Number(req.user?.id);
   const dossierId = Number(req.params.dossierId);
+  if (!Number.isInteger(dossierId)) return fail(res, 404, "Dossier niet gevonden");
   const tekenbevoegd = Boolean(req.body?.tekenbevoegd ?? req.body?.tekenBevoegd ?? req.body?.bevoegd);
 
   if (!tekenbevoegd) {
@@ -148,6 +150,7 @@ async function tekenContract(req, res) {
 async function getAfspraken(req, res) {
   const mentorId  = Number(req.user?.id);
   const dossierId = Number(req.params.dossierId);
+  if (!Number.isInteger(dossierId)) return fail(res, 404, "Dossier niet gevonden");
 
   try {
     const [[row]] = await db.query(
@@ -170,6 +173,7 @@ async function getAfspraken(req, res) {
 async function updateAfspraken(req, res) {
   const mentorId          = Number(req.user?.id);
   const dossierId         = Number(req.params.dossierId);
+  if (!Number.isInteger(dossierId)) return fail(res, 404, "Dossier niet gevonden");
   const { afspraken, velden } = req.body;
 
   // Story 29: de afspraken kunnen als losse velden komen (werkuren, thuiswerk, ...) of als één tekst.
@@ -229,6 +233,7 @@ async function updateAfspraken(req, res) {
 async function downloadMentorContractPdf(req, res) {
   const mentorId = Number(req.user?.id);
   const dossierId = Number(req.params.dossierId);
+  if (!Number.isInteger(dossierId)) return fail(res, 404, "Dossier niet gevonden");
 
   try {
     const [rows] = await db.query(

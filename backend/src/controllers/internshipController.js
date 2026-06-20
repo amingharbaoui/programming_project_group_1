@@ -720,6 +720,7 @@ async function getCommitteeApplications(req, res) {
 
 async function decideApplication(req, res) {
   const stagevoorstelId = Number(req.params.id);
+  if (!Number.isInteger(stagevoorstelId)) return fail(res, 404, "Voorstel niet gevonden");
   const beslistDoorId = getUserId(req, 2);
 
   const rawDecision = req.body.beslissing || req.body.decision;

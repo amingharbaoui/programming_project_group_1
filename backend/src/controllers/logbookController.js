@@ -544,6 +544,7 @@ async function getLogbooksByStudent(req, res) {
 
 async function mentorCheckLogbookWeek(req, res) {
   const weekId = Number(req.params.weekId);
+  if (!Number.isInteger(weekId)) return fail(res, 404, "Logboekweek niet gevonden");
   const requestedMentorId = getUserId(req, 4);
 
   const {
@@ -645,6 +646,7 @@ async function mentorCheckLogbookWeek(req, res) {
 
 async function docentReviewLogbookWeek(req, res) {
   const weekId = Number(req.params.weekId);
+  if (!Number.isInteger(weekId)) return fail(res, 404, "Logboekweek niet gevonden");
   const requestedDocentId = getUserId(req, 5);
 
   const {
