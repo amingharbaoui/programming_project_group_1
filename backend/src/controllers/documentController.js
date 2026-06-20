@@ -249,6 +249,12 @@ async function approveDocument(req, res) {
   if (!id) return fail(res, 400, "Ongeldig document-id");
 
   try {
+    const [docs] = await db.query("SELECT bestand_url, bestand_naam FROM documenten WHERE id = ? LIMIT 1", [id]);
+    if (docs.length === 0) return fail(res, 404, "Document niet gevonden");
+    if (!docs[0].bestand_url && !docs[0].bestand_naam) {
+      return fail(res, 400, "Een document zonder geupload bestand kan niet goedgekeurd worden");
+    }
+
     const [r] = await db.query(
       `UPDATE documenten
        SET status = 'goedgekeurd', afkeurreden = NULL, gecontroleerd_door_id = ?, gecontroleerd_op = NOW(), aangepast_op = NOW()
