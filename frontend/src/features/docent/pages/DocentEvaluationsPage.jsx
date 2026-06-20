@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 import "../docent.css";
@@ -435,6 +436,7 @@ export default function DocentEvaluationsPage() {
   const [evalData, setEvalData]           = useState(null);
   const [loadingEval, setLoadingEval]     = useState(false);
   const [activeType, setActiveType]       = useState("tussentijds");
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
     async function load() {
@@ -474,6 +476,16 @@ export default function DocentEvaluationsPage() {
       loadEval(student.id);
     }
   }
+
+  useEffect(() => {
+    const studentParam = Number(searchParams.get("student"));
+    if (studentParam && geselecteerdId !== studentParam && studenten.some((s) => s.id === studentParam)) {
+      setGeselecteerdId(studentParam);
+      setActiveType("tussentijds");
+      loadEval(studentParam);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studenten, searchParams]);
 
   const geselecteerdeStudent = studenten.find((s) => s.id === geselecteerdId);
 
