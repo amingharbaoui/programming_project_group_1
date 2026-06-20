@@ -3,8 +3,8 @@ import { ROLES } from "./roles";
 export const NAVIGATION = {
   [ROLES.STUDENT]: [
     { label: "Mijn stage",        path: "/student/internship",  icon: "ti-briefcase" },
-    { label: "Logboek",           path: "/student/logbook",     icon: "ti-notebook",        lockGroup: "logboek_eval" },
-    { label: "Evaluatie",         path: "/student/evaluation",  icon: "ti-clipboard-check", lockGroup: "logboek_eval" },
+    { label: "Logboek",           path: "/student/logbook",     icon: "ti-notebook",        lockGroup: "logboek" },
+    { label: "Evaluatie",         path: "/student/evaluation",  icon: "ti-clipboard-check", lockGroup: "evaluatie" },
     { label: "Stageovereenkomst", path: "/student/contract",    icon: "ti-writing",         lockGroup: "contract_docs" },
     { label: "Documenten",        path: "/student/documents",   icon: "ti-files",           lockGroup: "contract_docs" },
   ],

@@ -123,6 +123,7 @@ export const STUDENT_FASES = {
 
 function normaliseerVoorstelStatus(status) {
   if (status === "aanpassingen_gevraagd") return "aanpassingen";
+  if (status === "goedgekeurd_met_uitzondering") return "goedgekeurd";
   return status || "geen";
 }
 

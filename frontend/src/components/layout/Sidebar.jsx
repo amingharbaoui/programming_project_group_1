@@ -53,7 +53,7 @@ export default function Sidebar({ collapsed }) {
   const location = useLocation();
   const items = NAVIGATION[user.role] || [];
 
-  const [lockedGroups, setLockedGroups]   = useState(new Set(["contract_docs", "logboek_eval"]));
+  const [lockedGroups, setLockedGroups]   = useState(new Set(["contract_docs", "logboek", "evaluatie"]));
   const [faseInfo, setFaseInfo]           = useState(null);
   const [openPaths, setOpenPaths]         = useState(null);
   const [warnPaths, setWarnPaths]         = useState(new Set());
@@ -64,7 +64,7 @@ export default function Sidebar({ collapsed }) {
     if (user.role !== "student") return;
 
     async function fetchLockState() {
-      const locked = new Set(["contract_docs", "logboek_eval"]);
+      const locked = new Set(["contract_docs", "logboek", "evaluatie"]);
       const access = await fetchStudentAccess();
       const nextOpenPaths = new Set(
         Object.entries(STUDENT_PATH_KEYS)
@@ -81,8 +81,11 @@ export default function Sidebar({ collapsed }) {
       if (access.open.includes("overeenkomst") && access.open.includes("documenten")) {
         locked.delete("contract_docs");
       }
-      if (access.open.includes("logboek") && access.open.includes("evaluatie")) {
-        locked.delete("logboek_eval");
+      if (access.open.includes("logboek")) {
+        locked.delete("logboek");
+      }
+      if (access.open.includes("evaluatie")) {
+        locked.delete("evaluatie");
       }
       if (access.dot && STUDENT_KEY_PATHS[access.dot]) {
         warn.delete(STUDENT_KEY_PATHS[access.dot]);
@@ -166,7 +169,9 @@ export default function Sidebar({ collapsed }) {
           title={
             item.lockGroup === "contract_docs"
               ? "Beschikbaar na goedkeuring stagevoorstel"
-              : "Beschikbaar zodra stage loopt"
+              : item.lockGroup === "evaluatie"
+              ? "Beschikbaar zodra je stage geregistreerd is"
+              : "Beschikbaar zodra je stage gestart is"
           }
         >
           <i className={`ti ${item.icon}`}></i>
