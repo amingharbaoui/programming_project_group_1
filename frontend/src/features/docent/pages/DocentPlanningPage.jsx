@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import "../docent.css";
 
 function formatDateTime(val) {
   if (!val) return "-";
@@ -8,12 +9,12 @@ function formatDateTime(val) {
 }
 
 function getStatusClass(status) {
-  if (status === "bevestigd") return "s_ok";
-  if (status === "voorgesteld") return "s_amber";
-  if (status === "gegeven" || status === "geweest" || status === "afgerond") return "s_info";
-  if (status === "alternatief_gevraagd") return "s_amber";
-  if (status === "geannuleerd") return "s_rood";
-  return "s_grijs";
+  if (status === "bevestigd") return "s-ok";
+  if (status === "voorgesteld") return "s-amber";
+  if (status === "gegeven" || status === "geweest" || status === "afgerond") return "s-info";
+  if (status === "alternatief_gevraagd") return "s-amber";
+  if (status === "geannuleerd") return "s-rood";
+  return "s-grijs";
 }
 
 function getStatusLabel(status) {
@@ -122,8 +123,9 @@ export default function DocentPlanningPage() {
   }
 
   return (
-    <div className="page_inner">
-      <div className="page_header">
+    <div className="doc">
+    <div className="page-inner">
+      <div className="page-header">
         <div>
           <h1>Planning</h1>
           <p>Bedrijfsbezoeken en eindpresentaties beheren.</p>
@@ -138,13 +140,13 @@ export default function DocentPlanningPage() {
 
       {gelukt && (
         <div className="card" style={{ marginBottom: "12px" }}>
-          <span className="status s_ok"><i className="ti ti-circle-check" /> {gelukt}</span>
+          <span className="status s-ok"><i className="ti ti-circle-check" /> {gelukt}</span>
         </div>
       )}
 
       <div className="chips" style={{ marginBottom: "16px" }}>
         {TABS.map((t) => (
-          <button key={t} className={"chip" + (tab === t ? " actief" : "")}
+          <button key={t} className={"chip" + (tab === t ? " aan" : "")}
             onClick={() => { setTab(t); setGelukt(""); }}>
             {t}
           </button>
@@ -152,15 +154,15 @@ export default function DocentPlanningPage() {
       </div>
 
       {loading && <div className="card"><p className="muted">Planning laden...</p></div>}
-      {error && <div className="card"><span className="status s_rood">{error}</span></div>}
+      {error && <div className="card"><span className="status s-rood">{error}</span></div>}
 
       {!loading && !error && gefilterd.length === 0 && (
-        <div className="empty_state">Geen {tab.toLowerCase()} gevonden.</div>
+        <div className="card"><p className="muted">Geen {tab.toLowerCase()} gevonden.</p></div>
       )}
 
       {!loading && !error && gefilterd.length > 0 && (
         <div className="card">
-          <div className="card_title">{tab} ({gefilterd.length})</div>
+          <div className="card-title">{tab} ({gefilterd.length})</div>
           <table className="tbl">
             <thead>
               <tr>
@@ -200,15 +202,15 @@ export default function DocentPlanningPage() {
       )}
 
       {nieuwModal && (
-        <div className="popup-overlay" onClick={() => setNieuwModal(false)}>
-          <div className="popup" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
-            <div className="popup-header">
-              <strong>{tab} inplannen</strong>
-              <button className="btn sm" onClick={() => setNieuwModal(false)}>
+        <div className="modal-overlay" onClick={() => setNieuwModal(false)}>
+          <div className="modal" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <span className="mh-t">{tab} inplannen</span>
+              <button className="btn sm mh-x" onClick={() => setNieuwModal(false)}>
                 <i className="ti ti-x" />
               </button>
             </div>
-            <div className="popup-body">
+            <div className="modal-body">
               <div className="form_group">
                 <label className="form_label">Student <span style={{ color: "var(--red)" }}>*</span></label>
                 <select className="form_input" value={nieuwDossierId}
@@ -249,6 +251,7 @@ export default function DocentPlanningPage() {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

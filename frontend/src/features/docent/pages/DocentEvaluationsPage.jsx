@@ -1,16 +1,17 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import "../docent.css";
 
 function getEvalStatusClass(status) {
-  if (status === "open") return "s_amber";
-  if (status === "student_ingediend") return "s_info";
-  if (status === "mentor_ingediend") return "s_amber";
-  if (status === "geregistreerd") return "s_ok";
-  if (status === "klaar_voor_vrijgave") return "s_ok";
-  if (status === "vrijgegeven") return "s_ok";
-  if (status === "niet_open") return "s_grijs";
-  return "s_grijs";
+  if (status === "open") return "s-amber";
+  if (status === "student_ingediend") return "s-info";
+  if (status === "mentor_ingediend") return "s-amber";
+  if (status === "geregistreerd") return "s-ok";
+  if (status === "klaar_voor_vrijgave") return "s-ok";
+  if (status === "vrijgegeven") return "s-ok";
+  if (status === "niet_open") return "s-grijs";
+  return "s-grijs";
 }
 
 function getEvalStatusLabel(status) {
@@ -26,12 +27,12 @@ function getEvalStatusLabel(status) {
 
 function ScoreKnoppen({ waarde, onChange, leesOnly }) {
   return (
-    <div className="score_knoppen">
+    <div className="scale">
       {[1, 2, 3, 4, 5].map((n) => (
         <button
           key={n}
           type="button"
-          className={`score_knop${waarde === n ? " geselecteerd" : ""}`}
+          className={`scale-btn${waarde === n ? " selected" : ""}`}
           onClick={() => !leesOnly && onChange && onChange(n)}
           disabled={leesOnly}
           style={leesOnly ? { cursor: "default", opacity: waarde === n ? 1 : 0.35 } : {}}
@@ -119,9 +120,9 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
         { scores: scoresArr, ingediend: false },
         {}
       );
-      setMelding({ tekst: "Scores opgeslagen.", type: "s_ok" });
+      setMelding({ tekst: "Scores opgeslagen.", type: "s-ok" });
     } catch (err) {
-      setMelding({ tekst: err.response?.data?.message || "Opslaan mislukt", type: "s_rood" });
+      setMelding({ tekst: err.response?.data?.message || "Opslaan mislukt", type: "s-rood" });
     } finally {
       setBezig(false);
     }
@@ -134,10 +135,10 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
       setBezig(true);
       setMelding({ tekst: "", type: "" });
       await api.post(`/evaluations/${evaluatie.id}/release`, {});
-      setVrijgaveMelding({ tekst: "Eindresultaat vrijgegeven!", type: "s_ok" });
+      setVrijgaveMelding({ tekst: "Eindresultaat vrijgegeven!", type: "s-ok" });
       onRefresh && onRefresh();
     } catch (err) {
-      setMelding({ tekst: err.response?.data?.message || "Vrijgeven mislukt", type: "s_rood" });
+      setMelding({ tekst: err.response?.data?.message || "Vrijgeven mislukt", type: "s-rood" });
     } finally {
       setBezig(false);
     }
@@ -147,11 +148,11 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
     if (!evaluatie) return;
     const missing = competenties.filter((c) => !docentScores[c.id]);
     if (missing.length > 0) {
-      setMelding({ tekst: "Geef voor elke competentie een score in.", type: "s_amber" });
+      setMelding({ tekst: "Geef voor elke competentie een score in.", type: "s-amber" });
       return;
     }
     if (activeType === "finaal" && (eindpresentatieScore === null || eindpresentatieScore === "" || eindpresentatieScore === undefined)) {
-      setMelding({ tekst: "Geef een score (0–20) voor de eindpresentatie in.", type: "s_amber" });
+      setMelding({ tekst: "Geef een score (0–20) voor de eindpresentatie in.", type: "s-amber" });
       return;
     }
     // Eerst scores opslaan
@@ -177,10 +178,10 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
         },
         {}
       );
-      setMelding({ tekst: "Evaluatie geregistreerd!", type: "s_ok" });
+      setMelding({ tekst: "Evaluatie geregistreerd!", type: "s-ok" });
       onRefresh && onRefresh();
     } catch (err) {
-      setMelding({ tekst: err.response?.data?.message || "Registreren mislukt", type: "s_rood" });
+      setMelding({ tekst: err.response?.data?.message || "Registreren mislukt", type: "s-rood" });
     } finally {
       setBezig(false);
     }
@@ -200,7 +201,7 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
     <>
     {/* Matrix — Student · Mentor · Docent scores in één tabel */}
     <div className="card" style={{ marginBottom: "12px" }}>
-      <div className="card_title">
+      <div className="card-title">
         Competenties{" "}
         <span className={`status ${getEvalStatusClass(evaluatie.status)}`}>
           {getEvalStatusLabel(evaluatie.status)}
@@ -219,7 +220,7 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
         <tbody>
           {competenties.map((c) => (
             <tr key={c.id}>
-              <td><span className="status s_info">{c.code}</span></td>
+              <td><span className="status s-info">{c.code}</span></td>
               <td>{c.naam}</td>
               <td style={{ textAlign: "center" }}>
                 <ScoreDisplay waarde={studentScoresMap[c.id]} />
@@ -337,14 +338,14 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
     {/* Story 43 — Eindresultaatkaart na finale registratie */}
     {activeType === "finaal" && ["klaar_voor_vrijgave", "vrijgegeven"].includes(evaluatie.status) && (
       <div className="card" style={{ border: "1.5px solid var(--dark)", boxShadow: "0 4px 14px rgba(0,0,0,.08)" }}>
-        <div className="card_title">
+        <div className="card-title">
           Eindresultaat{" "}
           <span className={`status ${getEvalStatusClass(evaluatie.status)}`}>
             {getEvalStatusLabel(evaluatie.status)}
           </span>
         </div>
 
-        <div className="grid_2" style={{ marginBottom: "12px" }}>
+        <div className="grid-2" style={{ marginBottom: "12px" }}>
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: "11.5px", color: "var(--sub)", marginBottom: "6px" }}>
               Competentiescore
@@ -455,8 +456,9 @@ export default function DocentEvaluationsPage() {
   const geselecteerdeStudent = studenten.find((s) => s.id === geselecteerdId);
 
   return (
-    <div className="page_inner">
-      <div className="page_header">
+    <div className="doc">
+    <div className="page-inner">
+      <div className="page-header">
         <div>
           <h1>Evaluaties</h1>
           <p>Bekijk en registreer evaluaties van studenten.</p>
@@ -470,12 +472,12 @@ export default function DocentEvaluationsPage() {
       )}
 
       {!loading && studenten.length === 0 && (
-        <div className="empty_state">Geen studenten gevonden.</div>
+        <div className="card"><p className="muted">Geen studenten gevonden.</p></div>
       )}
 
       {!loading && studenten.length > 0 && (
         <div className="card" style={{ marginBottom: "16px" }}>
-          <div className="card_title">Studenten ({studenten.length})</div>
+          <div className="card-title">Studenten ({studenten.length})</div>
           <table className="tbl">
             <thead>
               <tr>
@@ -519,7 +521,7 @@ export default function DocentEvaluationsPage() {
       {/* Detail sectie */}
       {geselecteerdId && (
         <div>
-          <div className="page_header" style={{ marginBottom: "10px" }}>
+          <div className="page-header" style={{ marginBottom: "10px" }}>
             <div>
               <h2 style={{ fontSize: "18px", margin: 0 }}>
                 {geselecteerdeStudent
@@ -530,13 +532,13 @@ export default function DocentEvaluationsPage() {
             </div>
             <div className="chips" style={{ marginBottom: 0 }}>
               <button
-                className={`chip${activeType === "tussentijds" ? " actief" : ""}`}
+                className={`chip${activeType === "tussentijds" ? " aan" : ""}`}
                 onClick={() => setActiveType("tussentijds")}
               >
                 Tussentijds
               </button>
               <button
-                className={`chip${activeType === "finaal" ? " actief" : ""}`}
+                className={`chip${activeType === "finaal" ? " aan" : ""}`}
                 onClick={() => setActiveType("finaal")}
               >
                 Finaal
@@ -560,6 +562,7 @@ export default function DocentEvaluationsPage() {
           )}
         </div>
       )}
+    </div>
     </div>
   );
 }
