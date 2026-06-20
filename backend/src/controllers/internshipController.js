@@ -1387,6 +1387,19 @@ async function assignDossier(req, res) {
     const [d] = await db.query("SELECT id, student_id FROM stagedossiers WHERE id = ? LIMIT 1", [dossierId]);
     if (d.length === 0) return fail(res, 404, "Dossier niet gevonden");
 
+    if (docentId != null) {
+      const [g] = await db.query("SELECT hoofdrol, status FROM gebruikers WHERE id = ? LIMIT 1", [Number(docentId)]);
+      if (g.length === 0 || g[0].hoofdrol !== "docent" || g[0].status !== "actief") {
+        return fail(res, 400, "Ongeldige stagebegeleider: kies een actieve docent");
+      }
+    }
+    if (mentorId != null) {
+      const [g] = await db.query("SELECT hoofdrol, status FROM gebruikers WHERE id = ? LIMIT 1", [Number(mentorId)]);
+      if (g.length === 0 || g[0].hoofdrol !== "mentor" || !["actief", "uitgenodigd"].includes(g[0].status)) {
+        return fail(res, 400, "Ongeldige mentor: kies een geldige mentor");
+      }
+    }
+
     const fields = [];
     const vals = [];
     if (docentId != null) { fields.push("stagebegeleider_id = ?"); vals.push(Number(docentId)); }
