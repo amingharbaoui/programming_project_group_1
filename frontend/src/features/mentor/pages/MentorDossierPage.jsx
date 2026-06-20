@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
-import "../mentor.css";
+import "./MentorDossierPage.css";
+import { cacheGet, cacheSet, cacheDelete } from "../mentorCache";
 
 function initialen(naam) {
   const p = (naam || "").trim().split(/\s+/);
@@ -20,18 +21,18 @@ function datTijd(value) {
 }
 function contractBadge(c) {
   const s = c.status;
-  if (s === "geregistreerd") return { cls: "s-ok", icon: "ti-shield-check", txt: "Geregistreerd" };
-  if (s === "in_controle_bij_administratie") return { cls: "s-wacht", icon: "ti-shield", txt: "In controle bij administratie" };
-  if (c.bedrijf_getekend_op) return { cls: "s-ok", icon: "ti-check", txt: "Door jou getekend" };
-  if (c.student_getekend_op) return { cls: "s-rood", icon: "ti-signature", txt: "Jouw handtekening nodig" };
-  return { cls: "s-info", icon: "ti-hourglass", txt: "Wacht op student" };
+  if (s === "geregistreerd") return { cls: "s_ok", icon: "ti-shield-check", txt: "Geregistreerd" };
+  if (s === "in_controle_bij_administratie") return { cls: "s_amber", icon: "ti-shield", txt: "In controle bij administratie" };
+  if (c.bedrijf_getekend_op) return { cls: "s_ok", icon: "ti-check", txt: "Door jou getekend" };
+  if (c.student_getekend_op) return { cls: "s_rood", icon: "ti-signature", txt: "Jouw handtekening nodig" };
+  return { cls: "s_info", icon: "ti-hourglass", txt: "Wacht op student" };
 }
 function bezoekBadge(status) {
-  if (status === "bevestigd") return { cls: "s-ok", icon: "ti-check", txt: "Bevestigd door jou" };
-  if (status === "alternatief_gevraagd") return { cls: "s-wacht", icon: "ti-hourglass", txt: "Nieuw moment gevraagd" };
-  if (status === "gegeven") return { cls: "s-ok", icon: "ti-check", txt: "Heeft plaatsgevonden" };
-  if (status === "geannuleerd") return { cls: "s-rood", icon: "ti-x", txt: "Geannuleerd" };
-  return { cls: "s-rood", icon: "ti-hourglass", txt: "Te bevestigen" };
+  if (status === "bevestigd") return { cls: "s_ok", icon: "ti-check", txt: "Bevestigd door jou" };
+  if (status === "alternatief_gevraagd") return { cls: "s_amber", icon: "ti-hourglass", txt: "Nieuw moment gevraagd" };
+  if (status === "gegeven") return { cls: "s_ok", icon: "ti-check", txt: "Heeft plaatsgevonden" };
+  if (status === "geannuleerd") return { cls: "s_rood", icon: "ti-x", txt: "Geannuleerd" };
+  return { cls: "s_rood", icon: "ti-hourglass", txt: "Te bevestigen" };
 }
 function typeLabel(type) {
   if (type === "bedrijfsbezoek") return "Bedrijfsbezoek";
@@ -70,9 +71,17 @@ export default function MentorDossierPage() {
 
   useEffect(() => {
     async function init() {
+      const cached = cacheGet("mentor_students");
+      if (cached) {
+        const gekozen = cached.find((s) => s.id === vSt) || cached.find((s) => s.dossier_id === vDos) || cached[0] || null;
+        setStudent(gekozen);
+        setDossierId(gekozen?.dossier_id ?? vDos);
+        return;
+      }
       try {
-        const res = await api.get("/mentor/students", H);
+        const res = await api.get("/mentor/students");
         const lijst = res.data.data || [];
+        cacheSet("mentor_students", lijst);
         const gekozen = lijst.find((s) => s.id === vSt) || lijst.find((s) => s.dossier_id === vDos) || lijst[0] || null;
         setStudent(gekozen);
         setDossierId(gekozen?.dossier_id ?? vDos);
@@ -82,25 +91,43 @@ export default function MentorDossierPage() {
       }
     }
     init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!dossierId) return;
     async function load() {
+      const cachedC = cacheGet(`mentor_contract_${dossierId}`);
+      const cachedA = cacheGet(`mentor_afspraken_${dossierId}`);
+      const cachedP = cacheGet(`mentor_planning_${dossierId}`);
+      if (cachedC !== null && cachedA !== null && cachedP !== null) {
+        setContract(cachedC);
+        setAfspraken(cachedA.tekst || "");
+        setGedeeldOp(cachedA.gedeeldOp || null);
+        setMomenten(cachedP);
+        setLoading(false);
+        return;
+      }
       try {
         setLoading(true);
         const [c, a, p] = await Promise.allSettled([
-          api.get(`/mentor/contract/${dossierId}`, H),
-          api.get(`/mentor/dossier/${dossierId}/afspraken`, H),
-          api.get(`/mentor/planning/${dossierId}`, H),
+          api.get(`/mentor/contract/${dossierId}`),
+          api.get(`/mentor/dossier/${dossierId}/afspraken`),
+          api.get(`/mentor/planning/${dossierId}`),
         ]);
-        setContract(c.status === "fulfilled" ? c.value.data.data : null);
+        const contractData = c.status === "fulfilled" ? c.value.data.data : null;
+        cacheSet(`mentor_contract_${dossierId}`, contractData);
+        setContract(contractData);
         if (a.status === "fulfilled") {
-          setAfspraken(a.value.data.data?.praktische_afspraken || "");
-          setGedeeldOp(a.value.data.data?.praktische_afspraken_gedeeld_op || null);
+          const row = a.value.data.data;
+          const tekst = row?.praktische_afspraken || "";
+          const gedeeld = row?.praktische_afspraken_gedeeld_op || null;
+          cacheSet(`mentor_afspraken_${dossierId}`, { tekst, gedeeldOp: gedeeld });
+          setAfspraken(tekst);
+          setGedeeldOp(gedeeld);
         }
-        setMomenten(p.status === "fulfilled" ? (p.value.data.data || []) : []);
+        const momentenData = p.status === "fulfilled" ? (p.value.data.data || []) : [];
+        cacheSet(`mentor_planning_${dossierId}`, momentenData);
+        setMomenten(momentenData);
       } catch (err) {
         setError(err.response?.data?.message || "Dossier laden mislukt");
       } finally {
@@ -108,31 +135,40 @@ export default function MentorDossierPage() {
       }
     }
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dossierId]);
 
   async function herlaad() {
+    cacheDelete(`mentor_contract_${dossierId}`, `mentor_afspraken_${dossierId}`, `mentor_planning_${dossierId}`);
     const [c, a, p] = await Promise.allSettled([
-      api.get(`/mentor/contract/${dossierId}`, H),
-      api.get(`/mentor/dossier/${dossierId}/afspraken`, H),
-      api.get(`/mentor/planning/${dossierId}`, H),
+      api.get(`/mentor/contract/${dossierId}`),
+      api.get(`/mentor/dossier/${dossierId}/afspraken`),
+      api.get(`/mentor/planning/${dossierId}`),
     ]);
-    setContract(c.status === "fulfilled" ? c.value.data.data : null);
+    const contractData = c.status === "fulfilled" ? c.value.data.data : null;
+    cacheSet(`mentor_contract_${dossierId}`, contractData);
+    setContract(contractData);
     if (a.status === "fulfilled") {
-      setAfspraken(a.value.data.data?.praktische_afspraken || "");
-      setGedeeldOp(a.value.data.data?.praktische_afspraken_gedeeld_op || null);
+      const row = a.value.data.data;
+      const tekst = row?.praktische_afspraken || "";
+      const gedeeld = row?.praktische_afspraken_gedeeld_op || null;
+      cacheSet(`mentor_afspraken_${dossierId}`, { tekst, gedeeldOp: gedeeld });
+      setAfspraken(tekst);
+      setGedeeldOp(gedeeld);
     }
-    setMomenten(p.status === "fulfilled" ? (p.value.data.data || []) : []);
+    const momentenData = p.status === "fulfilled" ? (p.value.data.data || []) : [];
+    cacheSet(`mentor_planning_${dossierId}`, momentenData);
+    setMomenten(momentenData);
   }
 
   async function tekenContract() {
     try {
       setBezigTeken(true);
-      await api.patch(`/mentor/contract/${dossierId}/teken`, { tekenbevoegd: true }, H);
+      cacheDelete(`mentor_contract_${dossierId}`, "mentor_students");
+      await api.patch(`/mentor/contract/${dossierId}/teken`, { tekenbevoegd: true });
       await herlaad();
-      setMelding({ tekst: "Stageovereenkomst ondertekend.", type: "s-ok" });
+      setMelding({ tekst: "Stageovereenkomst ondertekend.", type: "s_ok" });
     } catch (err) {
-      setMelding({ tekst: err.response?.data?.message || "Tekenen mislukt", type: "s-rood" });
+      setMelding({ tekst: err.response?.data?.message || "Tekenen mislukt", type: "s_rood" });
     } finally {
       setBezigTeken(false);
     }
@@ -141,13 +177,16 @@ export default function MentorDossierPage() {
   async function deelAfspraken() {
     try {
       setBezigAfspraken(true);
-      await api.patch(`/mentor/dossier/${dossierId}/afspraken`, { afspraken: afsprakenWaarde }, H);
+      await api.patch(`/mentor/dossier/${dossierId}/afspraken`, { afspraken: afsprakenWaarde });
+      cacheDelete(`mentor_afspraken_${dossierId}`);
+      const nu = new Date().toISOString();
+      cacheSet(`mentor_afspraken_${dossierId}`, { tekst: afsprakenWaarde, gedeeldOp: nu, velden: null });
       setAfspraken(afsprakenWaarde);
-      setGedeeldOp(new Date().toISOString());
+      setGedeeldOp(nu);
       setEditAfspraken(false);
-      setMelding({ tekst: "Praktische afspraken gedeeld met de student.", type: "s-ok" });
+      setMelding({ tekst: "Praktische afspraken gedeeld met de student.", type: "s_ok" });
     } catch (err) {
-      setMelding({ tekst: err.response?.data?.message || "Opslaan mislukt", type: "s-rood" });
+      setMelding({ tekst: err.response?.data?.message || "Opslaan mislukt", type: "s_rood" });
     } finally {
       setBezigAfspraken(false);
     }
@@ -156,10 +195,10 @@ export default function MentorDossierPage() {
   async function bevestigMoment(id) {
     try {
       setBezigMoment(id);
-      await api.patch(`/mentor/planning/${id}/bevestig`, {}, H);
+      await api.patch(`/mentor/planning/${id}/bevestig`, {});
       await herlaad();
     } catch (err) {
-      setMelding({ tekst: err.response?.data?.message || "Bevestigen mislukt", type: "s-rood" });
+      setMelding({ tekst: err.response?.data?.message || "Bevestigen mislukt", type: "s_rood" });
     } finally {
       setBezigMoment(null);
     }
@@ -168,12 +207,12 @@ export default function MentorDossierPage() {
     if (!altTekst.trim()) return;
     try {
       setBezigMoment(id);
-      await api.patch(`/mentor/planning/${id}/alternatief`, { bericht: altTekst }, H);
+      await api.patch(`/mentor/planning/${id}/alternatief`, { bericht: altTekst });
       setAltOpen(null);
       setAltTekst("");
       await herlaad();
     } catch (err) {
-      setMelding({ tekst: err.response?.data?.message || "Versturen mislukt", type: "s-rood" });
+      setMelding({ tekst: err.response?.data?.message || "Versturen mislukt", type: "s_rood" });
     } finally {
       setBezigMoment(null);
     }
@@ -183,8 +222,7 @@ export default function MentorDossierPage() {
   const docentNaam = momenten.find((m) => m.docent_naam)?.docent_naam;
 
   return (
-    <div className="mtr">
-      <div className="page-inner">
+    <div className="page-inner">
         <div style={{ marginBottom: 10 }}>
           <a href="#" onClick={(e) => { e.preventDefault(); navigate("/mentor/students"); }} style={{ fontSize: 12.5, color: "var(--red)", textDecoration: "none", fontWeight: 600 }}>
             <i className="ti ti-arrow-left" /> Terug naar overzicht
@@ -193,7 +231,7 @@ export default function MentorDossierPage() {
         <div className="page-header"><h1>{naam}</h1></div>
 
         {loading && <div className="card"><p style={{ color: "var(--sub)", fontSize: 13 }}>Dossier laden…</p></div>}
-        {error && <div className="card"><span className="status s-rood">{error}</span></div>}
+        {error && <div className="card"><span className="status s_rood">{error}</span></div>}
 
         {melding.tekst && <div style={{ marginBottom: 12 }}><span className={`status ${melding.type}`}>{melding.tekst}</span></div>}
 
@@ -202,7 +240,7 @@ export default function MentorDossierPage() {
             {/* Contract */}
             {contract && (
               <div className="card" style={!contract.bedrijf_getekend_op && contract.student_getekend_op ? { border: "1.5px solid #0a0a0a", boxShadow: "0 4px 14px rgba(0,0,0,.10)" } : {}}>
-                <div className="card-title">
+                <div className="card_title">
                   <i className="ti ti-file-certificate" style={{ color: "var(--red)" }} />
                   Stageovereenkomst
                   <span className={`status ${contractBadge(contract).cls}`} style={{ marginLeft: 6 }}>
@@ -227,10 +265,10 @@ export default function MentorDossierPage() {
 
             {/* Praktische afspraken */}
             <div className="card">
-              <div className="card-title">
+              <div className="card_title">
                 <i className="ti ti-message-circle" style={{ color: "var(--red)" }} />
                 Praktische afspraken
-                <span className={`status ${afspraken ? "s-ok" : "s-grijs"}`} style={{ marginLeft: 6 }}>
+                <span className={`status ${afspraken ? "s_ok" : "s-grijs"}`} style={{ marginLeft: 6 }}>
                   {afspraken ? <><i className="ti ti-check" />Gedeeld met de student</> : "Nog niet gedeeld"}
                 </span>
               </div>
@@ -248,7 +286,7 @@ export default function MentorDossierPage() {
                 </>
               ) : (
                 <>
-                  <textarea className="form-input" style={{ minHeight: 80, fontSize: 12.5 }} value={afsprakenWaarde}
+                  <textarea className="form_input" style={{ minHeight: 80, fontSize: 12.5 }} value={afsprakenWaarde}
                     placeholder="bv. Werkuren 9u–17u30, vrijdag thuiswerk. Meld je de eerste dag aan het onthaal."
                     onChange={(e) => setAfsprakenWaarde(e.target.value)} />
                   <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
@@ -265,7 +303,7 @@ export default function MentorDossierPage() {
               const teBevestigen = ["voorgesteld", "gepland"].includes(m.status);
               return (
                 <div className="card" key={m.id} style={teBevestigen ? { borderLeft: "3px solid var(--red)" } : {}}>
-                  <div className="card-title">
+                  <div className="card_title">
                     <i className="ti ti-calendar" style={{ color: "var(--red)" }} />
                     {typeLabel(m.type)}
                     <span className={`status ${bb.cls}`} style={{ marginLeft: 6 }}><i className={`ti ${bb.icon}`} />{bb.txt}</span>
@@ -277,8 +315,8 @@ export default function MentorDossierPage() {
                   {teBevestigen && (
                     altOpen === m.id ? (
                       <div style={{ marginTop: 12 }}>
-                        <label className="form-label">Bericht / alternatief moment</label>
-                        <textarea className="form-input" style={{ minHeight: 60 }} value={altTekst} onChange={(e) => setAltTekst(e.target.value)}
+                        <label className="form_label">Bericht / alternatief moment</label>
+                        <textarea className="form_input" style={{ minHeight: 60 }} value={altTekst} onChange={(e) => setAltTekst(e.target.value)}
                           placeholder="bv. Die voormiddag zit ik in een klantmeeting — kan het in de namiddag?" />
                         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                           <button className="btn primary sm" disabled={bezigMoment === m.id || !altTekst.trim()} onClick={() => stelAlternatief(m.id)}><i className="ti ti-send" />Versturen</button>
@@ -298,7 +336,7 @@ export default function MentorDossierPage() {
 
             {/* Rol */}
             <div className="card">
-              <div className="card-title"><i className="ti ti-shield-check" style={{ color: "var(--red)" }} />Jouw rol als stagementor</div>
+              <div className="card_title"><i className="ti ti-shield-check" style={{ color: "var(--red)" }} />Jouw rol als stagementor</div>
               <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.65 }}>
                 Je kan de stageovereenkomst namens het stagebedrijf ondertekenen, praktische afspraken delen, logboeken inkijken en wekelijks afchecken, feedback geven en mentorinput invullen. Administratieve registratie, finale beoordeling en resultaatvrijgave gebeuren door de opleiding.
               </div>
@@ -313,13 +351,13 @@ export default function MentorDossierPage() {
                 <div className={`dossier-body ${dossierOpen ? "open" : ""}`}>
                   <div className="grid-2c">
                     <div className="card">
-                      <div className="card-title"><i className="ti ti-briefcase" style={{ color: "var(--red)" }} />Stage</div>
+                      <div className="card_title"><i className="ti ti-briefcase" style={{ color: "var(--red)" }} />Stage</div>
                       <div className="kv"><span className="k">Bedrijf</span><span className="v">{student.bedrijf || "-"}</span></div>
                       <div className="kv"><span className="k">Studentennummer</span><span className="v">{student.studentennummer || "-"}</span></div>
                       <div className="kv"><span className="k">Dossier</span><span className="v">#{student.dossier_id}</span></div>
                     </div>
                     <div className="card">
-                      <div className="card-title"><i className="ti ti-users" style={{ color: "var(--red)" }} />Betrokkenen</div>
+                      <div className="card_title"><i className="ti ti-users" style={{ color: "var(--red)" }} />Betrokkenen</div>
                       <div className="prof">
                         <div className="prof-av">{initialen(naam)}</div>
                         <div style={{ minWidth: 0 }}><div className="p-naam">{naam} <span className="tag">student</span></div></div>
@@ -337,7 +375,6 @@ export default function MentorDossierPage() {
             )}
           </>
         )}
-      </div>
     </div>
   );
 }

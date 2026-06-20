@@ -1,0 +1,89 @@
+/* MentorEvaluationPage — evaluatie-specifieke stijlen */
+
+/* Stepper */
+.ev-track { display: flex; align-items: flex-start; }
+.ev-stap { flex: 1; text-align: center; padding: 0 8px; }
+.ev-circle {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: #e9e9ec; color: var(--sub);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 16px; margin-bottom: 7px;
+}
+.ev-stap.actief .ev-circle { background: var(--red); color: #fff; box-shadow: 0 0 0 4px rgba(226,0,26,.12); }
+.ev-stap.done .ev-circle { background: var(--green); color: #fff; }
+.ev-label { font-size: 13px; font-weight: 700; }
+.ev-stap.actief .ev-label { color: var(--red); }
+.ev-sub { font-size: 11.5px; color: var(--sub); margin-top: 2px; line-height: 1.5; }
+.ev-lijn { flex: 0 0 36px; border-top: 2.5px dotted #c9c9d2; margin-top: 17px; }
+
+/* Competentie matrix */
+.mtx { background: var(--white); border: 0.5px solid var(--border); border-radius: 10px; overflow: hidden; }
+.mtx-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0,1fr) 70px 70px 26px;
+  align-items: center; gap: 6px; padding: 0 14px;
+  min-height: 44px; border-bottom: 0.5px solid var(--border);
+}
+.mtx-row:last-child { border-bottom: none; }
+.mtx-row.klik { cursor: pointer; transition: background 0.12s; }
+.mtx-row.klik:hover { background: var(--muted); }
+.mtx-head { min-height: 34px; background: #fafaf8; }
+.mtx-head span { font-size: 10.5px; color: var(--sub); letter-spacing: 0.3px; }
+.m-code { font-size: 10.5px; font-weight: 700; color: var(--faint); }
+.m-naam {
+  font-size: 13px; font-weight: 500;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: flex; align-items: center; gap: 7px;
+}
+.m-sc { text-align: center; font-size: 12.5px; font-weight: 600; }
+.m-sc .pil { display: inline-block; min-width: 34px; padding: 2px 7px; border-radius: 11px; background: var(--muted); }
+.m-sc .pil.jij { background: var(--red-light); color: var(--red); }
+.m-chev { color: var(--faint); font-size: 15px; text-align: right; }
+
+/* Score scale */
+.scale { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.scale-btn {
+  width: 32px; height: 32px; border-radius: 6px;
+  border: 0.5px solid var(--border); background: var(--white);
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.12s; color: var(--gray); font-family: var(--font);
+}
+.scale-btn:hover { border-color: var(--red); color: var(--red); }
+.scale-btn.selected { background: var(--red); border-color: var(--red); color: #fff; }
+.scale-lbl { font-size: 12px; color: var(--sub); }
+
+/* Feedback blok */
+.fb-blok { background: var(--muted); border-radius: 7px; padding: 9px 11px; margin-top: 8px; }
+.fb-blok .fb-wie { font-size: 11.5px; font-weight: 600; display: flex; align-items: center; gap: 6px; margin-bottom: 2px; }
+.fb-blok .fb-wat { font-size: 12.5px; color: var(--gray); line-height: 1.5; }
+
+/* Modal */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(10,10,10,.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 300; padding: 20px;
+}
+.modal {
+  background: #fff; border-radius: 12px;
+  max-width: 560px; width: 100%; max-height: 82vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0,0,0,.22);
+}
+.modal-head {
+  padding: 15px 18px; border-bottom: 0.5px solid var(--border);
+  display: flex; align-items: center; gap: 11px;
+}
+.mh-icon {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: var(--red-light); color: var(--red);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 17px; flex-shrink: 0;
+}
+.mh-t { font-size: 14.5px; font-weight: 600; }
+.mh-s { font-size: 11.5px; color: var(--sub); margin-top: 1px; }
+.mh-x { margin-left: auto; }
+.modal-body { padding: 16px 18px; overflow-y: auto; font-size: 13.5px; line-height: 1.65; color: var(--gray); }
+.modal-foot { padding: 12px 18px; border-top: 0.5px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; }
+
+.req { color: var(--red); margin-left: 2px; }

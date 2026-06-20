@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import "./MentorAfsprakenPage.css";
+import { cacheGet, cacheSet, cacheDelete } from "../mentorCache";
 
 function formatDate(value) {
   if (!value) return null;
@@ -38,17 +40,22 @@ export default function MentorAfsprakenPage() {
   const [veldenOpgeslagen, setVeldenOpgeslagen] = useState(null);
   const [veldenEdit, setVeldenEdit]             = useState({ ...LEGE_VELDEN });
 
-  // Laad studenten van de mentor
   useEffect(() => {
     async function loadStudenten() {
+      const cached = cacheGet("mentor_students");
+      if (cached) {
+        setStudenten(cached);
+        if (cached.length > 0) setGeselecteerdDossier(cached[0].dossier_id);
+        setLoading(false);
+        return;
+      }
       try {
         setLoading(true);
         const res = await api.get("/mentor/students");
         const data = res.data.data || [];
+        cacheSet("mentor_students", data);
         setStudenten(data);
-        if (data.length > 0) {
-          setGeselecteerdDossier(data[0].dossier_id);
-        }
+        if (data.length > 0) setGeselecteerdDossier(data[0].dossier_id);
       } catch (err) {
         console.error(err);
       } finally {
@@ -58,21 +65,25 @@ export default function MentorAfsprakenPage() {
     loadStudenten();
   }, []);
 
-  // Laad afspraken voor geselecteerd dossier
   useEffect(() => {
     if (!geselecteerdDossier) return;
     async function loadAfspraken() {
+      const cached = cacheGet(`mentor_afspraken_${geselecteerdDossier}`);
+      if (cached) {
+        setAfspraken(cached.tekst || "");
+        setGedeeldOp(cached.gedeeldOp || null);
+        setVeldenOpgeslagen(cached.velden || null);
+        setAfsprakenLoading(false);
+        return;
+      }
       try {
         setAfsprakenLoading(true);
         setMelding({ tekst: "", type: "" });
         setEditMode(false);
-        const res = await api.get(
-          `/mentor/dossier/${geselecteerdDossier}/afspraken`
-        );
+        const res = await api.get(`/mentor/dossier/${geselecteerdDossier}/afspraken`);
         const row = res.data.data;
-        setAfspraken(row?.praktische_afspraken || "");
-        setGedeeldOp(row?.praktische_afspraken_gedeeld_op || null);
-        // Story 29: losse velden uit de opgeslagen JSON halen (indien aanwezig).
+        const tekst = row?.praktische_afspraken || "";
+        const gedeeldOp = row?.praktische_afspraken_gedeeld_op || null;
         let velden = null;
         if (row?.praktische_afspraken_velden) {
           try {
@@ -81,6 +92,9 @@ export default function MentorAfsprakenPage() {
               : row.praktische_afspraken_velden;
           } catch { velden = null; }
         }
+        cacheSet(`mentor_afspraken_${geselecteerdDossier}`, { tekst, gedeeldOp, velden });
+        setAfspraken(tekst);
+        setGedeeldOp(gedeeldOp);
         setVeldenOpgeslagen(velden);
       } catch (err) {
         setAfspraken("");
@@ -112,16 +126,16 @@ export default function MentorAfsprakenPage() {
     try {
       setBezig(true);
       setMelding({ tekst: "", type: "" });
-      await api.patch(
-        `/mentor/dossier/${geselecteerdDossier}/afspraken`,
-        { velden: veldenEdit }
-      );
-      // De PATCH geeft enkel { dossierId } terug; haal de canonieke (opgebouwde) tekst opnieuw op.
+      await api.patch(`/mentor/dossier/${geselecteerdDossier}/afspraken`, { velden: veldenEdit });
+      cacheDelete(`mentor_afspraken_${geselecteerdDossier}`);
       const res = await api.get(`/mentor/dossier/${geselecteerdDossier}/afspraken`);
       const row = res.data?.data;
-      setAfspraken(row?.praktische_afspraken || "");
+      const tekst = row?.praktische_afspraken || "";
+      const gedeeldOp = row?.praktische_afspraken_gedeeld_op || new Date().toISOString();
+      cacheSet(`mentor_afspraken_${geselecteerdDossier}`, { tekst, gedeeldOp, velden: { ...veldenEdit } });
+      setAfspraken(tekst);
       setVeldenOpgeslagen({ ...veldenEdit });
-      setGedeeldOp(row?.praktische_afspraken_gedeeld_op || new Date().toISOString());
+      setGedeeldOp(gedeeldOp);
       setEditMode(false);
       setMelding({ tekst: "Afspraken opgeslagen!", type: "s_ok" });
     } catch (err) {
@@ -268,7 +282,7 @@ export default function MentorAfsprakenPage() {
                   onClick={opslaan}
                   disabled={bezig}
                 >
-                  {bezig ? "Opslaan..." : "Opslaan"}
+                  <i className="ti ti-device-floppy" />{bezig ? "Opslaan..." : "Opslaan"}
                 </button>
                 <button className="btn" onClick={annuleer} disabled={bezig}>
                   Annuleren
