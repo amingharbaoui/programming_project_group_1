@@ -19,6 +19,13 @@ export default function StageApplicationPage() {
   const [huidigStatus, setHuidigStatus] = useState(null);
   // Modal state: null = gesloten, object = { icon, titel, sub, body, onSluit }
   const [modal, setModal] = useState(null);
+  const [stageRegel, setStageRegel] = useState(null);
+
+  useEffect(() => {
+    apiRequest("GET", "/internships/settings").then(res => {
+      if (res?.data?.stageRegels?.[0]) setStageRegel(res.data.stageRegels[0]);
+    }).catch(() => {});
+  }, []);
 
   const [form, setForm] = useState({
     bedrijfNaam: "",
@@ -302,7 +309,7 @@ export default function StageApplicationPage() {
           </div>
           <div className="checklist-item">
             <IconCircleCheck size={14} />
-            Minstens 12 weken voltijds (456 uur) binnen het stagevenster
+            Minstens {stageRegel?.minimum_weken ?? 12} weken voltijds ({stageRegel?.minimum_uren ?? 456} uur) binnen het stagevenster
           </div>
           <div className="checklist-item">
             <IconCircleCheck size={14} />

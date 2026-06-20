@@ -1,6 +1,5 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import '@tabler/icons-webfont/dist/tabler-icons.min.css'
 import '@fontsource-variable/dm-sans'
 import './index.css'
 import App from './App.jsx'
