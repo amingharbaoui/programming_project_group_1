@@ -305,8 +305,10 @@ function serveBestand(req, res) {
   if (!verifyToken(headerToken || req.query.t)) {
     return res.status(401).json({ success: false, message: "Authenticatie vereist" });
   }
-  const filename = req.params.filename;
-  if (!filename || filename.includes("..") || filename.includes("/") || filename.includes("\\")) {
+  // Wildcard route: req.params[0] bevat het volledige pad incl. subdirectories
+  // Regex route: capture group 0 bevat het volledige pad incl. subdirectories
+  const filename = (req.params[0] ?? req.params.filename ?? "").toString();
+  if (!filename || filename.includes("..") || filename.includes("\\")) {
     return res.status(400).json({ success: false, message: "Ongeldige bestandsnaam" });
   }
   const filePath = path.join(UPLOADS_DIR, filename);

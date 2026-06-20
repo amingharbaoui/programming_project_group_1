@@ -120,8 +120,8 @@
 	padding: 12px 13px;
 	background: var(--white);
 	border-radius: 9px;
-	border: 1.5px solid #0a0a0a;
-	box-shadow: 0 4px 12px rgba(0,0,0,.10);
+	border: 0.5px solid var(--border);
+	box-shadow: none;
 }
 .side-status .fase { font-size: 11px; color: var(--sub); }
 .side-status .fase-naam { font-size: 13.5px; font-weight: 600; margin: 2px 0 8px; }

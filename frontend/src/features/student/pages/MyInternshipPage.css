@@ -121,8 +121,8 @@
 .taak-kaart {
   background: var(--white);
   border-radius: 10px;
-  border: 1.5px solid #0a0a0a;
-  box-shadow: 0 4px 14px rgba(0,0,0,.10);
+  border: 0.5px solid var(--border);
+  box-shadow: none;
   padding: 16px 18px;
   margin-bottom: 16px;
 }
@@ -149,7 +149,14 @@
 .taak-info { flex: 1; font-size: 13.5px; font-weight: 500; color: var(--dark); }
 
 /* Dossier collapsible blok */
-.dossier { margin-bottom: 16px; }
+.dossier { margin-bottom: 16px; border-top: none; }
+
+/* Même hauteur dans grid_2 */
+.grid_2 > .dossier,
+.grid_2 > .card {
+  box-sizing: border-box;
+  margin-bottom: 0;
+}
 .dossier-kop {
   display: flex;
   align-items: center;
@@ -169,7 +176,7 @@
 .dossier-kop i { font-size: 16px; transition: transform .2s; }
 .dossier-kop.open i { transform: rotate(90deg); }
 .dossier-body { display: none; }
-.dossier-body.open { display: block; }
+.dossier-body.open { display: flex; flex-direction: column; gap: 16px; }
 
 /* Versie historiek */
 .versie {

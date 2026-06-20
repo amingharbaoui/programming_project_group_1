@@ -1207,6 +1207,7 @@ async function getAdminDossierById(req, res) {
         id,
         status,
         versie_nummer,
+        bestand_url,
         student_getekend_op,
         bedrijf_getekend_op,
         opleiding_getekend_op,

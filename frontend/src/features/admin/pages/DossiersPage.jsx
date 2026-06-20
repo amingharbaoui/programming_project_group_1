@@ -222,7 +222,7 @@ export default function DossiersPage() {
                 </td>
                         <td style={{ textAlign: "right" }}>
                   <button
-                    className={"btn sm primary" + (d.needsAction ? "" : " btn_ghost")}
+                    className={d.needsAction ? "btn sm primary" : "btn sm"}
                     onClick={() => navigate(`/admin/dossiers/${d.id}`)}
                   >
                     <IconEye size={16} stroke={1.8} />

@@ -63,18 +63,25 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  async function markEen(id) {
+  async function deleteEen(id) {
+    // optimistisch: verwijder meteen uit de lijst
+    setMeldingen(prev => prev.filter(m => m.id !== id));
+    setOngelezen(prev => {
+      const m = meldingen.find(m => m.id === id);
+      return m && m.status !== "gelezen" ? Math.max(0, prev - 1) : prev;
+    });
     try {
-      await apiRequest("post", `/notifications/${id}/read`);
-      load();
-    } catch { /* stil */ }
+      await apiRequest("delete", `/notifications/${id}`);
+    } catch { load(); /* herstel bij fout */ }
   }
 
   async function markAlles() {
+    // optimistisch: markeer alles als gelezen meteen
+    setMeldingen(prev => prev.map(m => ({ ...m, status: "gelezen" })));
+    setOngelezen(0);
     try {
       await apiRequest("post", "/notifications/read-all");
-      load();
-    } catch { /* stil */ }
+    } catch { load(); /* herstel bij fout */ }
   }
 
   return (
@@ -114,7 +121,6 @@ export default function NotificationBell() {
                   <div
                     key={m.id}
                     className={`notif-item${!gelezen ? " sel" : ""}`}
-                    onClick={() => !gelezen && markEen(m.id)}
                   >
                     <div className={`notif-icon ${colorCls}`}>
                       <i className={`ti ${icon}`}></i>
@@ -126,15 +132,13 @@ export default function NotificationBell() {
                       </div>
                       <div className="ts">{formatTS(m.aangemaakt_op)}</div>
                     </div>
-                    {!gelezen && (
-                      <button
-                        className="notif-x"
-                        onClick={(e) => { e.stopPropagation(); markEen(m.id); }}
-                        title="Markeer als gelezen"
-                      >
-                        <i className="ti ti-x"></i>
-                      </button>
-                    )}
+                    <button
+                      className="notif-x"
+                      onClick={(e) => { e.stopPropagation(); deleteEen(m.id); }}
+                      title="Verwijderen"
+                    >
+                      <i className="ti ti-x"></i>
+                    </button>
                   </div>
                 );
               })

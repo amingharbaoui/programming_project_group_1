@@ -112,7 +112,7 @@ function DossierKaart({ titel, data, formatDatum }) {
             <div className="kv"><span className="k">Uren/week</span><span className="v">{data?.uren_per_week ? `${data.uren_per_week}u` : "—"}</span></div>
           </div>
         </div>
-        <div className="card">
+        <div className="card" style={{ marginTop: 16 }}>
           <div className="card_title"><IconFileDescription size={16} />Opdracht</div>
           <p style={{ fontSize: 13.5, lineHeight: 1.65, color: "var(--sub)", margin: 0 }}>{data?.opdrachtomschrijving || "—"}</p>
         </div>
@@ -121,9 +121,9 @@ function DossierKaart({ titel, data, formatDatum }) {
   );
 }
 
-function BegeleidingKaart({ data, wacht }) {
+function BegeleidingKaart({ data, wacht, style }) {
   return (
-    <div className="card">
+    <div className="card" style={style}>
       <div className="card_title"><IconUsers size={16} />Begeleiding</div>
       {data?.mentor_naam && (
         <div className="prof">
@@ -455,18 +455,16 @@ export default function MyInternshipPage() {
               <div className="b-text">Je stagevoorstel wordt behandeld door de stagecommissie. Je krijgt een melding zodra er een beslissing is.</div>
             </div>
           </div>
-          <div style={{ borderTop: "1px solid var(--border)", marginTop: 6, paddingTop: 14 }}>
-            <div className="grid_2">
-              <div>
-                <DossierKaart titel="Je voorstel zoals ingediend — nog niet goedgekeurd" data={data} formatDatum={formatDatum} />
-                {kanIntrekken && (
-                  <button className="btn" style={{ marginTop: 10 }} onClick={() => setIntrekModal(true)}>
-                    <IconArrowBackUp size={14} /> Voorstel intrekken
-                  </button>
-                )}
-              </div>
-              <BegeleidingKaart data={data} wacht={true} />
+          <div className="grid_2" style={{ marginTop: 16, alignItems: "stretch" }}>
+            <div>
+              <DossierKaart titel="Je voorstel zoals ingediend — nog niet goedgekeurd" data={data} formatDatum={formatDatum} />
+              {kanIntrekken && (
+                <button className="btn" style={{ marginTop: 10 }} onClick={() => setIntrekModal(true)}>
+                  <IconArrowBackUp size={14} /> Voorstel intrekken
+                </button>
+              )}
             </div>
+            <BegeleidingKaart data={data} wacht={true} style={{ alignSelf: "start" }} />
           </div>
         </>
       )}
@@ -485,16 +483,14 @@ export default function MyInternshipPage() {
           <div style={{ marginBottom: 16 }}>
             <Historiek items={historiek} />
           </div>
-          <div style={{ borderTop: "1px solid var(--border)", marginTop: 6, paddingTop: 14 }}>
-            <div className="grid_2">
-              <div>
-                <DossierKaart titel="Je voorstel zoals ingediend" data={data} formatDatum={formatDatum} />
-                <button className="btn" style={{ marginTop: 10 }} onClick={() => setIntrekModal(true)}>
-                  <IconArrowBackUp size={14} /> Voorstel intrekken
-                </button>
-              </div>
-              <BegeleidingKaart data={data} wacht={true} />
+          <div className="grid_2" style={{ marginTop: 16, alignItems: "stretch" }}>
+            <div>
+              <DossierKaart titel="Je voorstel zoals ingediend" data={data} formatDatum={formatDatum} />
+              <button className="btn" style={{ marginTop: 10 }} onClick={() => setIntrekModal(true)}>
+                <IconArrowBackUp size={14} /> Voorstel intrekken
+              </button>
             </div>
+            <BegeleidingKaart data={data} wacht={true} style={{ alignSelf: "start" }} />
           </div>
         </>
       )}
@@ -503,7 +499,7 @@ export default function MyInternshipPage() {
       {isAanpassingen && (
         <>
           <ProgressBar status={currentStatus} contractGetekend={false} />
-          <div className="card" style={{ marginBottom: 16, border: "1.5px solid #0a0a0a", boxShadow: "0 4px 14px rgba(0,0,0,.10)" }}>
+          <div className="card" style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 11, flexWrap: "wrap" }}>
               <div className="taak-icon amber" style={{ width: 34, height: 34, fontSize: 17, borderRadius: 8, flexShrink: 0 }}>
                 <i className="ti ti-message-circle"></i>
@@ -517,7 +513,7 @@ export default function MyInternshipPage() {
               </button>
             </div>
           </div>
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "minmax(0,3fr) minmax(0,2fr)", gap: 16, alignItems: "stretch" }}>
             <Historiek items={historiek} />
           </div>
         </>
@@ -528,15 +524,13 @@ export default function MyInternshipPage() {
         <>
           <ProgressBar status={currentStatus} contractGetekend={volledigGetekend} startdatum={internship?.startdatum} />
           <TaakKaart status={currentStatus} contractStudentGekend={contractStudentGekend} volledigGetekend={volledigGetekend} docsOk={docsOk} navigate={navigate} startdatum={internship?.startdatum} />
-          <div style={{ borderTop: "1px solid var(--border)", marginTop: 16, paddingTop: 14 }}>
-            <div className="grid_2">
-              <DossierKaart
-                titel={`Je stagedossier — goedgekeurd${data?.stagefunctie ? ` · ${data.stagefunctie}` : ""}`}
-                data={data}
-                formatDatum={formatDatum}
-              />
-              <BegeleidingKaart data={data} wacht={false} />
-            </div>
+          <div className="grid_2" style={{ marginTop: 16, alignItems: "stretch" }}>
+            <DossierKaart
+              titel={`Je stagedossier — goedgekeurd${data?.stagefunctie ? ` · ${data.stagefunctie}` : ""}`}
+              data={data}
+              formatDatum={formatDatum}
+            />
+            <BegeleidingKaart data={data} wacht={false} style={{ alignSelf: "start" }} />
           </div>
         </>
       )}

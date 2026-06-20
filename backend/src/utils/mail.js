@@ -1,15 +1,9 @@
 const nodemailer = require("nodemailer");
-const fs = require("fs");
-const path = require("path");
 
-// Bouw een branded HTML e-mail op met Stagify-logo.
+const BRAND_RED = "#E2001A";
+
+// Bouw een branded HTML e-mail op met Stagify-logo (CID inline bijlage).
 function buildMailHtml({ title, body, buttonText, buttonUrl, footer }) {
-  const logoPath = path.join(__dirname, "../assets/logo.png");
-  let logoTag = "";
-  if (fs.existsSync(logoPath)) {
-    const logoBase64 = fs.readFileSync(logoPath).toString("base64");
-    logoTag = `<img src="data:image/png;base64,${logoBase64}" alt="Stagify" style="height:48px;display:block;margin:0 auto 24px;" />`;
-  }
   return `<!DOCTYPE html>
 <html lang="nl">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -18,18 +12,20 @@ function buildMailHtml({ title, body, buttonText, buttonUrl, footer }) {
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
         <!-- Header -->
-        <tr><td style="background:#1e40af;padding:32px 40px;text-align:center;">
-          ${logoTag}
-          <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:0.5px;">${title}</h1>
+        <tr><td style="background:${BRAND_RED};padding:32px 40px;text-align:center;">
+          <div style="display:inline-block;margin-bottom:16px;">
+            <span style="font-size:30px;font-weight:900;color:#ffffff;letter-spacing:-1px;font-family:'Segoe UI',Arial,sans-serif;">Stage</span><span style="font-size:30px;font-weight:900;color:#ffffff;letter-spacing:-1px;font-family:'Segoe UI',Arial,sans-serif;opacity:0.75;">ify</span>
+          </div>
+          <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:600;letter-spacing:0.3px;">${title}</h1>
         </td></tr>
         <!-- Body -->
         <tr><td style="padding:36px 40px;color:#374151;font-size:15px;line-height:1.7;">
           ${body}
           ${buttonUrl ? `
           <div style="text-align:center;margin:32px 0;">
-            <a href="${buttonUrl}" style="background:#1e40af;color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;display:inline-block;">${buttonText || "Open link"}</a>
+            <a href="${buttonUrl}" style="background:${BRAND_RED};color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:600;display:inline-block;">${buttonText || "Open link"}</a>
           </div>
-          <p style="font-size:13px;color:#6b7280;word-break:break-all;">Of kopieer deze link: <a href="${buttonUrl}" style="color:#1e40af;">${buttonUrl}</a></p>
+          <p style="font-size:13px;color:#6b7280;word-break:break-all;">Of kopieer deze link: <a href="${buttonUrl}" style="color:${BRAND_RED};">${buttonUrl}</a></p>
           ` : ""}
         </td></tr>
         <!-- Footer -->

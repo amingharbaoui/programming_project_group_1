@@ -149,12 +149,14 @@ h1 {
 	color: var(--blue);
 }
 
-.s_rood {
+.s_rood,
+.s_red {
 	background: var(--red-light);
 	color: var(--red);
 }
 
-.s_grijs {
+.s_grijs,
+.s_gray {
 	background: #f0f0ee;
 	color: var(--sub);
 }
@@ -474,8 +476,8 @@ h1 {
 .banner.amber .b-text { color: #9a6c2a; }
 .banner.groen { background: var(--green-bg); border-color: #bfe3cb; color: var(--green); }
 .banner.groen .b-text { color: #3a7a4f; }
-.banner.blauw { background: var(--white); border: 1.5px solid #0a0a0a; color: #0a0a0a; }
-.banner.blauw .b-text { color: #0a0a0a; }
+.banner.blauw { background: var(--muted); border-color: var(--border); color: var(--dark); }
+.banner.blauw .b-text { color: var(--dark); }
 
 /* ── Gedeelde mentor-utilities ── */
 .prof-av {

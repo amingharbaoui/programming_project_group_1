@@ -13,7 +13,7 @@ import { useEffect } from "react";
  *   children  – body-inhoud (JSX)
  *   footer    – knoppenrij onderaan (JSX, optioneel)
  */
-export default function Modal({ open, onClose, icon, titel, sub, children, footer, wide }) {
+export default function Modal({ open, onClose, icon, titel, sub, children, footer, wide, noPad, headerAction }) {
   // Sluiten bij Escape-toets
   useEffect(() => {
     function onKey(e) {
@@ -38,10 +38,11 @@ export default function Modal({ open, onClose, icon, titel, sub, children, foote
               <i className={`ti ${icon}`}></i>
             </div>
           )}
-          <div>
+          <div style={{ flex: 1, minWidth: 0 }}>
             <div className="mh-t">{titel}</div>
             {sub && <div className="mh-s">{sub}</div>}
           </div>
+          {headerAction && <div className="mh-action">{headerAction}</div>}
           <button
             className="icon-btn mh-x"
             onClick={onClose}
@@ -52,7 +53,7 @@ export default function Modal({ open, onClose, icon, titel, sub, children, foote
         </div>
 
         {/* Body */}
-        {children && <div className="modal-body">{children}</div>}
+        {children && <div className={`modal-body${noPad ? " modal-body--no-pad" : ""}`}>{children}</div>}
 
         {/* Footer met knoppen */}
         {footer && <div className="modal-foot">{footer}</div>}
