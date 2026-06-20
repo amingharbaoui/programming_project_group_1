@@ -4,6 +4,7 @@ import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 import "./MentorDossierPage.css";
 import { cacheGet, cacheSet, cacheDelete } from "../mentorCache";
+import { kiesMentorStagiair, onthoudMentorDossier } from "../mentorSelection";
 
 function initialen(naam) {
   const p = (naam || "").trim().split(/\s+/);
@@ -45,6 +46,7 @@ function typeLabel(type) {
 function getStappen(contract, gedeeldOp, dossierStatus) {
   const contractKlaar = contract?.status === "geregistreerd";
   const stageAfgerond = ["afgerond", "voltooid", "resultaat_vrijgegeven"].includes(dossierStatus);
+  const stageLoopt = dossierStatus === "stage_loopt";
   const evalVrijgegeven = dossierStatus === "resultaat_vrijgegeven";
 
   return [
@@ -60,8 +62,8 @@ function getStappen(contract, gedeeldOp, dossierStatus) {
     },
     {
       label: "Stage",
-      sub: stageAfgerond ? "Afgerond" : gedeeldOp ? "Loopt" : "Nog niet gestart",
-      state: stageAfgerond ? "done" : gedeeldOp ? "actief" : "todo",
+      sub: stageAfgerond ? "Afgerond" : stageLoopt ? "Loopt" : "Nog niet gestart",
+      state: stageAfgerond ? "done" : stageLoopt ? "actief" : "todo",
     },
     {
       label: "Evaluatie",
@@ -103,18 +105,20 @@ export default function MentorDossierPage() {
     async function init() {
       const cached = cacheGet("mentor_students");
       if (cached) {
-        const gekozen = cached.find((s) => s.id === vSt) || cached.find((s) => s.dossier_id === vDos) || cached[0] || null;
+        const gekozen = kiesMentorStagiair(cached, searchParams);
         setStudent(gekozen);
         setDossierId(gekozen?.dossier_id ?? vDos);
+        onthoudMentorDossier(gekozen?.dossier_id);
         return;
       }
       try {
         const res = await api.get("/mentor/students");
         const lijst = res.data.data || [];
         cacheSet("mentor_students", lijst);
-        const gekozen = lijst.find((s) => s.id === vSt) || lijst.find((s) => s.dossier_id === vDos) || lijst[0] || null;
+        const gekozen = kiesMentorStagiair(lijst, searchParams);
         setStudent(gekozen);
         setDossierId(gekozen?.dossier_id ?? vDos);
+        onthoudMentorDossier(gekozen?.dossier_id);
       } catch (err) {
         setError(err.response?.data?.message || "Stagiair ophalen mislukt");
         setLoading(false);
