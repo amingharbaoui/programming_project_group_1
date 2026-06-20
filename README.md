@@ -156,3 +156,5 @@ The student accounts are named after their phase (`student.geen`, `student.inged
 ## License
 
 Released under the MIT License.
+
+![Erasmus Logo](frontend/src/assets/ehb-logo/erasmus_wide_version.png) ![Logo Stageify](frontend/src/assets/stageify-logo/stageify_logo_wide.png)
