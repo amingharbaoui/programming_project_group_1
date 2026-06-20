@@ -440,7 +440,7 @@ async function inviteUser(req, res) {
 
     await conn.commit();
 
-    const activatielink = `/mentor/activate?token=${token}`;
+    const activatielink = `/activeren?token=${token}`;
     await emailMelding(userId, {
       titel: "Uitnodiging stageplatform",
       bericht: `Je bent uitgenodigd op Stagify. Activeer je account via ${activatielink}`,
