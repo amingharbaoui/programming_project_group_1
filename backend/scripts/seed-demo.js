@@ -4,7 +4,7 @@
  * Wachtwoorden worden gehasht (pbkdf2, zelfde schema als userController) zodat echte login werkt.
  *
  * Gebruik:  node scripts/seed-demo.js
- * Demo-wachtwoord voor ELKE gebruiker:  Stagify!2026
+ * Demo-wachtwoord voor ELKE gebruiker:  Demo!2026
  */
 const crypto = require("crypto");
 const db = require("../src/config/db");
