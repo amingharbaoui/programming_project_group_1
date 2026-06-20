@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import "./MentorPlanningPage.css";
+import { cacheGet, cacheSet, cacheDelete } from "../mentorCache";
 
 function formatDateTime(value) {
   if (!value) return "-";
@@ -51,15 +53,20 @@ export default function MentorPlanningPage() {
 
   useEffect(() => {
     async function loadStudenten() {
+      const cached = cacheGet("mentor_students");
+      if (cached) {
+        setStudenten(cached);
+        if (cached.length > 0) setGeselecteerdDossier(cached[0].dossier_id);
+        setLoading(false);
+        return;
+      }
       try {
         setLoading(true);
-        const res = await api.get("/mentor/students", {
-        });
+        const res = await api.get("/mentor/students");
         const data = res.data.data || [];
+        cacheSet("mentor_students", data);
         setStudenten(data);
-        if (data.length > 0) {
-          setGeselecteerdDossier(data[0].dossier_id);
-        }
+        if (data.length > 0) setGeselecteerdDossier(data[0].dossier_id);
       } catch (err) {
         console.error(err);
       } finally {
@@ -74,14 +81,19 @@ export default function MentorPlanningPage() {
     loadPlanning(geselecteerdDossier);
   }, [geselecteerdDossier]);
 
-  async function loadPlanning(dossierId) {
+  async function loadPlanning(dossierId, forceRefresh = false) {
+    if (!forceRefresh) {
+      const cached = cacheGet(`mentor_planning_${dossierId}`);
+      if (cached) { setMomenten(cached); setPlanningLoading(false); return; }
+    }
     try {
       setPlanningLoading(true);
       setMomenten([]);
       setMelding({ id: null, tekst: "", type: "" });
-      const res = await api.get(`/mentor/planning/${dossierId}`, {
-      });
-      setMomenten(res.data.data || []);
+      const res = await api.get(`/mentor/planning/${dossierId}`);
+      const data = res.data.data || [];
+      cacheSet(`mentor_planning_${dossierId}`, data);
+      setMomenten(data);
     } catch {
       setMomenten([]);
     } finally {
@@ -93,10 +105,10 @@ export default function MentorPlanningPage() {
     try {
       setBezig(momentId);
       setMelding({ id: null, tekst: "", type: "" });
-      await api.patch(`/mentor/planning/${momentId}/bevestig`, {}, {
-      });
+      await api.patch(`/mentor/planning/${momentId}/bevestig`, {});
       setMelding({ id: momentId, tekst: "Bedrijfsbezoek bevestigd! De docent en student kregen een melding.", type: "s_ok" });
-      await loadPlanning(geselecteerdDossier);
+      cacheDelete(`mentor_planning_${geselecteerdDossier}`);
+      await loadPlanning(geselecteerdDossier, true);
     } catch (err) {
       setMelding({ id: momentId, tekst: err.response?.data?.message || "Bevestigen mislukt.", type: "s_rood" });
     } finally {
@@ -109,12 +121,12 @@ export default function MentorPlanningPage() {
     try {
       setBezig(momentId);
       setMelding({ id: null, tekst: "", type: "" });
-      await api.patch(`/mentor/planning/${momentId}/alternatief`, { bericht: alternatifTekst }, {
-      });
+      await api.patch(`/mentor/planning/${momentId}/alternatief`, { bericht: alternatifTekst });
       setMelding({ id: momentId, tekst: "Alternatief voorstel verstuurd. De docent plant het bezoek opnieuw in.", type: "s_ok" });
       setAlternatifOpen(null);
       setAlternatifTekst("");
-      await loadPlanning(geselecteerdDossier);
+      cacheDelete(`mentor_planning_${geselecteerdDossier}`);
+      await loadPlanning(geselecteerdDossier, true);
     } catch (err) {
       setMelding({ id: momentId, tekst: err.response?.data?.message || "Versturen mislukt.", type: "s_rood" });
     } finally {

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import "./MentorContractPage.css";
+import { cacheGet, cacheSet, cacheDelete } from "../mentorCache";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -39,15 +41,20 @@ export default function MentorContractPage() {
   // Laad studentenlijst van de mentor
   useEffect(() => {
     async function loadStudenten() {
+      const cached = cacheGet("mentor_students");
+      if (cached) {
+        setStudenten(cached);
+        if (cached.length > 0) setGeselecteerdDossier(cached[0].dossier_id);
+        setLoading(false);
+        return;
+      }
       try {
         setLoading(true);
-        const res = await api.get("/mentor/students", {
-        });
+        const res = await api.get("/mentor/students");
         const data = res.data.data || [];
+        cacheSet("mentor_students", data);
         setStudenten(data);
-        if (data.length > 0) {
-          setGeselecteerdDossier(data[0].dossier_id);
-        }
+        if (data.length > 0) setGeselecteerdDossier(data[0].dossier_id);
       } catch (err) {
         console.error(err);
       } finally {
@@ -57,17 +64,19 @@ export default function MentorContractPage() {
     loadStudenten();
   }, []);
 
-  // Laad contract wanneer dossier geselecteerd wordt
   useEffect(() => {
     if (!geselecteerdDossier) return;
     async function loadContract() {
+      const cached = cacheGet(`mentor_contract_${geselecteerdDossier}`);
+      if (cached !== null) { setContract(cached); setContractLoading(false); return; }
       try {
         setContractLoading(true);
         setMelding("");
         setContract(null);
-        const res = await api.get(`/mentor/contract/${geselecteerdDossier}`, {
-        });
-        setContract(res.data.data);
+        const res = await api.get(`/mentor/contract/${geselecteerdDossier}`);
+        const data = res.data.data;
+        cacheSet(`mentor_contract_${geselecteerdDossier}`, data);
+        setContract(data);
       } catch (err) {
         setContract(null);
       } finally {
@@ -82,14 +91,12 @@ export default function MentorContractPage() {
     try {
       setBezig(true);
       setMelding("");
-      await api.patch(
-        `/mentor/contract/${geselecteerdDossier}/teken`,
-        { tekenbevoegd: true }
-      );
-      // Herlaad contract
-      const res = await api.get(`/mentor/contract/${geselecteerdDossier}`, {
-      });
-      setContract(res.data.data);
+      cacheDelete(`mentor_contract_${geselecteerdDossier}`, "mentor_students");
+      await api.patch(`/mentor/contract/${geselecteerdDossier}/teken`, { tekenbevoegd: true });
+      const res = await api.get(`/mentor/contract/${geselecteerdDossier}`);
+      const data = res.data.data;
+      cacheSet(`mentor_contract_${geselecteerdDossier}`, data);
+      setContract(data);
       setMelding("Contract succesvol getekend!");
     } catch (err) {
       setMelding(err.response?.data?.message || "Tekenen mislukt");

@@ -2,7 +2,6 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import AppLayout from "./components/layout/AppLayout";
-import MentorLayout from "./features/mentor/MentorLayout";
 import LoginPage from "./components/layout/LoginPage.jsx";
 import {
   fetchStudentAccess,
@@ -142,7 +141,7 @@ export default function App() {
             <Route path="/docent/planning" element={<DocentPlanningPage />} />
           </Route>
 
-          <Route element={<MentorLayout />}>
+          <Route element={<AppLayout />}>
             <Route path="/mentor/students" element={<MentorStudentsPage />} />
             <Route path="/mentor/dossier" element={<MentorDossierPage />} />
             <Route path="/mentor/logbooks" element={<MentorLogbooksPage />} />

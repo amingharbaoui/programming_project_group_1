@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
-import "../mentor.css";
+import "./MentorEvaluationPage.css";
+import { cacheGet, cacheSet, cacheDelete } from "../mentorCache";
 
 const SCORE_LBL = ["", "Onvoldoende", "Matig", "Voldoende", "Goed", "Uitstekend"];
 const KLAAR = ["mentor_ingediend", "klaar_voor_docent", "geregistreerd", "klaar_voor_vrijgave", "vrijgegeven"];
@@ -39,26 +40,47 @@ export default function MentorEvaluationPage() {
 
   useEffect(() => {
     async function init() {
+      const cached = cacheGet("mentor_students");
+      if (cached) { setStudenten(cached); return; }
       try {
         const res = await api.get("/mentor/students");
-        setStudenten(res.data.data || []);
+        const data = res.data.data || [];
+        cacheSet("mentor_students", data);
+        setStudenten(data);
       } catch (err) {
         setError(err.response?.data?.message || "Stagiairs ophalen mislukt");
       }
     }
     init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!detailId) return;
     async function load() {
+      const cached = cacheGet(`mentor_evaluation_${detailId}`);
+      if (cached) {
+        setEvalData(cached);
+        const ns = { tussentijds: {}, finaal: {} };
+        const nm = { tussentijds: {}, finaal: {} };
+        for (const ev of cached.evaluaties || []) {
+          const key = ev.type === "finaal" ? "finaal" : "tussentijds";
+          for (const s of (ev.scores || []).filter((x) => x.rol === "mentor")) {
+            ns[key][s.competentie_id] = s.score;
+            nm[key][s.competentie_id] = s.motivering || "";
+          }
+        }
+        setScores(ns);
+        setMotiv(nm);
+        setLoadingEval(false);
+        return;
+      }
       try {
         setLoadingEval(true);
         setError("");
         setMelding({ tekst: "", type: "" });
         const res = await api.get(`/evaluations/${detailId}`);
         const data = res.data.data;
+        cacheSet(`mentor_evaluation_${detailId}`, data);
         setEvalData(data);
         const ns = { tussentijds: {}, finaal: {} };
         const nm = { tussentijds: {}, finaal: {} };
@@ -78,7 +100,6 @@ export default function MentorEvaluationPage() {
       }
     }
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailId]);
 
   const detailStudent = studenten.find((s) => s.id === detailId);
@@ -104,7 +125,7 @@ export default function MentorEvaluationPage() {
     if (ingediend) {
       const missing = competenties.filter((c) => !scores[activeTab][c.id]);
       if (missing.length > 0) {
-        setMelding({ tekst: "Geef voor elke competentie een score in.", type: "s-amber" });
+        setMelding({ tekst: "Geef voor elke competentie een score in.", type: "s_amber" });
         return;
       }
     }
@@ -117,11 +138,14 @@ export default function MentorEvaluationPage() {
       setBezig(true);
       setMelding({ tekst: "", type: "" });
       await api.post(`/evaluations/${huidigeEval.id}/scores`, { scores: scoresArr, ingediend });
-      setMelding({ tekst: ingediend ? "Mentorinput ingediend!" : "Opgeslagen als concept.", type: "s-ok" });
+      setMelding({ tekst: ingediend ? "Mentorinput ingediend!" : "Opgeslagen als concept.", type: "s_ok" });
+      cacheDelete(`mentor_evaluation_${detailId}`);
       const res = await api.get(`/evaluations/${detailId}`);
-      setEvalData(res.data.data);
+      const fresh = res.data.data;
+      cacheSet(`mentor_evaluation_${detailId}`, fresh);
+      setEvalData(fresh);
     } catch (err) {
-      setMelding({ tekst: err.response?.data?.message || "Opslaan mislukt", type: "s-rood" });
+      setMelding({ tekst: err.response?.data?.message || "Opslaan mislukt", type: "s_rood" });
     } finally {
       setBezig(false);
     }
@@ -130,13 +154,12 @@ export default function MentorEvaluationPage() {
   // ─── TABEL ───
   if (!detailId) {
     return (
-      <div className="mtr">
-        <div className="page-inner">
+      <div className="page-inner">
           <div className="page-header">
             <h1>Evaluaties</h1>
             <p>Competentieprofiel: Toegepaste Informatica 2025–2026 — de student motiveert, jij scoort als advies</p>
           </div>
-          {error && <div className="card"><span className="status s-rood">{error}</span></div>}
+          {error && <div className="card"><span className="status s_rood">{error}</span></div>}
           {!error && studenten.length === 0 && <div className="card"><p style={{ color: "var(--sub)", fontSize: 13 }}>Geen stagiairs gevonden.</p></div>}
           {studenten.length > 0 && (
             <div className="card" style={{ padding: "6px 14px" }}>
@@ -148,7 +171,7 @@ export default function MentorEvaluationPage() {
                       <td>
                         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
                           <div className="prof-av" style={{ width: 30, height: 30, fontSize: 11 }}>{initialen(s)}</div>
-                          <div style={{ fontSize: 13.5, fontWeight: 600, cursor: "pointer" }} onClick={() => setDetailId(s.id)}>{s.voornaam} {s.achternaam}</div>
+                          <div style={{ fontSize: 13.5, fontWeight: 600 }}>{s.voornaam} {s.achternaam}</div>
                         </div>
                       </td>
                       <td style={{ fontSize: 12.5, color: "var(--sub)" }}>{s.bedrijf || "-"}</td>
@@ -161,7 +184,6 @@ export default function MentorEvaluationPage() {
               </table>
             </div>
           )}
-        </div>
       </div>
     );
   }
@@ -174,8 +196,7 @@ export default function MentorEvaluationPage() {
   const modalStudent = modalComp ? studentScore(modalComp.id) : null;
 
   return (
-    <div className="mtr">
-      <div className="page-inner">
+    <div className="page-inner">
         <div style={{ marginBottom: 12 }}>
           <button className="btn" onClick={() => setDetailId(null)}><i className="ti ti-arrow-left" />Alle evaluaties</button>
         </div>
@@ -258,9 +279,9 @@ export default function MentorEvaluationPage() {
                 </div>
 
                 <div className="card" style={{ marginTop: 12 }}>
-                  <div className="card-title"><i className="ti ti-message" style={{ color: "var(--red)" }} />Algemene praktijkfeedback</div>
+                  <div className="card_title"><i className="ti ti-message" style={{ color: "var(--red)" }} />Algemene praktijkfeedback</div>
                   <textarea
-                    className="form-input"
+                    className="form_input"
                     style={{ minHeight: 60, fontSize: 12.5 }}
                     placeholder="Hoe draait je stagiair mee op de werkvloer?"
                     value={motiv[activeTab].algemeen || ""}
@@ -283,7 +304,6 @@ export default function MentorEvaluationPage() {
             )}
           </>
         )}
-      </div>
 
       {/* score-modal */}
       {modalComp && (
@@ -306,7 +326,7 @@ export default function MentorEvaluationPage() {
 
               {kanInvullen ? (
                 <>
-                  <div className="form-label" style={{ margin: "12px 0 6px" }}>Jouw advies-score<span className="req">*</span></div>
+                  <div className="form_label" style={{ margin: "12px 0 6px" }}>Jouw advies-score<span className="req">*</span></div>
                   <div className="scale" style={{ marginBottom: 6 }}>
                     {[1, 2, 3, 4, 5].map((n) => (
                       <button key={n} className={`scale-btn ${scores[activeTab][modalComp.id] === n ? "selected" : ""}`} onClick={() => zetScore(modalComp.id, n)}>{n}</button>
@@ -314,9 +334,9 @@ export default function MentorEvaluationPage() {
                     <span className="scale-lbl">{scores[activeTab][modalComp.id] ? SCORE_LBL[scores[activeTab][modalComp.id]] : ""}</span>
                   </div>
                   <div style={{ fontSize: 11, color: "var(--faint)" }}>1 onvoldoende · 3 voldoende · 5 uitstekend</div>
-                  <div className="form-group" style={{ marginTop: 12 }}>
-                    <label className="form-label">Praktijkfeedback (optioneel)</label>
-                    <textarea className="form-input" style={{ minHeight: 48, fontSize: 12.5 }} value={motiv[activeTab][modalComp.id] || ""} onChange={(e) => zetMotiv(modalComp.id, e.target.value)} />
+                  <div className="form_group" style={{ marginTop: 12 }}>
+                    <label className="form_label">Praktijkfeedback (optioneel)</label>
+                    <textarea className="form_input" style={{ minHeight: 48, fontSize: 12.5 }} value={motiv[activeTab][modalComp.id] || ""} onChange={(e) => zetMotiv(modalComp.id, e.target.value)} />
                   </div>
                 </>
               ) : (

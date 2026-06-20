@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import "../docent.css";
 
 function getStatusClass(status) {
-  if (status === "goedgekeurd_door_docent") return "s_ok";
-  if (status === "afgecheckt_door_mentor") return "s_info";
-  if (status === "ingediend") return "s_info";
-  if (status?.includes("teruggestuurd")) return "s_rood";
-  return "s_grijs";
+  if (status === "goedgekeurd_door_docent") return "s-ok";
+  if (status === "afgecheckt_door_mentor") return "s-info";
+  if (status === "ingediend") return "s-info";
+  if (status?.includes("teruggestuurd")) return "s-rood";
+  return "s-grijs";
 }
 
 function getStatusLabel(status) {
@@ -106,12 +107,12 @@ export default function DocentLogbooksPage() {
       setRemindMelding({ weekNr: null, tekst: "", type: "" });
       await api.post(`/docent/logbooks/${studentId}/remind`, { weken: weekNr ? [weekNr] : [] }, {
       });
-      setRemindMelding({ weekNr, tekst: "Herinnering verstuurd naar student.", type: "s_ok" });
+      setRemindMelding({ weekNr, tekst: "Herinnering verstuurd naar student.", type: "s-ok" });
     } catch (err) {
       setRemindMelding({
         weekNr,
         tekst: err.response?.data?.message || "Herinnering versturen mislukt.",
-        type: "s_rood",
+        type: "s-rood",
       });
     } finally {
       setRemindLoading(false);
@@ -146,8 +147,9 @@ export default function DocentLogbooksPage() {
   ].sort((a, b) => b.week_nummer - a.week_nummer);
 
   return (
-    <div className="page_inner">
-      <div className="page_header">
+    <div className="doc">
+    <div className="page-inner">
+      <div className="page-header">
         <div>
           <h1>Logboeken</h1>
           <p>Bekijk logboeken, mentorfeedback en geef docentfeedback.</p>
@@ -160,7 +162,7 @@ export default function DocentLogbooksPage() {
       {/* Student selector */}
       {studenten.length > 0 && (
         <div className="card" style={{ marginBottom: "12px" }}>
-          <div className="card_title">Student kiezen</div>
+          <div className="card-title">Student kiezen</div>
           <div className="form_group" style={{ marginBottom: 0 }}>
             <label className="form_label">Student</label>
             <select
@@ -187,12 +189,12 @@ export default function DocentLogbooksPage() {
 
       {error && (
         <div className="card">
-          <span className="status s_rood">{error}</span>
+          <span className="status s-rood">{error}</span>
         </div>
       )}
 
       {!loading && !error && alleWeken.length === 0 && (
-        <div className="empty_state">Geen logboeken gevonden voor deze student.</div>
+        <div className="card"><p className="muted">Geen logboeken gevonden voor deze student.</p></div>
       )}
 
       {/* Ontbrekende weken banner */}
@@ -254,7 +256,7 @@ export default function DocentLogbooksPage() {
                 flexWrap: "wrap",
               }}>
                 <span style={{ fontSize: "13.5px", fontWeight: 600 }}>Week {week.week_nummer}</span>
-                <span className="status s_rood">
+                <span className="status s-rood">
                   <i className="ti ti-alert-triangle" /> Niet ingediend door student
                 </span>
                 <div style={{ marginLeft: "auto" }}>
@@ -274,13 +276,13 @@ export default function DocentLogbooksPage() {
         // Bestaande week
         return (
           <div className="card" key={week.id} style={{ marginBottom: "8px" }}>
-            <div className="card_title">
+            <div className="card-title">
               Week {week.week_nummer}
               <span className={`status ${getStatusClass(week.status)}`}>
                 {getStatusLabel(week.status)}
               </span>
               {week.blokkade && (
-                <span className="status s_rood" style={{ marginLeft: "4px" }}>
+                <span className="status s-rood" style={{ marginLeft: "4px" }}>
                   <i className="ti ti-alert-triangle" /> {week.blokkade}
                 </span>
               )}
@@ -363,6 +365,7 @@ export default function DocentLogbooksPage() {
           </div>
         );
       })}
+    </div>
     </div>
   );
 }

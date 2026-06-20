@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
-import "../mentor.css";
+import "./MentorLogbooksPage.css";
+import { cacheGet, cacheSet, cacheDelete } from "../mentorCache";
 
 const DAG_KORT = ["Ma", "Di", "Wo", "Do", "Vr"];
 
@@ -11,11 +12,11 @@ function initialen(s) {
 }
 
 function weekBadge(status) {
-  if (status === "ingediend") return { cls: "s-rood", icon: "ti-hourglass", txt: "Af te checken" };
-  if (status === "afgecheckt_door_mentor") return { cls: "s-ok", icon: "ti-checks", txt: "Afgecheckt" };
-  if (status === "goedgekeurd_door_docent") return { cls: "s-ok", icon: "ti-checks", txt: "Goedgekeurd" };
-  if (status && status.includes("teruggestuurd")) return { cls: "s-amber", icon: "ti-hourglass", txt: "Teruggestuurd" };
-  return { cls: "s-info", icon: "ti-pencil", txt: "In opbouw" };
+  if (status === "ingediend") return { cls: "s_rood", icon: "ti-hourglass", txt: "Af te checken" };
+  if (status === "afgecheckt_door_mentor") return { cls: "s_ok", icon: "ti-checks", txt: "Afgecheckt" };
+  if (status === "goedgekeurd_door_docent") return { cls: "s_ok", icon: "ti-checks", txt: "Goedgekeurd" };
+  if (status && status.includes("teruggestuurd")) return { cls: "s_amber", icon: "ti-hourglass", txt: "Teruggestuurd" };
+  return { cls: "s_info", icon: "ti-pencil", txt: "In opbouw" };
 }
 
 function dagIndex(datum) {
@@ -47,25 +48,37 @@ export default function MentorLogbooksPage() {
 
   useEffect(() => {
     async function init() {
+      const cached = cacheGet("mentor_students");
+      if (cached) { setStudenten(cached); return; }
       try {
         const res = await api.get("/mentor/students");
-        setStudenten(res.data.data || []);
+        const data = res.data.data || [];
+        cacheSet("mentor_students", data);
+        setStudenten(data);
       } catch (err) {
         setError(err.response?.data?.message || "Stagiairs ophalen mislukt");
       }
     }
     init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!detailId) return;
     async function load() {
+      const cached = cacheGet(`mentor_logbooks_${detailId}`);
+      if (cached) {
+        setWeeks(cached);
+        const teCheck = cached.find((w) => w.status === "ingediend") || cached[cached.length - 1];
+        setOpenWeeks(new Set(teCheck ? [teCheck.id] : []));
+        setLoadingDetail(false);
+        return;
+      }
       try {
         setLoadingDetail(true);
         setError("");
         const res = await api.get(`/mentor/logbooks/${detailId}`);
         const data = res.data.data || [];
+        cacheSet(`mentor_logbooks_${detailId}`, data);
         setWeeks(data);
         const teCheck = data.find((w) => w.status === "ingediend") || data[data.length - 1];
         setOpenWeeks(new Set(teCheck ? [teCheck.id] : []));
@@ -76,7 +89,6 @@ export default function MentorLogbooksPage() {
       }
     }
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailId]);
 
   function toggleWeek(id) {
@@ -94,8 +106,11 @@ export default function MentorLogbooksPage() {
         feedback: feedbackByWeek[weekId] || "Week nagekeken door mentor.",
         herindieningNodig,
       });
+      cacheDelete(`mentor_logbooks_${detailId}`, "mentor_students");
       const res = await api.get(`/mentor/logbooks/${detailId}`);
-      setWeeks(res.data.data || []);
+      const data = res.data.data || [];
+      cacheSet(`mentor_logbooks_${detailId}`, data);
+      setWeeks(data);
     } catch (err) {
       alert(err.response?.data?.message || "Mentorcontrole mislukt");
     } finally {
@@ -107,8 +122,11 @@ export default function MentorLogbooksPage() {
     try {
       setActionLoadingId(`dag-${dayId}`);
       await api.patch(`/mentor/logbooks/days/${dayId}/confirm`, {});
+      cacheDelete(`mentor_logbooks_${detailId}`);
       const res = await api.get(`/mentor/logbooks/${detailId}`);
-      setWeeks(res.data.data || []);
+      const data = res.data.data || [];
+      cacheSet(`mentor_logbooks_${detailId}`, data);
+      setWeeks(data);
     } catch (err) {
       alert(err.response?.data?.message || "Dag bevestigen mislukt");
     } finally {
@@ -121,13 +139,12 @@ export default function MentorLogbooksPage() {
   // ─── TABEL ───
   if (!detailId) {
     return (
-      <div className="mtr">
-        <div className="page-inner">
+      <div className="page-inner">
           <div className="page-header">
             <h1>Logboeken</h1>
             <p>Je stagiairs vullen dagelijks hun logboek in; jij checkt elke week af — daarna leest de docent mee</p>
           </div>
-          {error && <div className="card"><span className="status s-rood">{error}</span></div>}
+          {error && <div className="card"><span className="status s_rood">{error}</span></div>}
           {!error && studenten.length === 0 && (
             <div className="card"><p style={{ color: "var(--sub)", fontSize: 13 }}>Geen stagiairs gevonden.</p></div>
           )}
@@ -158,15 +175,13 @@ export default function MentorLogbooksPage() {
               </table>
             </div>
           )}
-        </div>
       </div>
     );
   }
 
   // ─── DETAIL ───
   return (
-    <div className="mtr">
-      <div className="page-inner">
+    <div className="page-inner">
         <div style={{ marginBottom: 12 }}>
           <button className="btn" onClick={() => setDetailId(null)}><i className="ti ti-arrow-left" />Alle logboeken</button>
         </div>
@@ -176,7 +191,7 @@ export default function MentorLogbooksPage() {
         </div>
 
         {loadingDetail && <div className="card"><p style={{ color: "var(--sub)", fontSize: 13 }}>Logboeken laden…</p></div>}
-        {error && <div className="card"><span className="status s-rood">{error}</span></div>}
+        {error && <div className="card"><span className="status s_rood">{error}</span></div>}
         {!loadingDetail && !error && weeks.length === 0 && (
           <div className="zone-act leeg"><i className="ti ti-info-circle" style={{ color: "var(--sub)" }} /><span>Nog geen ingediende weken voor deze student.</span></div>
         )}
@@ -212,7 +227,7 @@ export default function MentorLogbooksPage() {
                     {d.status !== "geen_stagedag" && (
                       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
                         {d.mentor_bevestigd_op ? (
-                          <span className="status s-ok"><i className="ti ti-check" />Dag bevestigd</span>
+                          <span className="status s_ok"><i className="ti ti-check" />Dag bevestigd</span>
                         ) : (
                           <button className="btn sm" disabled={actionLoadingId === `dag-${d.id}`} onClick={() => confirmDag(d.id)}>
                             <i className="ti ti-check" />Dag bevestigen
@@ -236,10 +251,10 @@ export default function MentorLogbooksPage() {
 
                 {kanChecken && (
                   <>
-                    <div className="form-group" style={{ marginTop: 12 }}>
-                      <label className="form-label">Feedback (optioneel)</label>
+                    <div className="form_group" style={{ marginTop: 12 }}>
+                      <label className="form_label">Feedback (optioneel)</label>
                       <textarea
-                        className="form-input"
+                        className="form_input"
                         style={{ minHeight: 48, fontSize: 12.5 }}
                         placeholder="Korte feedback voor deze week…"
                         value={feedbackByWeek[week.id] || ""}
@@ -260,7 +275,6 @@ export default function MentorLogbooksPage() {
             </div>
           );
         })}
-      </div>
     </div>
   );
 }
