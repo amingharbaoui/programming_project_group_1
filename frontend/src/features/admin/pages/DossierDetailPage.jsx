@@ -423,10 +423,8 @@ export default function DossierDetailPage() {
         </div>
         <div className="kv">
           <span className="k">Verzekering</span>
-          <span className="v" style={{ color: isGeregistreerd ? "var(--green)" : "inherit" }}>
+          <span className="v" style={{ color: dossier.verzekering_in_orde ? "var(--green)" : "inherit" }}>
             {dossier.verzekering_in_orde
-              ? "In orde"
-              : isGeregistreerd
               ? "In orde"
               : "Nog niet in orde — wacht op registratie"}
           </span>
