@@ -59,6 +59,7 @@ function DocumentKaart({ soort, documenten, onUpload, onFout, onBekijken }) {
   const inputRef = useRef(null);
 
   const actief = documenten?.[0] ?? null;
+  const heeftBestand = Boolean(actief?.bestand_url) && actief?.status !== "ontbreekt";
 
   async function handleBestandKiezen(e) {
     const bestand = e.target.files?.[0];
@@ -84,7 +85,7 @@ function DocumentKaart({ soort, documenten, onUpload, onFout, onBekijken }) {
         <IconFile size={16} className="doc-file-icon" />
         <div>
           <div className="doc-naam">{soort.naam}</div>
-          {actief && (
+          {heeftBestand && (
             <div className="doc-meta">
               {formatDatum(actief.opgeladen_op)}
             </div>
@@ -100,7 +101,7 @@ function DocumentKaart({ soort, documenten, onUpload, onFout, onBekijken }) {
       <div className="doc-rij-rechts">
         <StatusBadge status={actief?.status ?? "ontbreekt"} />
 
-        {actief?.bestand_url && (
+        {heeftBestand && (
           <button className="btn sm" onClick={() => onBekijken(actief.bestand_url, soort.naam)}>
             <IconEye size={14} /> Bekijken
           </button>
@@ -108,7 +109,7 @@ function DocumentKaart({ soort, documenten, onUpload, onFout, onBekijken }) {
 
         <button className="btn sm primary" disabled={bezig} onClick={() => inputRef.current?.click()}>
           <IconUpload size={14} />
-          {bezig ? "Bezig…" : actief ? "Nieuwe versie" : "Uploaden"}
+          {bezig ? "Bezig…" : heeftBestand ? "Nieuwe versie" : "Uploaden"}
         </button>
         <input
           ref={inputRef}

@@ -565,7 +565,7 @@ export default function DossierDetailPage() {
                   )}
                 </div>
                 <span className={`status ${cfg.cls}`}>{cfg.label}</span>
-                {doc.bestand_naam && (
+                {doc.bestand_naam && doc.status !== "ontbreekt" && (
                   <button className="btn sm" onClick={() => openPreview(doc.bestand_url, doc.bestand_naam)}>
                     <IconEye size={13} stroke={2} />
                     Bekijken

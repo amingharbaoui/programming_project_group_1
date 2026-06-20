@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 import "./MentorContractPage.css";
 import { cacheGet, cacheSet, cacheDelete } from "../mentorCache";
+import { kiesMentorStagiair, onthoudMentorDossier } from "../mentorSelection";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -31,6 +33,7 @@ export default function MentorContractPage() {
   const { user } = useAuth();
 
   const [studenten, setStudenten] = useState([]);
+  const [searchParams] = useSearchParams();
   const [geselecteerdDossier, setGeselecteerdDossier] = useState(null);
   const [contract, setContract] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +47,7 @@ export default function MentorContractPage() {
       const cached = cacheGet("mentor_students");
       if (cached) {
         setStudenten(cached);
-        if (cached.length > 0) setGeselecteerdDossier(cached[0].dossier_id);
+        if (cached.length > 0) setGeselecteerdDossier(kiesMentorStagiair(cached, searchParams)?.dossier_id);
         setLoading(false);
         return;
       }
@@ -54,7 +57,7 @@ export default function MentorContractPage() {
         const data = res.data.data || [];
         cacheSet("mentor_students", data);
         setStudenten(data);
-        if (data.length > 0) setGeselecteerdDossier(data[0].dossier_id);
+        if (data.length > 0) setGeselecteerdDossier(kiesMentorStagiair(data, searchParams)?.dossier_id);
       } catch (err) {
         console.error(err);
       } finally {
@@ -146,7 +149,7 @@ export default function MentorContractPage() {
             <select
               className="form_input"
               value={geselecteerdDossier || ""}
-              onChange={(e) => setGeselecteerdDossier(Number(e.target.value))}
+              onChange={(e) => { const v = Number(e.target.value); setGeselecteerdDossier(v); onthoudMentorDossier(v); }}
             >
               {studenten.map((s) => (
                 <option key={s.dossier_id} value={s.dossier_id}>

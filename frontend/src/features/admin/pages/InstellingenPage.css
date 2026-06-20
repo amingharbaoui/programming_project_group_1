@@ -77,7 +77,7 @@
 .inst_toggle {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
   cursor: pointer;
   user-select: none;
 }
@@ -92,6 +92,7 @@
 .inst_toggle_label {
   font-size: 13px;
   color: var(--dark);
+  min-width: 64px;
 }
 
 .inst_toggle_inline {

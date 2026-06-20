@@ -1,7 +1,7 @@
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 
-// Instellingen ophalen: stageregels (periode/min weken-uren) + documenttypes.
+// Instellingen ophalen: stageregels (periode/min weken-uren) + documenttypes + checklist items.
 async function getSettings(req, res) {
   try {
     const [stageRegels] = await db.query(
@@ -13,9 +13,87 @@ async function getSettings(req, res) {
     const [documentSoorten] = await db.query(
       "SELECT id, naam, type, is_verplicht, is_vast, status FROM document_soorten ORDER BY id"
     );
-    return ok(res, { stageRegels, documentSoorten }, "Instellingen opgehaald");
+    let checklistItems = [];
+    try {
+      const [rows] = await db.query(
+        "SELECT id, tekst, volgorde, actief FROM checklist_items ORDER BY volgorde ASC, id ASC"
+      );
+      checklistItems = rows;
+    } catch (_) {
+      // tabel bestaat nog niet — patch_checklist_items.sql nog niet uitgevoerd
+    }
+    return ok(res, { stageRegels, documentSoorten, checklistItems }, "Instellingen opgehaald");
   } catch (error) {
     return fail(res, 500, "Instellingen ophalen mislukt", error.message);
+  }
+}
+
+// Checklist item aanmaken
+async function createChecklistItem(req, res) {
+  const { tekst, volgorde } = req.body;
+  if (!tekst || !String(tekst).trim()) return fail(res, 400, "Tekst is verplicht");
+  try {
+    const [r] = await db.query(
+      "INSERT INTO checklist_items (tekst, volgorde, actief) VALUES (?, ?, 1)",
+      [String(tekst).trim(), Number(volgorde) || 0]
+    );
+    return ok(res, { id: r.insertId, tekst: String(tekst).trim(), volgorde: Number(volgorde) || 0, actief: 1 }, "Checklist item aangemaakt");
+  } catch (error) {
+    return fail(res, 500, "Checklist item aanmaken mislukt", error.message);
+  }
+}
+
+// Checklist item aanpassen (tekst / volgorde / actief)
+async function updateChecklistItem(req, res) {
+  const id = Number(req.params.id);
+  if (!id) return fail(res, 400, "Ongeldig checklist item id");
+
+  const fields = [];
+  const vals = [];
+  if (req.body.tekst !== undefined) { fields.push("tekst = ?"); vals.push(String(req.body.tekst).trim()); }
+  if (req.body.volgorde !== undefined) { fields.push("volgorde = ?"); vals.push(Number(req.body.volgorde)); }
+  if (req.body.actief !== undefined) { fields.push("actief = ?"); vals.push(req.body.actief ? 1 : 0); }
+  if (fields.length === 0) return fail(res, 400, "Geen velden om aan te passen");
+
+  try {
+    const [r] = await db.query(
+      `UPDATE checklist_items SET ${fields.join(", ")}, aangepast_op = NOW() WHERE id = ?`,
+      [...vals, id]
+    );
+    if (r.affectedRows === 0) return fail(res, 404, "Checklist item niet gevonden");
+    return ok(res, { id }, "Checklist item bijgewerkt");
+  } catch (error) {
+    return fail(res, 500, "Checklist item bijwerken mislukt", error.message);
+  }
+}
+
+// Checklist items resetten naar standaardwaarden
+async function resetChecklistItems(req, res) {
+  try {
+    await db.query("DELETE FROM checklist_items");
+    await db.query(`
+      INSERT INTO checklist_items (id, tekst, volgorde, actief) VALUES
+      (1, 'IT-gerelateerde opdracht met een ontwikkelcomponent', 1, 1),
+      (2, 'Mentor met een technische functie binnen het bedrijf', 2, 1),
+      (3, 'Concrete omschrijving: technologie, taken en team', 3, 1),
+      (4, 'Stage in een professionele bedrijfsomgeving', 4, 1)
+    `);
+    return ok(res, {}, "Checklist items gereset naar standaardwaarden");
+  } catch (error) {
+    return fail(res, 500, "Reset mislukt", error.message);
+  }
+}
+
+// Checklist item verwijderen
+async function deleteChecklistItem(req, res) {
+  const id = Number(req.params.id);
+  if (!id) return fail(res, 400, "Ongeldig checklist item id");
+  try {
+    const [r] = await db.query("DELETE FROM checklist_items WHERE id = ?", [id]);
+    if (r.affectedRows === 0) return fail(res, 404, "Checklist item niet gevonden");
+    return ok(res, { id }, "Checklist item verwijderd");
+  } catch (error) {
+    return fail(res, 500, "Checklist item verwijderen mislukt", error.message);
   }
 }
 
@@ -154,4 +232,4 @@ async function deleteDocumentType(req, res) {
   }
 }
 
-module.exports = { getSettings, updateStageRule, updateDocumentType, createDocumentType, resetDocumentTypes, deleteDocumentType };
+module.exports = { getSettings, updateStageRule, updateDocumentType, createDocumentType, resetDocumentTypes, deleteDocumentType, createChecklistItem, updateChecklistItem, deleteChecklistItem, resetChecklistItems };

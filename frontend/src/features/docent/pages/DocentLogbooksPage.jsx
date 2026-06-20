@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 import "../docent.css";
@@ -29,6 +30,7 @@ function formatDate(value) {
 export default function DocentLogbooksPage() {
   const { user } = useAuth();
 
+  const [searchParams] = useSearchParams();
   const [studenten, setStudenten] = useState([]);
   const [studentId, setStudentId] = useState(null);
   const [weeks, setWeeks] = useState([]);
@@ -49,7 +51,9 @@ export default function DocentLogbooksPage() {
         const data = res.data.data || [];
         setStudenten(data);
         if (data.length > 0) {
-          const sid = data[0].student_id || data[0].id;
+          const param = Number(searchParams.get("student"));
+          const gekozen = data.find((s) => (s.student_id || s.id) === param) || data[0];
+          const sid = gekozen.student_id || gekozen.id;
           setStudentId(sid);
           loadLogbooks(sid);
         } else {
