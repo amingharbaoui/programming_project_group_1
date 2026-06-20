@@ -26,8 +26,8 @@ async function getActiveCompetencies(conn) {
     `SELECT c.id, c.code, c.naam, c.beschrijving, c.gewicht_percentage, c.volgorde
      FROM competenties c
      JOIN competentie_profielen p ON p.id = c.competentie_profiel_id
-     WHERE c.is_actief = 1
-     ORDER BY (p.status = 'actief') DESC, c.volgorde ASC, c.id ASC`
+     WHERE c.is_actief = 1 AND p.status = 'actief'
+     ORDER BY c.volgorde ASC, c.id ASC`
   );
   return rows;
 }
