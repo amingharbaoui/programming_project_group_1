@@ -87,6 +87,17 @@ async function getDossierMeta(connection, dossierId) {
   return rows[0] || null;
 }
 
+// Eerste echte logboekactiviteit van de student is het bewijs dat de stage gestart is —
+// er bestond geen ander codepad dat 'geregistreerd' ooit naar 'stage_loopt' omzette.
+async function startStageIndienNodig(connection, dossierId, huidigeStatus) {
+  if (huidigeStatus === "geregistreerd") {
+    await connection.query(
+      "UPDATE stagedossiers SET status = 'stage_loopt', aangepast_op = NOW() WHERE id = ? AND status = 'geregistreerd'",
+      [dossierId]
+    );
+  }
+}
+
 
 async function getValidMentorIdForWeek(connection, weekId, requestedMentorId) {
   // Eerst de meegegeven mentor valideren — pas als dat geen geldige mentor is, de week ophalen.
@@ -248,6 +259,8 @@ async function createLogbook(req, res) {
       await connection.rollback();
       return fail(res, 409, "Je kan pas een logboek indienen zodra je stagedossier startklaar geregistreerd is");
     }
+
+    await startStageIndienNodig(connection, dossierId, dossier.status);
 
     const totaalUren = sumHours(finalDays);
 
@@ -1033,6 +1046,8 @@ async function saveLogbookDay(req, res) {
       await conn.rollback();
       return fail(res, 409, "Je kan pas een logboek invullen zodra je stagedossier startklaar geregistreerd is");
     }
+
+    await startStageIndienNodig(conn, dossierId, dossiers[0].status);
 
     // Week zoeken of aanmaken (week_start = maandag van de datum, week_einde = vrijdag).
     const [weken] = await conn.query(
