@@ -103,6 +103,11 @@ async function signContract(req, res) {
       [now, contract.id]
     );
 
+    await connection.query(
+      "UPDATE stagedossiers SET status = 'wacht_op_bedrijf', aangepast_op = NOW() WHERE id = ? AND status = 'wacht_op_student'",
+      [contract.stagedossier_id]
+    );
+
     await connection.commit();
 
     // Volgende ondertekenaar (mentor/bedrijf) en de administratie verwittigen.
