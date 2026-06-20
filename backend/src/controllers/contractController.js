@@ -61,6 +61,11 @@ async function getContract(req, res) {
    Student tekent de stageovereenkomst digitaal */
 async function signContract(req, res) {
   const studentId = getUserId(req);
+
+  if (req.body?.bevestigd !== true) {
+    return fail(res, 400, "Je moet bevestigen dat je de stageovereenkomst gelezen hebt voor je tekent");
+  }
+
   const connection = await db.getConnection();
 
   try {

@@ -108,7 +108,7 @@ export default function StudentContractPage() {
     setBezig(true);
     setFout(null);
     try {
-      const res = await apiRequest("POST", "/contracts/sign");
+      const res = await apiRequest("POST", "/contracts/sign", { bevestigd: true });
       cacheDelete("student_contract");
       await laadContract();
       setAkkoord(false);
