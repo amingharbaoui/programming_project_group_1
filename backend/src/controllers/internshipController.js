@@ -966,9 +966,18 @@ async function createDossierAfterApproval(connection, stagevoorstelId) {
 
   let mentorId = await getMentorIdByEmail(connection, data.mentor_email);
   if (!mentorId && data.mentor_email) {
-    const [bestaand] = await connection.query("SELECT id FROM gebruikers WHERE email = ? LIMIT 1", [data.mentor_email]);
+    const [bestaand] = await connection.query("SELECT id, hoofdrol FROM gebruikers WHERE email = ? LIMIT 1", [data.mentor_email]);
     if (bestaand.length > 0) {
+      if (bestaand[0].hoofdrol !== "mentor") {
+        throw new Error(`Het e-mailadres ${data.mentor_email} hoort bij een gebruiker die geen mentor is en kan niet als mentor gekoppeld worden`);
+      }
       mentorId = bestaand[0].id;
+      const mentorRecordToken = crypto.randomBytes(24).toString("hex");
+      await connection.query(
+        `INSERT INTO mentoren (gebruiker_id, bedrijf_id, functie, mag_stageovereenkomst_tekenen, uitnodiging_status, uitnodiging_token, uitnodiging_vervalt_op)
+         VALUES (?, ?, ?, 1, 'verstuurd', ?, DATE_ADD(NOW(), INTERVAL 14 DAY))`,
+        [mentorId, data.bedrijf_id, data.mentor_functie || "Mentor", mentorRecordToken]
+      );
     } else {
       const naam = String(data.mentor_naam || "").trim();
       const spatie = naam.indexOf(" ");
