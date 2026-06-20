@@ -164,6 +164,9 @@ async function inviteMentor(req, res) {
   if (!voornaam || !achternaam || !email) {
     return fail(res, 400, "Voornaam, achternaam en e-mail zijn verplicht");
   }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return fail(res, 400, "Ongeldig e-mailadres");
+  }
 
   // Admin e-mailadres ophalen als afzender
   const adminId = Number(req.user?.id);
@@ -415,6 +418,7 @@ async function inviteUser(req, res) {
   const rol = String(req.body.rol ?? req.body.hoofdrol ?? "").trim();
 
   if (!voornaam || !achternaam || !email) return fail(res, 400, "Voornaam, achternaam en e-mail zijn verplicht");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail(res, 400, "Ongeldig e-mailadres");
   if (!GELDIGE_INVITE_ROLLEN.includes(rol)) {
     return fail(res, 400, `Ongeldige rol. Kies uit: ${GELDIGE_INVITE_ROLLEN.join(", ")}`);
   }
