@@ -54,7 +54,7 @@ function ScoreDisplay({ waarde }) {
   );
 }
 
-function EvalDetail({ evalData, activeType, userId, onRefresh }) {
+function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId }) {
   const evaluatie = evalData?.evaluaties?.find((e) => e.type === activeType) || null;
   const competenties = evalData?.competenties || [];
 
@@ -78,6 +78,7 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
   const [verslag, setVerslag] = useState(evaluatie?.verslag ?? "");
   const [eindpresentatieScore, setEindpresentatieScore] = useState(evaluatie?.eindpresentatie_score ?? null);
   const [bezig, setBezig]   = useState(false);
+  const [openBezig, setOpenBezig] = useState(false);
   const [melding, setMelding] = useState({ tekst: "", type: "" });
   const [vrijgaveMelding, setVrijgaveMelding] = useState({ tekst: "", type: "" });
 
@@ -193,6 +194,27 @@ function EvalDetail({ evalData, activeType, userId, onRefresh }) {
         <p className="muted">
           {activeType === "tussentijds" ? "Tussentijdse" : "Finale"} evaluatie is nog niet beschikbaar.
         </p>
+        {melding.tekst && <p className={`melding ${melding.type}`}>{melding.tekst}</p>}
+        {stagedossierId && (
+          <button
+            className="btn primary"
+            disabled={openBezig}
+            onClick={async () => {
+              setOpenBezig(true);
+              setMelding({ tekst: "", type: "" });
+              try {
+                await api.post("/evaluations/open", { stagedossierId, type: activeType });
+                onRefresh?.();
+              } catch (e) {
+                setMelding({ tekst: e.response?.data?.message || "Openen mislukt", type: "error" });
+              } finally {
+                setOpenBezig(false);
+              }
+            }}
+          >
+            {openBezig ? "Bezig…" : `${activeType === "tussentijds" ? "Tussentijdse" : "Finale"} evaluatie openen`}
+          </button>
+        )}
       </div>
     );
   }
@@ -558,6 +580,7 @@ export default function DocentEvaluationsPage() {
               activeType={activeType}
               userId={user.id}
               onRefresh={() => loadEval(geselecteerdId)}
+              stagedossierId={geselecteerdeStudent?.dossier_id}
             />
           )}
         </div>
