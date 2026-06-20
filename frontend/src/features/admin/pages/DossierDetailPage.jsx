@@ -503,7 +503,7 @@ export default function DossierDetailPage() {
             <div className="dd_doc_naam">stageovereenkomst_{student.toLowerCase().replace(/\s+/g, "_")}.pdf</div>
             <div className="dd_doc_meta">{dossier.bedrijf_naam}</div>
           </div>
-          <button className="btn sm" onClick={() => openPreview(ovk?.bestand_url, `stageovereenkomst_${student.toLowerCase().replace(/\s+/g, "_")}.pdf`)} disabled={!ovk?.bestand_url}>
+          <button className="btn sm" onClick={() => openPreview(ovk?.bestand_url || `/admin/dossiers/${id}/contract-pdf`, `stageovereenkomst_${student.toLowerCase().replace(/\s+/g, "_")}.pdf`)} disabled={!ovk}>
             <IconEye size={13} stroke={2} />
             Bekijken
           </button>
