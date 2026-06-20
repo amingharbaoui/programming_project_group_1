@@ -119,7 +119,7 @@ export default function DocentStudentDossierPage() {
           {/* Snelle links */}
           <div className="card" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button className="btn sm" onClick={() => navigate(`/docent/logbooks?student=${d.student_id}`)}><i className="ti ti-notebook" /> Logboek</button>
-            <button className="btn sm" onClick={() => navigate(`/docent/evaluation?student=${d.student_id}`)}><i className="ti ti-clipboard-check" /> Evaluatie</button>
+            <button className="btn sm" onClick={() => navigate(`/docent/evaluations?student=${d.student_id}`)}><i className="ti ti-clipboard-check" /> Evaluatie</button>
             <button className="btn sm" onClick={() => navigate("/docent/planning")}><i className="ti ti-calendar" /> Planning</button>
           </div>
 
