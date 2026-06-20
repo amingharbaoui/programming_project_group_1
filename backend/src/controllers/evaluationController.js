@@ -448,6 +448,18 @@ async function releaseResult(req, res) {
       await conn.rollback();
       return fail(res, 409, "Er zijn nog logboekweken die niet volledig nagekeken zijn — die moeten eerst afgehandeld zijn voor je het resultaat vrijgeeft.");
     }
+    const [dossierRij] = await conn.query("SELECT aantal_weken FROM stagedossiers WHERE id = ? LIMIT 1", [evaluatie.stagedossier_id]);
+    const aantalWeken = Number(dossierRij[0]?.aantal_weken || 0);
+    if (aantalWeken > 0) {
+      const [goedWeken] = await conn.query(
+        "SELECT COUNT(*) AS aantal FROM logboek_weken WHERE stagedossier_id = ? AND status = 'goedgekeurd_door_docent'",
+        [evaluatie.stagedossier_id]
+      );
+      if (goedWeken[0].aantal < aantalWeken) {
+        await conn.rollback();
+        return fail(res, 409, `Niet alle logboekweken zijn nagekeken: ${goedWeken[0].aantal} van ${aantalWeken} goedgekeurd.`);
+      }
+    }
     const [pres] = await conn.query(
       "SELECT status FROM planning_momenten WHERE stagedossier_id = ? AND type = 'eindpresentatie' ORDER BY id DESC LIMIT 1",
       [evaluatie.stagedossier_id]
