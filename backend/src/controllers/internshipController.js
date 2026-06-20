@@ -148,10 +148,22 @@ async function createInternship(req, res) {
   } = req.body;
 
   const finalBedrijfNaam = bedrijfNaam || bedrijfsnaam;
-  const finalUrenPerWeek = Number(urenPerWeek || 38);
+  const finalUrenPerWeek = Number(urenPerWeek ?? 38);
 
   if (!finalBedrijfNaam || !mentorNaam || !mentorEmail || !stagefunctie || !opdrachtomschrijving || !startdatum || !einddatum) {
     return fail(res, 400, "Verplichte velden ontbreken");
+  }
+
+  const startDate = new Date(startdatum);
+  const endDate = new Date(einddatum);
+  if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+    return fail(res, 400, "Ongeldige start- of einddatum");
+  }
+  if (startDate > endDate) {
+    return fail(res, 400, "De startdatum moet voor de einddatum liggen");
+  }
+  if (!Number.isFinite(finalUrenPerWeek) || finalUrenPerWeek <= 0 || finalUrenPerWeek > 60) {
+    return fail(res, 400, "Uren per week moet tussen 1 en 60 liggen");
   }
 
   const connection = await db.getConnection();
@@ -169,6 +181,15 @@ async function createInternship(req, res) {
     if (!stageRegel) {
       await connection.rollback();
       return fail(res, 400, "Geen actieve stage_regel gevonden");
+    }
+
+    if (stageRegel.stagevenster_start && startDate < new Date(stageRegel.stagevenster_start)) {
+      await connection.rollback();
+      return fail(res, 400, "De startdatum valt buiten het stagevenster van de opleiding");
+    }
+    if (stageRegel.stagevenster_einde && endDate > new Date(stageRegel.stagevenster_einde)) {
+      await connection.rollback();
+      return fail(res, 400, "De einddatum valt buiten het stagevenster van de opleiding");
     }
 
     const aantalWeken = calculateWeeks(startdatum, einddatum);
