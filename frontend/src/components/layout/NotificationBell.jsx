@@ -63,25 +63,25 @@ export default function NotificationBell() {
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  async function markEen(id) {
-    try {
-      await apiRequest("post", `/notifications/${id}/read`);
-      load();
-    } catch { /* stil */ }
-  }
-
   async function deleteEen(id) {
+    // optimistisch: verwijder meteen uit de lijst
+    setMeldingen(prev => prev.filter(m => m.id !== id));
+    setOngelezen(prev => {
+      const m = meldingen.find(m => m.id === id);
+      return m && m.status !== "gelezen" ? Math.max(0, prev - 1) : prev;
+    });
     try {
       await apiRequest("delete", `/notifications/${id}`);
-      load();
-    } catch { /* stil */ }
+    } catch { load(); /* herstel bij fout */ }
   }
 
   async function markAlles() {
+    // optimistisch: markeer alles als gelezen meteen
+    setMeldingen(prev => prev.map(m => ({ ...m, status: "gelezen" })));
+    setOngelezen(0);
     try {
       await apiRequest("post", "/notifications/read-all");
-      load();
-    } catch { /* stil */ }
+    } catch { load(); /* herstel bij fout */ }
   }
 
   return (
