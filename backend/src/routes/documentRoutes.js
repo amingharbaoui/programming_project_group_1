@@ -3,8 +3,8 @@ const router = express.Router();
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
 const { getDocuments, uploadDocument, uploadEigenDocument, uploadMiddleware, getSoorten, approveDocument, rejectDocument, serveBestand } = require("../controllers/documentController");
 
-// GET /api/documents/bestand/:filename — geen auth vereist (iframe-toegankelijk)
-router.get("/bestand/:filename", serveBestand);
+// GET /api/documents/bestand/* — geen auth vereist (iframe-toegankelijk); wildcard voor subdirectories
+router.get(/^\/bestand\/(.+)$/, serveBestand);
 
 router.use(authenticateDemoUser);
 

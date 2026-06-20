@@ -10,6 +10,8 @@ import {
   IconEye,
   IconFolderOpen,
   IconArrowRight,
+  IconFileOff,
+  IconX,
 } from "@tabler/icons-react";
 
 const STATUS_MAP = {
@@ -197,6 +199,7 @@ export default function StudentDocumentsPage() {
   const [fout, setFout]             = useState(null);
   const [uploadFout, setUploadFout] = useState(null);
   const [preview, setPreview] = useState(null); // { url, naam }
+  const [iframeErr, setIframeErr] = useState(false);
   const [eigenBezig, setEigenBezig] = useState(false);
   const eigenInputRef = useRef(null);
 
@@ -363,39 +366,58 @@ export default function StudentDocumentsPage() {
     </div>
 
     {/* Preview-modal */}
-    <Modal
-      wide
-      open={!!preview}
-      onClose={() => setPreview(null)}
-      titel={preview?.naam ?? "Document"}
-      footer={
-        <a
-          href={bestandSrc(preview?.url)}
-          target="_blank"
-          rel="noreferrer"
-          className="btn"
-          style={{ marginRight: "auto" }}
+    {preview && (
+      <div
+        style={{ position: "fixed", inset: 0, background: "rgba(17,17,17,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: 20 }}
+        onClick={() => { setPreview(null); setIframeErr(false); }}
+      >
+        <div
+          style={{ background: "var(--white)", borderRadius: 14, border: "0.5px solid var(--border)", width: "92vw", maxWidth: 860, display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}
+          onClick={(e) => e.stopPropagation()}
         >
-          <i className="ti ti-external-link"></i> Openen in nieuw tabblad
-        </a>
-      }
-    >
-      {preview && (
-        isAfbeelding(preview.url) ? (
-          <img
-            src={bestandSrc(preview.url)}
-            alt={preview.naam}
-            style={{ maxWidth: "100%", display: "block", borderRadius: 6 }}
-          />
-        ) : (
-          <iframe
-            src={bestandSrc(preview.url)}
-            title={preview.naam}
-            style={{ width: "100%", height: "65vh", border: "none", borderRadius: 6 }}
-          />
-        )
-      )}
-    </Modal>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "0.5px solid var(--border)" }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--dark)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+              {preview.naam}
+            </span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0, marginLeft: 12 }}>
+              <a href={bestandSrc(preview.url)} target="_blank" rel="noreferrer" className="btn sm">
+                <i className="ti ti-external-link" style={{ fontSize: 13 }}></i> Openen in nieuw venster
+              </a>
+              <button
+                style={{ width: 30, height: 30, border: "0.5px solid var(--border)", borderRadius: 7, background: "var(--white)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--sub)", flexShrink: 0 }}
+                onClick={() => { setPreview(null); setIframeErr(false); }}
+              >
+                <IconX size={16} stroke={2} />
+              </button>
+            </div>
+          </div>
+          {/* Body */}
+          <div style={{ padding: 0 }}>
+            {isAfbeelding(preview.url) ? (
+              <img src={bestandSrc(preview.url)} alt={preview.naam} style={{ maxWidth: "100%", display: "block", borderRadius: "0 0 14px 14px" }} />
+            ) : iframeErr ? (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, height: "70vh", color: "var(--faint)" }}>
+                <IconFileOff size={40} stroke={1.4} />
+                <span style={{ fontSize: 13, fontWeight: 500 }}>Document niet beschikbaar</span>
+              </div>
+            ) : (
+              <iframe
+                src={bestandSrc(preview.url)}
+                title={preview.naam}
+                style={{ width: "100%", height: "70vh", border: "none", borderRadius: "0 0 14px 14px", display: "block" }}
+                onLoad={(e) => {
+                  try {
+                    const text = e.target.contentDocument?.body?.innerText || "";
+                    if (text.includes('"success":false')) setIframeErr(true);
+                  } catch {}
+                }}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Fout-modal bij mislukte upload */}
     <Modal

@@ -28,6 +28,18 @@
   max-width: min(900px, 92vw);
 }
 
+/* Header action slot */
+.mh-action {
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+/* Body zonder padding (voor iframe previews) */
+.modal-body--no-pad {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
 /* Kop */
 .modal-head {
   padding: 15px 18px;
@@ -65,7 +77,8 @@
 
 /* Sluitknop rechts */
 .modal-head .mh-x {
-  margin-left: auto;
+  margin-left: 0;
+  flex-shrink: 0;
 }
 
 /* Body */
@@ -75,6 +88,7 @@
   font-size: 13.5px;
   line-height: 1.65;
   color: var(--gray);
+  flex: 1;
 }
 
 .modal-body p {

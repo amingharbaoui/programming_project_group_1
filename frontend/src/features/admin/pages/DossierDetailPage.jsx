@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "./DossierDetailPage.css";
 import "../../../index.css";
-import api from "../../../services/api";
+import api, { fileUrl } from "../../../services/api";
 import {
   IconArrowLeft,
   IconFolder,
@@ -22,6 +22,7 @@ import {
   IconWalk,
   IconUsers,
   IconAlertTriangle,
+  IconFileOff,
 } from "@tabler/icons-react";
 
 /* ─── Real DB status values (schema.sql line 312) ─── */
@@ -162,6 +163,11 @@ export default function DossierDetailPage() {
 
   /* document-level approve/reject */
   const [docModal, setDocModal] = useState(null); // null | { id, naam }
+
+  /* PDF preview */
+  const [preview, setPreview] = useState(null); // null | { naam, url }
+  const [iframeErr, setIframeErr] = useState(false);
+  function openPreview(url, naam) { if (url) setPreview({ naam, url }); }
   const [docReden, setDocReden] = useState("");
   const [docRedenError, setDocRedenError] = useState("");
 
@@ -497,7 +503,7 @@ export default function DossierDetailPage() {
             <div className="dd_doc_naam">stageovereenkomst_{student.toLowerCase().replace(/\s+/g, "_")}.pdf</div>
             <div className="dd_doc_meta">{dossier.bedrijf_naam}</div>
           </div>
-          <button className="btn sm">
+          <button className="btn sm" onClick={() => openPreview(ovk?.bestand_url, `stageovereenkomst_${student.toLowerCase().replace(/\s+/g, "_")}.pdf`)} disabled={!ovk?.bestand_url}>
             <IconEye size={13} stroke={2} />
             Bekijken
           </button>
@@ -566,7 +572,7 @@ export default function DossierDetailPage() {
                 </div>
                 <span className={`status ${cfg.cls}`}>{cfg.label}</span>
                 {doc.bestand_naam && (
-                  <button className="btn sm">
+                  <button className="btn sm" onClick={() => openPreview(doc.bestand_url, doc.bestand_naam)}>
                     <IconEye size={13} stroke={2} />
                     Bekijken
                   </button>
@@ -681,19 +687,21 @@ export default function DossierDetailPage() {
           <span className="k">Inhoud</span>
           <span className="v">Competentiescores · eindpresentatie · eindcijfer · logboekstatus · stageperiode · documentstatus</span>
         </div>
-        <p className="dd_card_footer_muted">
-          Het eindresultaat werd bepaald en vrijgegeven door de docent — de administratie genereert enkel het eindoverzicht.
-        </p>
-        {afgerond && (
-          <div className="dd_doc_row" style={{ marginTop: 8 }}>
-            <div className="dd_doc_icon"><IconFileTypePdf size={16} stroke={1.5} /></div>
-            <div className="dd_doc_info">
-              <div className="dd_doc_naam">eindoverzicht_{student.toLowerCase().replace(/\s+/g, "_")}.pdf</div>
-              <div className="dd_doc_meta">Zichtbaar voor student en stagebegeleider</div>
+        {afgerond && (() => {
+          const eindDoc = (dossier.documenten || []).find((d) => d.type === "eindoverzicht");
+          return (
+            <div className="dd_doc_row" style={{ marginTop: 8 }}>
+              <div className="dd_doc_icon"><IconFileTypePdf size={16} stroke={1.5} /></div>
+              <div className="dd_doc_info">
+                <div className="dd_doc_naam">eindoverzicht_{student.toLowerCase().replace(/\s+/g, "_")}.pdf</div>
+                <div className="dd_doc_meta">Zichtbaar voor student en stagebegeleider</div>
+              </div>
+              <button className="btn sm" onClick={() => openPreview(eindDoc?.bestand_url, `eindoverzicht_${student.toLowerCase().replace(/\s+/g, "_")}.pdf`)} disabled={!eindDoc?.bestand_url}>
+                <IconEye size={13} stroke={2} />Bekijken
+              </button>
             </div>
-            <button className="btn sm"><IconEye size={13} stroke={2} />Bekijken</button>
-          </div>
-        )}
+          );
+        })()}
         {!afgerond && (
           <div className="dd_card_actions">
             <button className="btn primary" onClick={() => setModal("eindoverzicht")}>
@@ -987,6 +995,45 @@ export default function DossierDetailPage() {
                 <IconX size={14} stroke={2.5} />
                 {actionLoading ? "Bezig..." : "Afkeuren"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Preview */}
+      {preview && (
+        <div className="modal_overlay" onClick={() => { setPreview(null); setIframeErr(false); }}>
+          <div className="modal_box" style={{ maxWidth: 860, width: "92vw" }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal_header">
+              <span className="modal_title">{preview.naam}</span>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <a href={fileUrl(preview.url)} target="_blank" rel="noreferrer" className="btn sm">
+                  <IconFileExport size={13} stroke={2} /> Openen in nieuw venster
+                </a>
+                <button className="icon_close" onClick={() => { setPreview(null); setIframeErr(false); }}><IconX size={16} stroke={2} /></button>
+              </div>
+            </div>
+            <div className="modal_body" style={{ padding: 0 }}>
+              {/\.(png|jpe?g|gif|webp)(\?|$)/i.test(preview.url) ? (
+                <img src={fileUrl(preview.url)} alt={preview.naam} style={{ maxWidth: "100%", display: "block", borderRadius: "0 0 14px 14px" }} />
+              ) : iframeErr ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, height: "70vh", color: "var(--faint)" }}>
+                  <IconFileOff size={40} stroke={1.4} />
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>Document niet beschikbaar</span>
+                </div>
+              ) : (
+                <iframe
+                  src={fileUrl(preview.url)}
+                  title={preview.naam}
+                  style={{ width: "100%", height: "70vh", border: "none", borderRadius: "0 0 14px 14px", display: "block" }}
+                  onLoad={(e) => {
+                    try {
+                      const text = e.target.contentDocument?.body?.innerText || "";
+                      if (text.includes('"success":false')) setIframeErr(true);
+                    } catch {}
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>

@@ -70,6 +70,13 @@ export default function NotificationBell() {
     } catch { /* stil */ }
   }
 
+  async function deleteEen(id) {
+    try {
+      await apiRequest("delete", `/notifications/${id}`);
+      load();
+    } catch { /* stil */ }
+  }
+
   async function markAlles() {
     try {
       await apiRequest("post", "/notifications/read-all");
@@ -114,7 +121,6 @@ export default function NotificationBell() {
                   <div
                     key={m.id}
                     className={`notif-item${!gelezen ? " sel" : ""}`}
-                    onClick={() => !gelezen && markEen(m.id)}
                   >
                     <div className={`notif-icon ${colorCls}`}>
                       <i className={`ti ${icon}`}></i>
@@ -126,15 +132,13 @@ export default function NotificationBell() {
                       </div>
                       <div className="ts">{formatTS(m.aangemaakt_op)}</div>
                     </div>
-                    {!gelezen && (
-                      <button
-                        className="notif-x"
-                        onClick={(e) => { e.stopPropagation(); markEen(m.id); }}
-                        title="Markeer als gelezen"
-                      >
-                        <i className="ti ti-x"></i>
-                      </button>
-                    )}
+                    <button
+                      className="notif-x"
+                      onClick={(e) => { e.stopPropagation(); deleteEen(m.id); }}
+                      title="Verwijderen"
+                    >
+                      <i className="ti ti-x"></i>
+                    </button>
                   </div>
                 );
               })
