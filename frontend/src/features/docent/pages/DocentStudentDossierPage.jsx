@@ -22,9 +22,15 @@ function getStatusClass(status) {
 function getStappen(d, overeenkomst, evaluaties) {
   const stageAfgerond = ["afgerond", "voltooid", "resultaat_vrijgegeven"].includes(d?.status);
   const contractKlaar = overeenkomst?.status === "geregistreerd";
+  // De stage zelf wordt afgeleid uit de échte dossierstatus, niet uit de contractstatus —
+  // anders toont de stepper "nog niet gestart" terwijl het logboek/evaluatie al wél lopen
+  // (kan gebeuren als de administratie het contract laat registreert).
+  const stageLoopt = stageAfgerond || ["actief", "stage_loopt"].includes(d?.status);
   const finaal = (evaluaties || []).find((e) => e.type === "finaal");
-  const evalVrijgegeven = finaal?.status === "vrijgegeven";
-  const evalLoopt = (evaluaties || []).some((e) => e.status && e.status !== "niet_open");
+  // Een evaluatie kan logisch niet "lopen" of "vrijgegeven" zijn vóór de stage zelf actief is —
+  // ook als losse datavelden dat (door een fout elders) wel zouden suggereren.
+  const evalVrijgegeven = stageLoopt && finaal?.status === "vrijgegeven";
+  const evalLoopt = stageLoopt && (evaluaties || []).some((e) => e.status && e.status !== "niet_open");
 
   return [
     { label: "Voorstel", sub: "Ingediend", state: "done" },
@@ -36,8 +42,8 @@ function getStappen(d, overeenkomst, evaluaties) {
     },
     {
       label: "Stage",
-      sub: stageAfgerond ? "Afgerond" : contractKlaar ? "Loopt" : "Nog niet gestart",
-      state: stageAfgerond ? "done" : contractKlaar ? "actief" : "todo",
+      sub: stageAfgerond ? "Afgerond" : stageLoopt ? "Loopt" : "Nog niet gestart",
+      state: stageAfgerond ? "done" : stageLoopt ? "actief" : "todo",
     },
     {
       label: "Evaluatie",
@@ -114,13 +120,6 @@ export default function DocentStudentDossierPage() {
                 </Fragment>
               ))}
             </div>
-          </div>
-
-          {/* Snelle links */}
-          <div className="card" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            <button className="btn sm" onClick={() => navigate(`/docent/logbooks?student=${d.student_id}`)}><i className="ti ti-notebook" /> Logboek</button>
-            <button className="btn sm" onClick={() => navigate(`/docent/evaluation?student=${d.student_id}`)}><i className="ti ti-clipboard-check" /> Evaluatie</button>
-            <button className="btn sm" onClick={() => navigate("/docent/planning")}><i className="ti ti-calendar" /> Planning</button>
           </div>
 
           {/* Student */}

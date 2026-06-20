@@ -45,7 +45,11 @@ function typeLabel(type) {
 function getStappen(contract, gedeeldOp, dossierStatus) {
   const contractKlaar = contract?.status === "geregistreerd";
   const stageAfgerond = ["afgerond", "voltooid", "resultaat_vrijgegeven"].includes(dossierStatus);
-  const evalVrijgegeven = dossierStatus === "resultaat_vrijgegeven";
+  // Stage afleiden uit de échte dossierstatus, niet uit "afspraken gedeeld" — anders kan de
+  // stepper "nog niet gestart" tonen terwijl het logboek al wél loopt.
+  const stageLoopt = stageAfgerond || ["actief", "stage_loopt"].includes(dossierStatus);
+  // Eindresultaat kan logisch niet vrijgegeven zijn vóór de stage zelf actief is.
+  const evalVrijgegeven = stageLoopt && dossierStatus === "resultaat_vrijgegeven";
 
   return [
     {
@@ -60,8 +64,8 @@ function getStappen(contract, gedeeldOp, dossierStatus) {
     },
     {
       label: "Stage",
-      sub: stageAfgerond ? "Afgerond" : gedeeldOp ? "Loopt" : "Nog niet gestart",
-      state: stageAfgerond ? "done" : gedeeldOp ? "actief" : "todo",
+      sub: stageAfgerond ? "Afgerond" : stageLoopt ? "Loopt" : "Nog niet gestart",
+      state: stageAfgerond ? "done" : stageLoopt ? "actief" : "todo",
     },
     {
       label: "Evaluatie",
