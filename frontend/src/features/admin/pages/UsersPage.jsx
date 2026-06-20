@@ -376,9 +376,12 @@ export default function UsersPage() {
   }
 
   function formatUser(u) {
+    const voornaam = u.voornaam || "";
+    const achternaam = u.achternaam || "";
     return {
       id: u.id,
-      naam: `${u.voornaam || ""} ${u.achternaam || ""}`.trim() || "Onbekende gebruiker",
+      naam: `${voornaam} ${achternaam}`.trim() || "Onbekende gebruiker",
+      initialen: [voornaam, achternaam].filter(Boolean).map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?",
       email: u.email,
       rol: u.hoofdrol,
       status: u.status,
@@ -468,7 +471,12 @@ export default function UsersPage() {
                 const u = formatUser(rawUser);
                 return (
                   <tr key={u.id}>
-                    <td className="user-name">{u.naam}</td>
+                    <td className="user-name">
+                      <div className="tw_student_cell">
+                        <div className="tw_avatar">{u.initialen}</div>
+                        <span>{u.naam}</span>
+                      </div>
+                    </td>
                     <td>{u.email}</td>
                     <td>
                       <span className={`badge role-${u.rol.toLowerCase().replace(/\s+/g, "-")}`}>{u.rol}</span>

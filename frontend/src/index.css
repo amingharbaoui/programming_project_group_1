@@ -149,12 +149,14 @@ h1 {
 	color: var(--blue);
 }
 
-.s_rood {
+.s_rood,
+.s_red {
 	background: var(--red-light);
 	color: var(--red);
 }
 
-.s_grijs {
+.s_grijs,
+.s_gray {
 	background: #f0f0ee;
 	color: var(--sub);
 }

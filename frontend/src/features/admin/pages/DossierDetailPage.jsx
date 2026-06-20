@@ -27,11 +27,11 @@ import {
 
 /* ─── Real DB status values (schema.sql line 312) ─── */
 const STATUS_CONFIG = {
-  wacht_op_student:              { cls: "s_gray",  label: "Wacht op student" },
-  wacht_op_bedrijf:              { cls: "s_gray",  label: "Wacht op stagebedrijf" },
+  wacht_op_student:              { cls: "s_amber", label: "Wacht op student" },
+  wacht_op_bedrijf:              { cls: "s_amber", label: "Wacht op stagebedrijf" },
   in_controle_bij_administratie: { cls: "s_amber", label: "In controle" },
   document_afgekeurd:            { cls: "s_red",   label: "Wacht op nieuwe versie" },
-  geregistreerd:                 { cls: "s_ok",    label: "Startklaar" },
+  geregistreerd:                 { cls: "s_ok",    label: "Geregistreerd" },
   stage_loopt:                   { cls: "s_info",  label: "Stage loopt" },
   resultaat_vrijgegeven:         { cls: "s_amber", label: "Eindoverzicht te genereren" },
   afgerond:                      { cls: "s_ok",    label: "Afgerond" },
@@ -427,7 +427,7 @@ export default function DossierDetailPage() {
             {dossier.verzekering_in_orde
               ? "In orde"
               : isGeregistreerd
-              ? "In orde — geregistreerd"
+              ? "In orde"
               : "Nog niet in orde — wacht op registratie"}
           </span>
         </div>
@@ -511,13 +511,9 @@ export default function DossierDetailPage() {
 
         {isGeregistreerd ? (
           <div className="dd_ovk_footer dd_ovk_footer_ok">
-            <IconCheck size={13} stroke={2.5} /> Geregistreerd — de verzekering is in orde.
+            <IconCheck size={13} stroke={2.5} /> De verzekering is in orde.
           </div>
-        ) : (
-          <div className="dd_ovk_footer">
-            De administratie controleert en registreert de stageovereenkomst zodra alle handtekeningen binnen zijn.
-          </div>
-        )}
+        ) : null}
       </div>
     );
   }
@@ -601,9 +597,6 @@ export default function DossierDetailPage() {
               </div>
             );
           })}
-        </div>
-        <div className="dd_card_footer_muted">
-          Het dossier is pas compleet als de stageovereenkomst geregistreerd is en alle verplichte documenten goedgekeurd zijn.
         </div>
       </div>
     );

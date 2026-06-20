@@ -47,6 +47,7 @@ export default function ToewijzingenPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [modalError, setModalError] = useState("");
 
+  const [successModal, setSuccessModal] = useState(false);
   const [toast, setToast] = useState(null);
   const showToast = useCallback((msg, type = "ok") => {
     setToast({ msg, type });
@@ -98,10 +99,10 @@ export default function ToewijzingenPage() {
       await api.patch(`/admin/dossiers/${modal.dossier.id}/assign`, {
         stagebegeleiderId: Number(geselecteerdeDocent),
       });
-      showToast("Stagebegeleider gekoppeld.");
       cacheDelete("admin_dossiers");
       setModal(null);
       load();
+      setSuccessModal(true);
     } catch (err) {
       showToast(err.response?.data?.message || "Koppelen mislukt", "error");
     } finally {
@@ -181,10 +182,7 @@ export default function ToewijzingenPage() {
 
       {!loading && !error && met.length > 0 && (
         <div className="card tw_card">
-          <div className="tw_section_title">
-            <IconCircleCheck size={16} stroke={1.8} />
-            Stagebegeleider toegewezen
-          </div>
+
           <table className="tbl tw_tbl">
             <thead>
               <tr>
@@ -281,6 +279,27 @@ export default function ToewijzingenPage() {
                 <IconLink size={16} stroke={1.8} />
                 {actionLoading ? "Bezig..." : heeftBegeleider(modal.dossier) ? "Opslaan" : "Koppelen"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {successModal && (
+        <div className="modal_overlay" onClick={() => setSuccessModal(false)}>
+          <div className="modal_box modal_box_sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal_header">
+              <span>Stagebegeleider gekoppeld</span>
+              <button className="icon_close" onClick={() => setSuccessModal(false)}>
+                <IconX size={16} stroke={1.8} />
+              </button>
+            </div>
+            <div className="modal_body">
+              <p style={{ margin: 0, fontSize: 14, color: "var(--dark)" }}>
+                De stagebegeleider is succesvol gekoppeld aan het dossier.
+              </p>
+            </div>
+            <div className="modal_footer">
+              <button className="btn primary" onClick={() => setSuccessModal(false)}>OK</button>
             </div>
           </div>
         </div>
