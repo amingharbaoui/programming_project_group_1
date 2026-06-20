@@ -1374,7 +1374,30 @@ async function registerDossierStartklaar(req, res) {
       return fail(res, 400, `Dossier nog niet startklaar: ${ontbrekend.join("; ")}`);
     }
 
-    await db.query("UPDATE stagedossiers SET status = 'geregistreerd', aangepast_op = NOW() WHERE id = ?", [dossierId]);
+    const adminId = Number(req.user?.id);
+
+    await db.query(
+      `UPDATE stageovereenkomsten
+       SET status = 'geregistreerd',
+           opleiding_getekend_op = COALESCE(opleiding_getekend_op, NOW()),
+           gecontroleerd_door_id = COALESCE(gecontroleerd_door_id, ?),
+           gecontroleerd_op = COALESCE(gecontroleerd_op, NOW()),
+           geregistreerd_door_id = ?,
+           geregistreerd_op = NOW(),
+           aangepast_op = NOW()
+       WHERE stagedossier_id = ? AND status <> 'geregistreerd'`,
+      [adminId, adminId, dossierId]
+    );
+
+    await db.query(
+      `UPDATE documenten doc
+       JOIN document_soorten ds ON ds.id = doc.document_soort_id
+       SET doc.status = 'geregistreerd', doc.aangepast_op = NOW()
+       WHERE doc.stagedossier_id = ? AND ds.type = 'stageovereenkomst'`,
+      [dossierId]
+    );
+
+    await db.query("UPDATE stagedossiers SET status = 'geregistreerd', verzekering_in_orde = 1, aangepast_op = NOW() WHERE id = ?", [dossierId]);
 
     try {
       const door = Number(req.user?.id);
