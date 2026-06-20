@@ -28,6 +28,7 @@
 
 .users_card {
 	margin-bottom: 0;
+	padding: 18px 18px 8px;
 }
 
 .users_card_header {
@@ -52,38 +53,61 @@
 .users-table th,
 .users-table td {
 	text-align: left;
-	padding: 18px 12px;
 	border-bottom: 1px solid var(--border);
 	font-size: 13px;
+	padding-left: 8px;
+	padding-right: 8px;
 }
 
 .users-table th {
-	padding-top: 12px;
-	padding-bottom: 12px;
+	padding-top: 14px;
+	padding-bottom: 14px;
 	font-size: 11px;
 	letter-spacing: 0.6px;
 	color: var(--faint);
-	font-weight: 600;
+	font-weight: 700;
+	text-transform: uppercase;
 }
 
-.user-name {
-	font-weight: 600;
+.users-table td {
+	padding-top: 22px;
+	padding-bottom: 22px;
+	vertical-align: middle;
+}
+
+.user-name span {
+	font-size: 14px;
+	font-weight: 700;
 	color: var(--dark);
+	line-height: 1.35;
 }
 
 .users-page .tw_student_cell {
 	display: flex;
 	align-items: center;
-	gap: 12px;
+	gap: 14px;
+}
+
+.users-page .tw_student_info {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+.users-page .tw_naam {
+	font-size: 14px;
+	font-weight: 700;
+	color: var(--dark);
+	line-height: 1.35;
 }
 
 .users-page .tw_avatar {
-	width: 38px;
-	height: 38px;
-	border-radius: 50%;
+	width: 44px;
+	height: 44px;
+	border-radius: 999px;
 	background: var(--red-light);
 	color: var(--red);
-	font-size: 12px;
+	font-size: 13px;
 	font-weight: 700;
 	display: flex;
 	align-items: center;

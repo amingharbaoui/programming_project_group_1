@@ -19,6 +19,15 @@ export default function StageApplicationPage() {
   const [huidigStatus, setHuidigStatus] = useState(null);
   // Modal state: null = gesloten, object = { icon, titel, sub, body, onSluit }
   const [modal, setModal] = useState(null);
+  const [stageRegel, setStageRegel] = useState(null);
+  const [checklistItems, setChecklistItems] = useState([]);
+
+  useEffect(() => {
+    apiRequest("GET", "/internships/settings").then(res => {
+      if (res?.data?.stageRegels?.[0]) setStageRegel(res.data.stageRegels[0]);
+      if (res?.data?.checklistItems) setChecklistItems(res.data.checklistItems.filter(i => i.actief));
+    }).catch(() => {});
+  }, []);
 
   const [form, setForm] = useState({
     bedrijfNaam: "",
@@ -308,24 +317,14 @@ export default function StageApplicationPage() {
           </div>
           <div className="checklist-item">
             <IconCircleCheck size={14} />
-            Minstens 12 weken voltijds (456 uur) binnen het stagevenster
+            Minstens {stageRegel?.minimum_weken ?? 12} weken voltijds ({stageRegel?.minimum_uren ?? 456} uur) binnen het stagevenster
           </div>
-          <div className="checklist-item">
-            <IconCircleCheck size={14} />
-            IT-gerelateerde opdracht met een ontwikkelcomponent
-          </div>
-          <div className="checklist-item">
-            <IconCircleCheck size={14} />
-            Mentor met een technische functie binnen het bedrijf
-          </div>
-          <div className="checklist-item">
-            <IconCircleCheck size={14} />
-            Concrete omschrijving: technologie, taken en team
-          </div>
-          <div className="checklist-item">
-            <IconCircleCheck size={14} />
-            Stage in een professionele bedrijfsomgeving
-          </div>
+          {checklistItems.map((item) => (
+            <div className="checklist-item" key={item.id}>
+              <IconCircleCheck size={14} />
+              {item.tekst}
+            </div>
+          ))}
         </div>
 
       </div>
