@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 const { meld, emailMelding } = require("../utils/notify");
@@ -932,6 +933,8 @@ async function createDossierAfterApproval(connection, stagevoorstelId) {
       s.academiejaar,
 
       v.mentor_email,
+      v.mentor_naam,
+      v.mentor_functie,
       v.startdatum,
       v.einddatum,
       v.aantal_weken,
@@ -960,7 +963,33 @@ async function createDossierAfterApproval(connection, stagevoorstelId) {
     throw new Error("Geen stagebegeleider gevonden voor stagedossier");
   }
 
-  const mentorId = await getMentorIdByEmail(connection, data.mentor_email) || await getDefaultMentorId(connection);
+  let mentorId = await getMentorIdByEmail(connection, data.mentor_email);
+  if (!mentorId && data.mentor_email) {
+    const [bestaand] = await connection.query("SELECT id FROM gebruikers WHERE email = ? LIMIT 1", [data.mentor_email]);
+    if (bestaand.length > 0) {
+      mentorId = bestaand[0].id;
+    } else {
+      const naam = String(data.mentor_naam || "").trim();
+      const spatie = naam.indexOf(" ");
+      const voornaam = spatie > 0 ? naam.slice(0, spatie) : (naam || "Mentor");
+      const achternaam = spatie > 0 ? naam.slice(spatie + 1) : "";
+      const [u] = await connection.query(
+        `INSERT INTO gebruikers (voornaam, achternaam, email, auth_provider, hoofdrol, status, aangemaakt_op, aangepast_op)
+         VALUES (?, ?, ?, 'local', 'mentor', 'uitgenodigd', NOW(), NOW())`,
+        [voornaam, achternaam, data.mentor_email]
+      );
+      mentorId = u.insertId;
+      const token = crypto.randomBytes(24).toString("hex");
+      await connection.query(
+        `INSERT INTO mentoren (gebruiker_id, bedrijf_id, functie, mag_stageovereenkomst_tekenen, uitnodiging_status, uitnodiging_token, uitnodiging_vervalt_op)
+         VALUES (?, ?, ?, 1, 'verstuurd', ?, DATE_ADD(NOW(), INTERVAL 14 DAY))`,
+        [mentorId, data.bedrijf_id, data.mentor_functie || "Mentor", token]
+      );
+    }
+  }
+  if (!mentorId) {
+    mentorId = await getDefaultMentorId(connection);
+  }
 
   const dossiernummer = `DOS-${new Date().getFullYear()}-${String(stagevoorstelId).padStart(4, "0")}`;
 
