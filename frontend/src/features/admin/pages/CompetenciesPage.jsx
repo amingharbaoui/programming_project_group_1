@@ -417,7 +417,7 @@ export default function CompetenciesPage() {
     setNieuweVersieLoading(true);
     setNieuweVersieError("");
     try {
-      await api.post(`/competencies/profiles/${profiel.id}/new-version`);
+      await api.post(`/competencies/profiles/${profiel.id}/duplicate`);
       const res = await api.get("/competencies", { params: { _t: Date.now() } });
       const { profiel: nieuwProfiel, competenties: nieuweCompetenties } = res.data.data;
       setProfiel(nieuwProfiel);
