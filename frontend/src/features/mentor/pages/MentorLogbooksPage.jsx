@@ -210,7 +210,7 @@ export default function MentorLogbooksPage() {
                 <span className="wk-pills">
                   {DAG_KORT.map((d, i) => <span key={i} className={`wk-pill ${aanwezig.has(i) ? "" : "mis"}`}>{d}</span>)}
                 </span>
-                <span className="status s-grijs">{week.totaal_uren || 0}u</span>
+                <span className="status s_grijs">{week.totaal_uren || 0}u</span>
                 <span className={`status ${wb.cls}`}>{wb.icon && <i className={`ti ${wb.icon}`} />}{wb.txt}</span>
                 <i className="ti ti-chevron-down logweek-chevron" />
               </div>

@@ -1,5 +1,21 @@
 /* MentorDossierPage — dossier-specifieke stijlen */
 
+/* Stepper */
+.ev-track { display: flex; align-items: flex-start; }
+.ev-stap { flex: 1; text-align: center; padding: 0 8px; }
+.ev-circle {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: #e9e9ec; color: var(--sub);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 16px; margin-bottom: 7px;
+}
+.ev-stap.actief .ev-circle { background: var(--red); color: #fff; box-shadow: 0 0 0 4px rgba(226,0,26,.12); }
+.ev-stap.done .ev-circle { background: var(--green); color: #fff; }
+.ev-label { font-size: 13px; font-weight: 700; }
+.ev-stap.actief .ev-label { color: var(--red); }
+.ev-sub { font-size: 11.5px; color: var(--sub); margin-top: 2px; line-height: 1.5; }
+.ev-lijn { flex: 0 0 36px; border-top: 2.5px dotted #c9c9d2; margin-top: 17px; }
+
 .tag {
   font-size: 9.5px; padding: 1px 6px; border-radius: 8px;
   background: var(--red-light); color: var(--red); font-weight: 500;

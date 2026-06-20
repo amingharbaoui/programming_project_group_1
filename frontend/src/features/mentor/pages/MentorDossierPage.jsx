@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
@@ -39,6 +39,36 @@ function typeLabel(type) {
   if (type === "tussentijdse_bespreking") return "Tussentijdse bespreking";
   if (type === "eindpresentatie") return "Eindpresentatie";
   return "Afspraak";
+}
+
+// Stepper: Contract / Voorbereiding (praktische afspraken) / Stage / Evaluatie.
+function getStappen(contract, gedeeldOp, dossierStatus) {
+  const contractKlaar = contract?.status === "geregistreerd";
+  const stageAfgerond = ["afgerond", "voltooid", "resultaat_vrijgegeven"].includes(dossierStatus);
+  const evalVrijgegeven = dossierStatus === "resultaat_vrijgegeven";
+
+  return [
+    {
+      label: "Contract",
+      sub: contractKlaar ? "Geregistreerd" : contract ? "Wacht op ondertekening/registratie" : "Nog niet opgemaakt",
+      state: contractKlaar ? "done" : "actief",
+    },
+    {
+      label: "Voorbereiding",
+      sub: gedeeldOp ? "Gedeeld" : "Nog niet gedeeld",
+      state: gedeeldOp ? "done" : contractKlaar ? "actief" : "todo",
+    },
+    {
+      label: "Stage",
+      sub: stageAfgerond ? "Afgerond" : gedeeldOp ? "Loopt" : "Nog niet gestart",
+      state: stageAfgerond ? "done" : gedeeldOp ? "actief" : "todo",
+    },
+    {
+      label: "Evaluatie",
+      sub: evalVrijgegeven ? "Vrijgegeven" : stageAfgerond ? "Loopt" : "—",
+      state: evalVrijgegeven ? "done" : stageAfgerond ? "actief" : "todo",
+    },
+  ];
 }
 
 export default function MentorDossierPage() {
@@ -175,6 +205,10 @@ export default function MentorDossierPage() {
   }
 
   async function deelAfspraken() {
+    if (!afsprakenWaarde.trim()) {
+      setMelding({ tekst: "Vul eerst afspraken in voor je ze deelt.", type: "s_amber" });
+      return;
+    }
     try {
       setBezigAfspraken(true);
       await api.patch(`/mentor/dossier/${dossierId}/afspraken`, { afspraken: afsprakenWaarde });
@@ -237,6 +271,22 @@ export default function MentorDossierPage() {
 
         {!loading && (
           <>
+            {/* Stepper */}
+            <div className="card" style={{ marginBottom: 12 }}>
+              <div className="ev-track">
+                {getStappen(contract, gedeeldOp, student?.dossier_status).map((s, i, arr) => (
+                  <Fragment key={s.label}>
+                    <div className={`ev-stap${s.state === "actief" ? " actief" : ""}${s.state === "done" ? " done" : ""}`}>
+                      <div className="ev-circle">{s.state === "done" ? <i className="ti ti-check" /> : i + 1}</div>
+                      <div className="ev-label">{s.label}</div>
+                      <div className="ev-sub">{s.sub}</div>
+                    </div>
+                    {i < arr.length - 1 && <div className="ev-lijn" />}
+                  </Fragment>
+                ))}
+              </div>
+            </div>
+
             {/* Contract */}
             {contract && (
               <div className="card" style={!contract.bedrijf_getekend_op && contract.student_getekend_op ? { border: "1.5px solid #0a0a0a", boxShadow: "0 4px 14px rgba(0,0,0,.10)" } : {}}>
@@ -268,7 +318,7 @@ export default function MentorDossierPage() {
               <div className="card_title">
                 <i className="ti ti-message-circle" style={{ color: "var(--red)" }} />
                 Praktische afspraken
-                <span className={`status ${afspraken ? "s_ok" : "s-grijs"}`} style={{ marginLeft: 6 }}>
+                <span className={`status ${afspraken ? "s_ok" : "s_grijs"}`} style={{ marginLeft: 6 }}>
                   {afspraken ? <><i className="ti ti-check" />Gedeeld met de student</> : "Nog niet gedeeld"}
                 </span>
               </div>
@@ -290,7 +340,7 @@ export default function MentorDossierPage() {
                     placeholder="bv. Werkuren 9u–17u30, vrijdag thuiswerk. Meld je de eerste dag aan het onthaal."
                     onChange={(e) => setAfsprakenWaarde(e.target.value)} />
                   <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                    <button className="btn primary sm" disabled={bezigAfspraken} onClick={deelAfspraken}><i className="ti ti-send" />Deel met de student</button>
+                    <button className="btn primary sm" disabled={bezigAfspraken || !afsprakenWaarde.trim()} onClick={deelAfspraken}><i className="ti ti-send" />Deel met de student</button>
                     <button className="btn sm" onClick={() => setEditAfspraken(false)}>Annuleer</button>
                   </div>
                 </>
