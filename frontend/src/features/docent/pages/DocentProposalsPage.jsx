@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import "../docent.css";
 
 function getStatusClass(status) {
-  if (status === "goedgekeurd" || status === "goedgekeurd_met_uitzondering") return "s_ok";
-  if (status === "ingediend" || status === "heringediend") return "s_info";
-  if (status === "aanpassingen_gevraagd") return "s_amber";
-  if (status === "afgekeurd") return "s_rood";
-  return "s_grijs";
+  if (status === "goedgekeurd" || status === "goedgekeurd_met_uitzondering") return "s-ok";
+  if (status === "ingediend" || status === "heringediend") return "s-info";
+  if (status === "aanpassingen_gevraagd") return "s-amber";
+  if (status === "afgekeurd") return "s-rood";
+  return "s-grijs";
 }
 
 function getStatusLabel(status) {
@@ -69,8 +70,9 @@ export default function DocentProposalsPage() {
   const h = detail?.huidige || null;
 
   return (
-    <div className="page_inner">
-      <div className="page_header">
+    <div className="doc">
+    <div className="page-inner">
+      <div className="page-header">
         <div>
           <h1>Stagevoorstellen</h1>
           <p>Voorstellen van jouw studenten — alleen-lezen (de stagecommissie beslist).</p>
@@ -79,14 +81,14 @@ export default function DocentProposalsPage() {
       </div>
 
       {loading && <div className="card"><p className="muted">Voorstellen laden...</p></div>}
-      {error && <div className="card"><span className="status s_rood">{error}</span></div>}
+      {error && <div className="card"><span className="status s-rood">{error}</span></div>}
       {!loading && !error && voorstellen.length === 0 && (
-        <div className="empty_state">Geen voorstellen gevonden.</div>
+        <div className="card"><p className="muted">Geen voorstellen gevonden.</p></div>
       )}
 
       {!loading && !error && voorstellen.length > 0 && (
         <div className="card">
-          <div className="card_title">Voorstellen ({voorstellen.length})</div>
+          <div className="card-title">Voorstellen ({voorstellen.length})</div>
           <table className="tbl">
             <thead>
               <tr>
@@ -123,13 +125,13 @@ export default function DocentProposalsPage() {
       )}
 
       {detail && h && (
-        <div className="popup-overlay" onClick={() => setDetail(null)}>
-          <div className="popup" style={{ maxWidth: 620 }} onClick={(e) => e.stopPropagation()}>
-            <div className="popup-header">
-              <strong>Voorsteldetail (read-only)</strong>
-              <button className="btn sm" onClick={() => setDetail(null)}><i className="ti ti-x" /></button>
+        <div className="modal-overlay" onClick={() => setDetail(null)}>
+          <div className="modal" style={{ maxWidth: 620 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <span className="mh-t">Voorsteldetail (read-only)</span>
+              <button className="btn sm mh-x" onClick={() => setDetail(null)}><i className="ti ti-x" /></button>
             </div>
-            <div className="popup-body">
+            <div className="modal-body">
               <div className="kv"><span className="k">Student</span><span className="v">{h.student_naam}</span></div>
               <div className="kv"><span className="k">Bedrijf</span><span className="v">{h.bedrijf_naam || "-"}{h.bedrijfsafdeling ? ` · ${h.bedrijfsafdeling}` : ""}</span></div>
               <div className="kv"><span className="k">Mentor</span><span className="v">{h.mentor_naam || "-"}{h.mentor_functie ? ` (${h.mentor_functie})` : ""}</span></div>
@@ -179,6 +181,7 @@ export default function DocentProposalsPage() {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

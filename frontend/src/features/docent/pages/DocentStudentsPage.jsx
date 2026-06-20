@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import "../docent.css";
 
 const FILTERS = ["Alle", "Lopend", "Niet gestart", "Afgerond"];
 
@@ -14,17 +15,17 @@ function getDossierFaseLabel(status) {
 }
 
 function getDossierFaseClass(status) {
-  if (status === "actief") return "s_ok";
-  if (status === "afgerond" || status === "voltooid") return "s_info";
-  return "s_grijs";
+  if (status === "actief") return "s-ok";
+  if (status === "afgerond" || status === "voltooid") return "s-info";
+  return "s-grijs";
 }
 
 function getLogboekClass(status) {
-  if (status === "ingediend") return "s_info";
-  if (status === "afgecheckt_door_mentor") return "s_amber";
-  if (status === "goedgekeurd_door_docent") return "s_ok";
-  if (status?.includes("teruggestuurd")) return "s_rood";
-  return "s_grijs";
+  if (status === "ingediend") return "s-info";
+  if (status === "afgecheckt_door_mentor") return "s-amber";
+  if (status === "goedgekeurd_door_docent") return "s-ok";
+  if (status?.includes("teruggestuurd")) return "s-rood";
+  return "s-grijs";
 }
 
 function getLogboekLabel(status) {
@@ -79,8 +80,9 @@ export default function DocentStudentsPage() {
         );
 
   return (
-    <div className="page_inner">
-      <div className="page_header">
+    <div className="doc">
+    <div className="page-inner">
+      <div className="page-header">
         <div>
           <h1>Mijn studenten</h1>
           <p>Overzicht van alle studenten die jij opvolgt als docent.</p>
@@ -95,7 +97,7 @@ export default function DocentStudentsPage() {
         {FILTERS.map((f) => (
           <button
             key={f}
-            className={`chip${filter === f ? " actief" : ""}`}
+            className={`chip${filter === f ? " aan" : ""}`}
             onClick={() => setFilter(f)}
           >
             {f}
@@ -111,17 +113,17 @@ export default function DocentStudentsPage() {
 
       {error && (
         <div className="card">
-          <span className="status s_rood">{error}</span>
+          <span className="status s-rood">{error}</span>
         </div>
       )}
 
       {!loading && !error && gefilterd.length === 0 && (
-        <div className="empty_state">Geen studenten gevonden voor dit filter.</div>
+        <div className="card"><p className="muted">Geen studenten gevonden voor dit filter.</p></div>
       )}
 
       {!loading && gefilterd.length > 0 && (
         <div className="card">
-          <div className="card_title">Studenten ({gefilterd.length})</div>
+          <div className="card-title">Studenten ({gefilterd.length})</div>
           <table className="tbl">
             <thead>
               <tr>
@@ -196,6 +198,7 @@ export default function DocentStudentsPage() {
           </table>
         </div>
       )}
+    </div>
     </div>
   );
 }
