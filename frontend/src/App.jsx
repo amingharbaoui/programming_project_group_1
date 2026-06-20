@@ -15,6 +15,7 @@ import StudentLogbookPage from "./features/student/pages/StudentLogbookPage";
 import StudentEvaluationPage from "./features/student/pages/StudentEvaluationPage";
 import StudentContractPage from "./features/student/pages/StudentContractPage";
 import StudentDocumentsPage from "./features/student/pages/StudentDocumentsPage";
+import StudentPlanningPage from "./features/student/pages/StudentPlanningPage";
 
 import ApplicationsPage from "./features/committee/pages/ApplicationsPage";
 
@@ -122,6 +123,7 @@ export default function App() {
             <Route path="/student/evaluation" element={<StudentFaseGuard path="/student/evaluation"><StudentEvaluationPage /></StudentFaseGuard>} />
             <Route path="/student/contract" element={<StudentFaseGuard path="/student/contract"><StudentContractPage /></StudentFaseGuard>} />
             <Route path="/student/documents" element={<StudentFaseGuard path="/student/documents"><StudentDocumentsPage /></StudentFaseGuard>} />
+            <Route path="/student/planning" element={<StudentFaseGuard path="/student/planning"><StudentPlanningPage /></StudentFaseGuard>} />
 
             <Route path="/committee" element={<Navigate to="/committee/applications" replace />} />
             <Route path="/committee/applications" element={<ApplicationsPage />} />

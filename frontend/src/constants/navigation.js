@@ -7,6 +7,7 @@ export const NAVIGATION = {
     { label: "Evaluatie",         path: "/student/evaluation",  icon: "ti-clipboard-check", lockGroup: "logboek_eval" },
     { label: "Stageovereenkomst", path: "/student/contract",    icon: "ti-writing",         lockGroup: "contract_docs" },
     { label: "Documenten",        path: "/student/documents",   icon: "ti-files",           lockGroup: "contract_docs" },
+    { label: "Planning",          path: "/student/planning",    icon: "ti-calendar-event",  lockGroup: "logboek_eval" },
   ],
 
   [ROLES.COMMITTEE]: [
