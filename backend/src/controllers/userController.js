@@ -121,6 +121,17 @@ async function updateUser(req, res) {
     return fail(res, 400, "Je kan je eigen rol niet wijzigen");
   }
 
+  // Een rol mag niet naar een andere rolfamilie wisselen: dat zou student-/mentor-/medewerkerrijen
+  // inconsistent maken. Voor zo'n wissel hoort een nieuwe gebruiker via de uitnodigingsflow.
+  if (hoofdrol !== undefined) {
+    const [huidig] = await db.query("SELECT hoofdrol FROM gebruikers WHERE id = ? LIMIT 1", [id]);
+    if (huidig.length === 0) return fail(res, 404, "Gebruiker niet gevonden");
+    const familie = (rol) => (rol === "student" ? "student" : rol === "mentor" ? "mentor" : "medewerker");
+    if (familie(hoofdrol) !== familie(huidig[0].hoofdrol)) {
+      return fail(res, 409, "Een gebruiker kan niet naar een andere rolfamilie (student, mentor, medewerker) gewijzigd worden. Maak hiervoor een nieuwe gebruiker aan via een uitnodiging.");
+    }
+  }
+
   const fields = [];
   const values = [];
 
