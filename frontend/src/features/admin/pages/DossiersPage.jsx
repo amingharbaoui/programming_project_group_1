@@ -95,8 +95,6 @@ export default function DossiersPage() {
   const [zoek, setZoek] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
-  useEffect(() => { loadDossiers(); }, []);
-
   async function loadDossiers() {
     try {
       setError("");
@@ -113,6 +111,8 @@ export default function DossiersPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => { loadDossiers(); }, []);
 
   const geformatteerd = dossiers.map(formatDossier);
 
