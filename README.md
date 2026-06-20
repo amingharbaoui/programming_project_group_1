@@ -137,6 +137,13 @@ The seed script creates accounts for every role. **Password for everyone: `Demo!
 The student accounts are named after their phase (`student.geen`, `student.ingediend`,
 `student.contract`, `student.startklaar`, …) so each step can be demonstrated.
 
+## Acknowledgements
+
+- [readme.so](https://readme.so) for making README creation straightforward
+- [Perplexity](https://www.perplexity.ai) for research and technical documentation lookups
+- The teachers and staff at Erasmushogeschool Brussel for their guidance throughout the project
+- [Claude](https://claude.ai) for development assistance and code support
+
 ## Authors
 
 | | |
