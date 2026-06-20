@@ -305,10 +305,11 @@ async function rejectDocument(req, res) {
 const fs = require("fs");
 const UPLOADS_DIR = path.join(__dirname, "../../uploads");
 
-function serveBestand(req, res) {
+async function serveBestand(req, res) {
   // Auth vereist: token via Authorization-header of ?t= query (een iframe/preview kan geen header sturen).
   const headerToken = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  if (!verifyToken(headerToken || req.query.t)) {
+  const sessie = verifyToken(headerToken || req.query.t);
+  if (!sessie) {
     return res.status(401).json({ success: false, message: "Authenticatie vereist" });
   }
   // Wildcard route: req.params[0] bevat het volledige pad incl. subdirectories
@@ -317,6 +318,33 @@ function serveBestand(req, res) {
   if (!filename || filename.includes("..") || filename.includes("\\")) {
     return res.status(400).json({ success: false, message: "Ongeldige bestandsnaam" });
   }
+
+  // Eigenaarschap: enkel betrokkenen van het dossier mogen het bestand openen (administratie alles).
+  try {
+    const [users] = await db.query("SELECT hoofdrol FROM gebruikers WHERE id = ? LIMIT 1", [sessie.id]);
+    const rol = users[0]?.hoofdrol;
+    if (rol !== "administratie") {
+      const [docs] = await db.query(
+        `SELECT d.student_id, d.mentor_id, d.stagebegeleider_id
+         FROM documenten doc JOIN stagedossiers d ON d.id = doc.stagedossier_id
+         WHERE doc.bestand_url = CONCAT('/uploads/', ?) OR doc.bestand_naam = ?
+         LIMIT 1`,
+        [filename, filename]
+      );
+      const d = docs[0];
+      const toegestaan = d && (
+        (rol === "student" && d.student_id === sessie.id) ||
+        (rol === "mentor" && d.mentor_id === sessie.id) ||
+        (rol === "docent" && d.stagebegeleider_id === sessie.id)
+      );
+      if (!toegestaan) {
+        return res.status(403).json({ success: false, message: "Geen toegang tot dit bestand" });
+      }
+    }
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Toegangscontrole mislukt" });
+  }
+
   const filePath = path.join(UPLOADS_DIR, filename);
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ success: false, message: "Bestand niet gevonden" });
