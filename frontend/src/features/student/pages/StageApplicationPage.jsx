@@ -43,6 +43,12 @@ export default function StageApplicationPage() {
         const data = cached ?? (await apiRequest("GET", "/internships/my")).data;
         if (!data) return;
 
+        const heropenbaar = ["concept", "aanpassingen_gevraagd", "afgekeurd", "ingetrokken"];
+        if (!heropenbaar.includes(data.status)) {
+          navigate("/student/internship", { replace: true });
+          return;
+        }
+
         const laadbaar = ["concept", "aanpassingen_gevraagd"];
         if (!laadbaar.includes(data.status)) return;
 
