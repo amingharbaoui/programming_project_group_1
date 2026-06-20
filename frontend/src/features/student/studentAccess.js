@@ -225,6 +225,15 @@ export function getStudentRouteLock(access, path) {
   const key = STUDENT_PATH_KEYS[path];
   const startLabel = formatDatumKort(access.startdatum);
 
+  if (path === "/student/planning") {
+    return {
+      titel: access.key === "startklaar" && startLabel ? `Opent op ${startLabel}` : "Planning nog niet beschikbaar",
+      uitleg: access.key === "startklaar"
+        ? "Je planning opent vanaf de startdatum van je stage."
+        : "Je planning opent zodra je stagedossier in orde is en je stage gestart is.",
+    };
+  }
+
   if (key === "overeenkomst") {
     return {
       titel: "Stageovereenkomst nog niet beschikbaar",
