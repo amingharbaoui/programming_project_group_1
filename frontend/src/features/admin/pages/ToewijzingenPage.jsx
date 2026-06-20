@@ -47,6 +47,8 @@ export default function ToewijzingenPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [modalError, setModalError] = useState("");
 
+  const [zoek, setZoek] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
   const [successModal, setSuccessModal] = useState(false);
   const [toast, setToast] = useState(null);
   const showToast = useCallback((msg, type = "ok") => {
@@ -111,8 +113,19 @@ export default function ToewijzingenPage() {
   }
 
   const heeftBegeleider = (d) => !!(d.docent_voornaam || d.docent_achternaam || d.stagebegeleider_id);
-  const zonder = dossiers.filter((d) => !heeftBegeleider(d));
-  const met    = dossiers.filter((d) =>  heeftBegeleider(d));
+
+  const matchZoekFilter = (d) => {
+    const z = zoek.toLowerCase();
+    if (!z) return true;
+    const naam = volledigeNaam(d.student_voornaam, d.student_achternaam).toLowerCase();
+    const bedrijf = (d.bedrijf_naam || "").toLowerCase();
+    return naam.includes(z) || bedrijf.includes(z);
+  };
+
+  const matchStatusFilter = (d) => !filterStatus || d.status === filterStatus;
+
+  const zonder = dossiers.filter((d) => !heeftBegeleider(d) && matchZoekFilter(d) && matchStatusFilter(d));
+  const met    = dossiers.filter((d) =>  heeftBegeleider(d) && matchZoekFilter(d) && matchStatusFilter(d));
 
   return (
     <div className="page">
@@ -124,6 +137,36 @@ export default function ToewijzingenPage() {
           )}
         </h1>
         <p>Koppel een docent als stagebegeleider aan elke student. De docent krijgt daarna toegang tot het dossier.</p>
+      </div>
+
+      <div className="dos_filters">
+        <input
+          className="dos_zoek"
+          placeholder="Zoek op student of stagebedrijf..."
+          value={zoek}
+          onChange={(e) => setZoek(e.target.value)}
+        />
+        <select
+          className="dos_select"
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+        >
+          <option value="">Alle statussen</option>
+          <option value="wacht_op_student">Wacht op student</option>
+          <option value="wacht_op_bedrijf">Wacht op bedrijf</option>
+          <option value="in_controle_bij_administratie">In controle</option>
+          <option value="document_afgekeurd">Document afgekeurd</option>
+          <option value="geregistreerd">Geregistreerd</option>
+          <option value="stage_loopt">Stage loopt</option>
+          <option value="resultaat_vrijgegeven">Resultaat vrijgegeven</option>
+          <option value="afgerond">Afgerond</option>
+        </select>
+        {(filterStatus || zoek) && (
+          <button className="btn sm primary" onClick={() => { setFilterStatus(""); setZoek(""); }}>
+            <IconX size={16} stroke={1.8} />
+            Wis filters
+          </button>
+        )}
       </div>
 
       {loading && <div className="card tw_state">Toewijzingen laden...</div>}

@@ -336,6 +336,8 @@ export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [zoek, setZoek] = useState("");
+  const [filterRol, setFilterRol] = useState("");
   const [wijzigenTarget, setWijzigenTarget] = useState(null);
   const [bevestigTarget, setBevestigTarget] = useState(null);
   const [uitnodigingOpen, setUitnodigingOpen] = useState(false);
@@ -448,10 +450,34 @@ export default function UsersPage() {
           </div>
         </div>
 
+        <div className="dos_filters">
+          <input
+            className="dos_zoek"
+            placeholder="Zoek op naam of e-mail..."
+            value={zoek}
+            onChange={(e) => setZoek(e.target.value)}
+          />
+          <select
+            className="dos_select"
+            value={filterRol}
+            onChange={(e) => setFilterRol(e.target.value)}
+          >
+            <option value="">Alle rollen</option>
+            <option value="student">Student</option>
+            <option value="docent">Docent</option>
+            <option value="mentor-extern">Mentor</option>
+            <option value="administratie">Administratie</option>
+            <option value="stagecommissie">Stagecommissie</option>
+          </select>
+          {(filterRol || zoek) && (
+            <button className="btn sm primary" onClick={() => { setFilterRol(""); setZoek(""); }}>
+              <IconX size={16} stroke={1.8} />
+              Wis filters
+            </button>
+          )}
+        </div>
+
         <div className="card users_card">
-          <div className="users_card_header">
-            <h2>Gebruikersoverzicht</h2>
-          </div>
           <table className="users-table">
             <thead>
               <tr>
@@ -467,14 +493,23 @@ export default function UsersPage() {
               {loading && <tr><td colSpan="6">Gebruikers laden...</td></tr>}
               {!loading && error && <tr><td colSpan="6" style={{ color: "var(--red)" }}>{error}</td></tr>}
               {!loading && !error && users.length === 0 && <tr><td colSpan="6">Geen gebruikers gevonden.</td></tr>}
-              {!loading && !error && users.map((rawUser) => {
+              {!loading && !error && users.filter((rawUser) => {
+                const z = zoek.toLowerCase();
+                const naam = `${rawUser.voornaam || ""} ${rawUser.achternaam || ""}`.toLowerCase();
+                const email = (rawUser.email || "").toLowerCase();
+                const matchZoek = !z || naam.includes(z) || email.includes(z);
+                const matchRol = !filterRol || (rawUser.hoofdrol || "").toLowerCase() === filterRol;
+                return matchZoek && matchRol;
+              }).map((rawUser) => {
                 const u = formatUser(rawUser);
                 return (
                   <tr key={u.id}>
-                    <td className="user-name">
+                    <td>
                       <div className="tw_student_cell">
                         <div className="tw_avatar">{u.initialen}</div>
-                        <span>{u.naam}</span>
+                        <div className="tw_student_info">
+                          <div className="tw_naam">{u.naam}</div>
+                        </div>
                       </div>
                     </td>
                     <td>{u.email}</td>
