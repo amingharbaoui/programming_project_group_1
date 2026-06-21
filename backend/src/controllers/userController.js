@@ -164,6 +164,16 @@ async function updateUser(req, res) {
       [...values, id]
     );
     if (r.affectedRows === 0) return fail(res, 404, "Gebruiker niet gevonden");
+
+    // Rolwissel binnen de medewerker-familie (docent/stagecommissie/administratie) moet ook de
+    // gekoppelde medewerkers-rij meenemen, anders kiest backendlogica (bv. defaultdocent) nog op de oude rol.
+    if (hoofdrol !== undefined && ["docent", "stagecommissie", "administratie"].includes(hoofdrol)) {
+      await db.query(
+        "UPDATE medewerkers SET medewerker_type = ? WHERE gebruiker_id = ?",
+        [hoofdrol, id]
+      );
+    }
+
     return ok(res, { id }, "Gebruiker bijgewerkt");
   } catch (error) {
     if (error.code === "ER_DUP_ENTRY") return fail(res, 409, "Dit e-mailadres is al in gebruik");
