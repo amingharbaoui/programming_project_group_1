@@ -295,6 +295,9 @@ export default function MentorDossierPage() {
 
   const naam = student ? `${student.voornaam} ${student.achternaam}` : "Stagiair";
   const docentNaam = momenten.find((m) => m.docent_naam)?.docent_naam;
+  // In de eindfase mag de mentor geen afspraken meer delen/bewerken en geen planning meer bevestigen;
+  // de backend weigert dit (409), dus de UI mag die acties ook niet meer tonen.
+  const dossierAfgerond = ["afgerond", "voltooid", "resultaat_vrijgegeven"].includes(student?.dossier_status);
 
   return (
     <div className="page-inner">
@@ -390,9 +393,13 @@ export default function MentorDossierPage() {
                     {afspraken || "Nog geen afspraken gedeeld. De student ziet ze in zijn dashboard zodra je ze deelt."}
                   </div>
                   <div style={{ marginTop: 12 }}>
-                    <button className="btn primary sm" onClick={() => { setAfsprakenWaarde(afspraken); setEditAfspraken(true); }}>
-                      <i className="ti ti-pencil" />{afspraken ? "Bewerken" : "Afspraken delen"}
-                    </button>
+                    {dossierAfgerond ? (
+                      <span className="status s_grijs">Dossier afgerond — read-only</span>
+                    ) : (
+                      <button className="btn primary sm" onClick={() => { setAfsprakenWaarde(afspraken); setEditAfspraken(true); }}>
+                        <i className="ti ti-pencil" />{afspraken ? "Bewerken" : "Afspraken delen"}
+                      </button>
+                    )}
                   </div>
                 </>
               ) : (
@@ -411,7 +418,7 @@ export default function MentorDossierPage() {
             {/* Bedrijfsbezoek / planning */}
             {momenten.map((m) => {
               const bb = bezoekBadge(m.status);
-              const teBevestigen = m.type === "bedrijfsbezoek" && ["voorgesteld", "gepland"].includes(m.status);
+              const teBevestigen = !dossierAfgerond && m.type === "bedrijfsbezoek" && ["voorgesteld", "gepland"].includes(m.status);
               return (
                 <div className="card" key={m.id} style={teBevestigen ? { borderLeft: "3px solid var(--red)" } : {}}>
                   <div className="card_title">
