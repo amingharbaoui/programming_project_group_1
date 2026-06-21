@@ -764,8 +764,13 @@ export default function StudentLogbookPage() {
       setWeken(resolved);
 
       if (!editWeek) {
-        const maxWeek = resolved.length > 0 ? Math.max(...resolved.map((w) => w.week_nummer)) : 0;
-        const verwachtWeekNr = maxWeek + 1;
+        // Weken met status 'in_opbouw' zijn nog NIET ingediend — de student vult ze nog aan.
+        // Alleen echt ingediende weken (ingediend, goedgekeurd, enz.) tellen mee voor de volgende week.
+        const inOpbouwWeek = resolved.find((w) => w.status === "in_opbouw");
+        const ingediendWeken = resolved.filter((w) => w.status !== "in_opbouw");
+        const maxWeek = ingediendWeken.length > 0 ? Math.max(...ingediendWeken.map((w) => w.week_nummer)) : 0;
+        // Als er een week in opbouw is, hervat die — anders start een nieuwe week.
+        const verwachtWeekNr = inOpbouwWeek ? inOpbouwWeek.week_nummer : maxWeek + 1;
 
         // Herstel concept-week als de draft in localStorage past bij de verwachte week
         let herstellenGelukt = false;
@@ -877,8 +882,9 @@ export default function StudentLogbookPage() {
     : null;
 
   const huidigFormulierWeek = editWeek ? editWeek.week_nummer : logbook.weekNummer;
+  // 'in_opbouw' = nog bezig, NIET ingediend — de student moet die week nog kunnen aanvullen.
   const weekAlIngediend =
-    !editWeek && weken.some((w) => w.week_nummer === huidigFormulierWeek);
+    !editWeek && weken.some((w) => w.week_nummer === huidigFormulierWeek && w.status !== "in_opbouw");
   const vorigeWeekOk =
     huidigFormulierWeek === 1 ||
     weken.some((w) => w.week_nummer === huidigFormulierWeek - 1);
@@ -975,9 +981,10 @@ export default function StudentLogbookPage() {
   function handleAnnuleerBewerken() {
     setEditWeek(null);
     setError(null);
-    const maxWeek =
-      weken.length > 0 ? Math.max(...weken.map((w) => w.week_nummer)) : 0;
-    setLogbook(defaultLogbook(maxWeek + 1, startDatum));
+    const inOpbouwWeek = weken.find((w) => w.status === "in_opbouw");
+    const ingediendWeken = weken.filter((w) => w.status !== "in_opbouw");
+    const maxWeek = ingediendWeken.length > 0 ? Math.max(...ingediendWeken.map((w) => w.week_nummer)) : 0;
+    setLogbook(defaultLogbook(inOpbouwWeek ? inOpbouwWeek.week_nummer : maxWeek + 1, startDatum));
   }
 
   /* Nieuwe week starten */
@@ -985,9 +992,10 @@ export default function StudentLogbookPage() {
     setSubmitted(false);
     setEditWeek(null);
     setError(null);
-    const maxWeek =
-      weken.length > 0 ? Math.max(...weken.map((w) => w.week_nummer)) : 0;
-    const verwachtWeekNr = maxWeek + 1;
+    const inOpbouwWeek = weken.find((w) => w.status === "in_opbouw");
+    const ingediendWeken = weken.filter((w) => w.status !== "in_opbouw");
+    const maxWeek = ingediendWeken.length > 0 ? Math.max(...ingediendWeken.map((w) => w.week_nummer)) : 0;
+    const verwachtWeekNr = inOpbouwWeek ? inOpbouwWeek.week_nummer : maxWeek + 1;
     // Herstel draft als die er nog is voor de volgende week
     try {
       const opgeslagen = localStorage.getItem(DRAFT_KEY(user.id));
@@ -1196,13 +1204,14 @@ export default function StudentLogbookPage() {
         </>
       )}
 
-      {/* Ingediende weken — altijd zichtbaar, nieuwste eerst */}
-      {!editWeek && weken.length > 0 && (
+      {/* Ingediende weken — weken 'in_opbouw' zijn nog niet ingediend en horen in het formulier, niet hier */}
+      {!editWeek && weken.filter((w) => w.status !== "in_opbouw").length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <p style={{ fontSize: "12.5px", color: "var(--sub)", marginBottom: 8 }}>
             Ingediende weken
           </p>
           {[...weken]
+            .filter((w) => w.status !== "in_opbouw")
             .sort((a, b) => b.week_nummer - a.week_nummer)
             .map((week) => (
               <LogboekWeek
