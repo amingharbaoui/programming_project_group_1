@@ -34,6 +34,17 @@ export default function StudentPlanningPage() {
   const [momenten, setMomenten] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [popupMoment, setPopupMoment] = useState(null); // 525: auto-pop-up bij een bevestigd moment
+  const [gezien, setGezien] = useState(() => new Set());
+
+  // 525: zodra de planning geladen is, een pop-up tonen voor het nieuwste bevestigde moment dat de student
+  // nog niet bevestigd-gezien heeft — net als het studentprototype ("Bedrijfsbezoek/Eindpresentatie ingepland").
+  useEffect(() => {
+    const bevestigd = momenten.find(
+      (m) => ["bedrijfsbezoek", "eindpresentatie"].includes(m.type) && m.status === "bevestigd" && !gezien.has(m.id)
+    );
+    setPopupMoment(bevestigd || null);
+  }, [momenten, gezien]);
 
   async function laden() {
     try {
@@ -61,6 +72,34 @@ export default function StudentPlanningPage() {
         <h1>Planning</h1>
         <button className="btn sm" onClick={laden} disabled={loading}>Vernieuwen</button>
       </div>
+
+      {popupMoment && (() => {
+        const isPres = popupMoment.type === "eindpresentatie";
+        return (
+          <div className="modal_overlay" onClick={() => setGezien((p) => new Set(p).add(popupMoment.id))}>
+            <div className="modal_box" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+              <div className="modal_header">
+                <span className="modal_title">{isPres ? "Eindpresentatie ingepland" : "Bedrijfsbezoek ingepland"}</span>
+                <button className="icon_btn" onClick={() => setGezien((p) => new Set(p).add(popupMoment.id))}><i className="ti ti-x" /></button>
+              </div>
+              <div className="modal_body">
+                <div className="card" style={{ marginBottom: 10 }}>
+                  <p style={{ margin: "2px 0" }}><strong>Wanneer:</strong> {formatMoment(popupMoment.gepland_op)}</p>
+                  <p style={{ margin: "2px 0" }}><strong>Waar:</strong> {popupMoment.locatie || "—"}</p>
+                </div>
+                <p style={{ fontSize: 12.5, color: "var(--sub)" }}>
+                  {isPres
+                    ? "Vul je finale zelf-evaluatie in tot uiterlijk 1 week vóór de presentatie — niet ingevuld telt als 0."
+                    : "Vul je tussentijdse zelf-evaluatie in tot uiterlijk 1 week vóór het bezoek — niet ingevuld telt als 0."}
+                </p>
+              </div>
+              <div className="modal_footer">
+                <button className="btn primary" onClick={() => setGezien((p) => new Set(p).add(popupMoment.id))}>Begrepen</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {loading && <div className="card"><p>Laden…</p></div>}
       {!loading && error && <div className="card"><p className="status s_rood">{error}</p></div>}
