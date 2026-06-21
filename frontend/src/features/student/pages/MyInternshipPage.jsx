@@ -194,7 +194,7 @@ function TaakKaart({ status, contractStudentGekend, volledigGetekend, docsOk, na
         Wat moet je nu doen
       </div>
 
-      {alleOk && gestart ? (
+      {alleOk && volledigGetekend && gestart ? (
         <div className="taak-rij">
           <div className="taak-icon groen"><i className="ti ti-circle-check"></i></div>
           <div className="taak-info">Je stage loopt. Vul wekelijks je logboek in.</div>
@@ -340,8 +340,8 @@ export default function MyInternshipPage() {
           const actief = docs
             .filter((d) => d.document_soort_id === s.id)
             .sort((a, b) => (b.versie_nummer ?? 0) - (a.versie_nummer ?? 0))[0];
-          // Pas 'in orde' wanneer de administratie het document écht goedgekeurd/geregistreerd heeft.
-          return actief && ["goedgekeurd", "geregistreerd"].includes(actief.status);
+          // In orde zodra het document ingediend is (ook in_controle/goedgekeurd/geregistreerd).
+          return actief && ["ingediend", "in_controle", "goedgekeurd", "geregistreerd"].includes(actief.status);
         });
         setDocsOk(alleGoed);
       } catch { setFlowDataFout(true); }
