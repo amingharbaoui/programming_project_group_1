@@ -232,10 +232,13 @@ export default function StudentEvaluationPage() {
     try {
       const KEY = `student_evaluation_${user.id}`;
       const cached = cacheGet(KEY);
-      const data = cached ?? (await apiRequest("GET", `/evaluations/${user.id}`)).data;
-      if (!cached && data) cacheSet(KEY, data);
+      // Een gecachte lege lijst niet hergebruiken — de docent kan ondertussen een evaluatie geopend hebben.
+      const bruikbaar = cached && Array.isArray(cached.evaluaties) && cached.evaluaties.length > 0;
+      const data = bruikbaar ? cached : (await apiRequest("GET", `/evaluations/${user.id}`)).data;
+      if (!bruikbaar && data) cacheSet(KEY, data);
       setData(data);
-      const actief = huidigeEval();
+      const evs = data?.evaluaties;
+      const actief = (activeType && evs?.find((e) => e.type === activeType)) || getActieveEval(evs);
       if (actief) {
         const init = {};
         (actief.scores || []).filter((s) => s.rol === "student").forEach((s) => {
@@ -363,7 +366,7 @@ export default function StudentEvaluationPage() {
   if (!data || !data.evaluaties || data.evaluaties.length === 0) {
     return (
       <div className="page-inner">
-        <div className="page-header"><h1>Evaluatie</h1><p>Competentieprofiel · Toegepaste Informatica 2025–2026</p></div>
+        <div className="page-header"><h1>Evaluatie</h1><p>Actief competentieprofiel</p></div>
         <div className="card">
           <div className="geen-data">
             <IconClipboardCheck size={36} />
@@ -406,7 +409,7 @@ export default function StudentEvaluationPage() {
 
       <div className="page-header">
         <h1>Evaluatie</h1>
-        <p>Competentieprofiel · Toegepaste Informatica 2025–2026</p>
+        <p>Actief competentieprofiel</p>
       </div>
 
       <EvalTrack tussentijds={tussentijds} finale={finale} />

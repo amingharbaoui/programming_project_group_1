@@ -331,6 +331,9 @@ function weekNaarFormulier(week) {
       reflectie: dag.reflectie ?? "",
       problemen: dag.problemen ?? "",
       aantalUren: Number(dag.aantal_uren) || 0,
+      // Dagstatus behouden, anders verliest een 'geen_stagedag' bij bewerken zijn markering
+      // en wordt hij bij opnieuw indienen als gewone stagedag verstuurd.
+      status: dag.status ?? "",
       competenties: Array.isArray(dag.competenties)
         ? dag.competenties
         : (dag.competenties ? JSON.parse(dag.competenties) : []),

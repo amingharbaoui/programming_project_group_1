@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../../../services/api";
-import { cacheGet, cacheSet, cacheDelete } from "../studentCache";
+import { cacheSet, cacheDelete } from "../studentCache";
 import "./StageApplicationPage.css";
 import Modal from "../../../components/ui/Modal";
 import {
@@ -48,9 +48,11 @@ export default function StageApplicationPage() {
   useEffect(() => {
     async function laadBestaand() {
       try {
-        const cached = cacheGet("student_internship");
-        const data = cached ?? (await apiRequest("GET", "/internships/my")).data;
+        // Statusbeslissing (herindienen/redirect) altijd op verse data — een gecachte oude status kan
+        // de student onterecht wegsturen na een commissiebeslissing (bv. aanpassingen gevraagd).
+        const data = (await apiRequest("GET", "/internships/my")).data;
         if (!data) return;
+        cacheSet("student_internship", data);
 
         const heropenbaar = ["concept", "aanpassingen_gevraagd", "afgekeurd", "ingetrokken"];
         if (!heropenbaar.includes(data.status)) {
