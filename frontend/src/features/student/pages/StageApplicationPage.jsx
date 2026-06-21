@@ -293,7 +293,11 @@ export default function StageApplicationPage() {
               <label className="form_label">Uren per week</label>
               <input className="form_input" type="number" min="1" max="60" name="urenPerWeek" value={form.urenPerWeek} onChange={handleChange} placeholder="38" />
             </div>
-            <p className="stagevenster-info">Moet binnen het stagevenster van de opleiding vallen: 9 feb - 26 jun 2026.</p>
+            <p className="stagevenster-info">
+              {stageRegel?.stagevenster_start && stageRegel?.stagevenster_einde
+                ? `Moet binnen het stagevenster van de opleiding vallen: ${new Date(stageRegel.stagevenster_start).toLocaleDateString("nl-BE", { day: "numeric", month: "short", year: "numeric" })} - ${new Date(stageRegel.stagevenster_einde).toLocaleDateString("nl-BE", { day: "numeric", month: "short", year: "numeric" })}.`
+                : "Moet binnen het stagevenster van de opleiding vallen."}
+            </p>
           </div>
 
           <div className="actions">

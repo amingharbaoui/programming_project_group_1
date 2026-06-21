@@ -12,9 +12,20 @@ function initialen(s) {
 }
 
 function faseLabel(status) {
-  if (status === "afgerond" || status === "voltooid") return "Afgerond";
-  if (status === "in_aanvraag" || status === "aangevraagd") return "Niet gestart";
-  return "Stage loopt";
+  const map = {
+    wacht_op_student: "Wacht op student",
+    wacht_op_bedrijf: "Wacht op bedrijf",
+    in_controle_bij_administratie: "In controle",
+    document_afgekeurd: "Document afgekeurd",
+    geregistreerd: "Startklaar",
+    stage_loopt: "Stage loopt",
+    resultaat_vrijgegeven: "Resultaat vrijgegeven",
+    afgerond: "Afgerond",
+    voltooid: "Afgerond",
+    in_aanvraag: "Niet gestart",
+    aangevraagd: "Niet gestart",
+  };
+  return map[status] || (status ? "In behandeling" : "Onbekend");
 }
 
 function logboekBadge(status) {

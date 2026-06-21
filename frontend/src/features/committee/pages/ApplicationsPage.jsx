@@ -821,7 +821,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
         {(isGoed || isAfgekeurd || isIngetrokken) && (
           <>
             <VoorstelKaart aanvraag={aanvraag} />
-            <CriteriaKaart aanvraag={aanvraag} criteria={{}} onChange={() => {}} readonly />
+            <CriteriaKaart aanvraag={aanvraag} criteria={criteria} onChange={() => {}} readonly />
             <HistoriekKaart items={historiek} />
           </>
         )}

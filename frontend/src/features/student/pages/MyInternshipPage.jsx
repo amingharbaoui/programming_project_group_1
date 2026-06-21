@@ -309,7 +309,8 @@ export default function MyInternshipPage() {
           const actief = docs
             .filter((d) => d.document_soort_id === s.id)
             .sort((a, b) => (b.versie_nummer ?? 0) - (a.versie_nummer ?? 0))[0];
-          return actief && !DOC_ACTIE_STATUS.has(actief.status);
+          // Pas 'in orde' wanneer de administratie het document écht goedgekeurd/geregistreerd heeft.
+          return actief && ["goedgekeurd", "geregistreerd"].includes(actief.status);
         });
         setDocsOk(alleGoed);
       } catch {}

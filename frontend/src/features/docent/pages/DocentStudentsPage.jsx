@@ -7,11 +7,20 @@ import "../docent.css";
 const FILTERS = ["Alle", "Lopend", "Niet gestart", "Afgerond"];
 
 function getDossierFaseLabel(status) {
-  if (!status) return "Onbekend";
-  if (status === "actief") return "Lopend";
-  if (status === "afgerond" || status === "voltooid") return "Afgerond";
-  if (status === "in_aanvraag" || status === "aangevraagd") return "Niet gestart";
-  return "Lopend";
+  const map = {
+    wacht_op_student: "Wacht op student",
+    wacht_op_bedrijf: "Wacht op bedrijf",
+    in_controle_bij_administratie: "In controle",
+    document_afgekeurd: "Document afgekeurd",
+    geregistreerd: "Startklaar",
+    stage_loopt: "Stage loopt",
+    resultaat_vrijgegeven: "Resultaat vrijgegeven",
+    afgerond: "Afgerond",
+    voltooid: "Afgerond",
+    in_aanvraag: "Niet gestart",
+    aangevraagd: "Niet gestart",
+  };
+  return map[status] || (status ? "In behandeling" : "Onbekend");
 }
 
 function getDossierFaseClass(status) {
@@ -187,8 +196,8 @@ export default function DocentStudentsPage() {
 
                   <td className="right">
                     <div className="actions">
-                      <button className="btn sm" onClick={() => navigate("/docent/logbooks")}>Logboek</button>
-                      <button className="btn sm" onClick={() => navigate("/docent/evaluations")}>Evaluatie</button>
+                      <button className="btn sm" onClick={() => navigate(`/docent/logbooks?student=${s.student_id || s.id}`)}>Logboek</button>
+                      <button className="btn sm" onClick={() => navigate(`/docent/evaluations?student=${s.student_id || s.id}`)}>Evaluatie</button>
                       <button className="btn sm primary" onClick={() => navigate(`/docent/students/${s.dossier_id}/dossier`)}>Dossier</button>
                     </div>
                   </td>
