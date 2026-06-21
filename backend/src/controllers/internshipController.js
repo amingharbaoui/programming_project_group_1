@@ -7,8 +7,9 @@ const { meld, emailMelding } = require("../utils/notify");
 const { sendMail, buildMailHtml } = require("../utils/mail");
 const { buildSimplePdf } = require("../utils/pdf");
 
-function getUserId(req, fallbackId) {
-  return Number(req.user?.id || fallbackId);
+function getUserId(req) {
+  // Geen demo-fallback meer (auditpunt 312): zonder ingelogde gebruiker liever null dan stil user 1.
+  return Number(req.user?.id) || null;
 }
 
 function calculateWeeks(startdatum, einddatum) {

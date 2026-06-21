@@ -39,7 +39,8 @@ const upload = multer({
 const uploadMiddleware = upload.single("bestand");
 
 function getUserId(req) {
-  return Number(req.user?.id || 1);
+  // Geen demo-fallback meer (auditpunt 312): zonder ingelogde gebruiker liever null dan stil user 1.
+  return Number(req.user?.id) || null;
 }
 
 /* GET /api/documents/soorten */

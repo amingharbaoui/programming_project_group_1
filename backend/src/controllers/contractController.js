@@ -4,7 +4,8 @@ const { meld } = require("../utils/notify");
 const { buildSimplePdf } = require("../utils/pdf");
 
 function getUserId(req) {
-  return Number(req.user?.id || 1);
+  // Geen demo-fallback meer (auditpunt 312): zonder ingelogde gebruiker liever null dan stil user 1.
+  return Number(req.user?.id) || null;
 }
 
 /* GET /api/contracts/my
