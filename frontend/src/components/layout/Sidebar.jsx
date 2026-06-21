@@ -118,8 +118,11 @@ export default function Sidebar({ collapsed }) {
             const vandaag = new Date();
             const verschil = Math.floor((vandaag - startdatum) / (1000 * 60 * 60 * 24));
             const huidigeWeek = Math.max(1, Math.ceil((verschil + 1) / 7));
+            // Een 'in_opbouw' week is enkel conceptdata, geen officiële indiening: dan blijft de dot staan
+            // zodat de student dezelfde waarschuwing krijgt als docent/mentor/reminders (auditpunt 422).
+            const OFFICIEEL_INGEDIEND = new Set(["ingediend", "afgecheckt_door_mentor", "klaar_voor_docent", "goedgekeurd_door_docent", "afgesloten"]);
             const alIngediend = weken.some(
-              (w) => Number(w.week_nummer) === huidigeWeek && w.status !== "ontbreekt"
+              (w) => Number(w.week_nummer) === huidigeWeek && OFFICIEEL_INGEDIEND.has(w.status)
             );
             if (alIngediend) showLogboekDot = false;
           }
