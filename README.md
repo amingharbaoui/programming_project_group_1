@@ -100,7 +100,7 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 
 ## Database
 
-First import the schema (creates all tables), then load the demo data. The seed script only fills tables — it does not create them, so the schema import is required on a fresh database.
+First import the schema (creates all tables), then load the demo data. The seed script only fills tables and prepares demo login passwords — it does not create the database itself.
 
 ```bash
 cd backend
@@ -126,19 +126,18 @@ Open http://localhost:5173 and log in with an e-mail address and password.
 
 ## Demo accounts
 
-The seed script creates accounts for every role. **All active accounts use the password `Demo!2026`.** (The account `mentor3@bedrijf.be` is intentionally left as an *invited* account without a password, to demonstrate the activation flow.)
+The seed script creates accounts for every role. **All active demo accounts use the password `Demo!2026`.**
 
 | Role | E-mail |
 |------|--------|
-| Student (internship running) | student.loopt@ehb.be |
-| Student (finished) | student.afgerond@ehb.be |
+| Student | student@ehb.be |
+| Student 2 | student2@ehb.be |
+| Student 3 | student3@ehb.be |
+| Student 4 | student4@ehb.be |
 | Stagecommissie | commissie@ehb.be |
 | Administratie | admin@ehb.be |
 | Docent | docent@ehb.be |
 | Mentor | mentor@bedrijf.be |
-
-The student accounts are named after their phase (`student.geen`, `student.ingediend`,
-`student.contract`, `student.startklaar`, …) so each step can be demonstrated.
 
 ## Acknowledgements
 

@@ -276,6 +276,8 @@ CREATE TABLE `planning_momenten` (
   `voorgesteld_door_id` int DEFAULT NULL,
   `bevestigd_door_id` int DEFAULT NULL,
   `alternatief_voorstel` text,
+  `alternatief_gepland_op` datetime DEFAULT NULL,
+  `alternatief_locatie` varchar(255) DEFAULT NULL,
   `verslag` text,
   `deelnemers` text,
   `aangemaakt_op` timestamp NULL DEFAULT NULL,
@@ -287,6 +289,36 @@ CREATE TABLE `planning_momenten` (
   CONSTRAINT `planning_momenten_ibfk_1` FOREIGN KEY (`stagedossier_id`) REFERENCES `stagedossiers` (`id`),
   CONSTRAINT `planning_momenten_ibfk_2` FOREIGN KEY (`voorgesteld_door_id`) REFERENCES `gebruikers` (`id`),
   CONSTRAINT `planning_momenten_ibfk_3` FOREIGN KEY (`bevestigd_door_id`) REFERENCES `gebruikers` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+DROP TABLE IF EXISTS `rubriek_scores`;
+DROP TABLE IF EXISTS `rubriek_criteria`;
+CREATE TABLE `rubriek_criteria` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `titel` varchar(255) NOT NULL,
+  `beschrijving` text,
+  `max_score` int NOT NULL DEFAULT '5',
+  `volgorde` int NOT NULL DEFAULT '0',
+  `actief` tinyint NOT NULL DEFAULT '1',
+  `aangemaakt_op` datetime DEFAULT CURRENT_TIMESTAMP,
+  `aangepast_op` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+CREATE TABLE `rubriek_scores` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `evaluatie_id` int NOT NULL,
+  `rubriek_criterium_id` int NOT NULL,
+  `score` decimal(4,2) DEFAULT NULL,
+  `feedback` text,
+  `beoordeeld_door_id` int DEFAULT NULL,
+  `aangemaakt_op` datetime DEFAULT CURRENT_TIMESTAMP,
+  `aangepast_op` datetime DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniek_eval_criterium` (`evaluatie_id`,`rubriek_criterium_id`),
+  KEY `rubriek_criterium_id` (`rubriek_criterium_id`),
+  CONSTRAINT `rubriek_scores_ibfk_1` FOREIGN KEY (`evaluatie_id`) REFERENCES `evaluaties` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `rubriek_scores_ibfk_2` FOREIGN KEY (`rubriek_criterium_id`) REFERENCES `rubriek_criteria` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 DROP TABLE IF EXISTS `stage_regels`;
