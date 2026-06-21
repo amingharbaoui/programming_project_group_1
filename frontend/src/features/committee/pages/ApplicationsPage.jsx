@@ -34,6 +34,7 @@ function statusLabel(status) {
     aanpassingen_gevraagd: "Aanpassingen vereist",
     heringediend:          "Heringediend",
     goedgekeurd:           "Goedgekeurd",
+    goedgekeurd_met_uitzondering: "Goedgekeurd (uitzondering)",
     afgekeurd:             "Afgekeurd",
     ingetrokken:           "Ingetrokken",
   }[status] || status;
@@ -41,6 +42,7 @@ function statusLabel(status) {
 
 function statusKlasse(status) {
   if (status === "goedgekeurd")            return "s_ok";
+  if (status === "goedgekeurd_met_uitzondering") return "s_ok";
   if (status === "afgekeurd")              return "s_rood";
   if (status === "aanpassingen_gevraagd")  return "s_amber";
   if (status === "ingediend")              return "s_info";
