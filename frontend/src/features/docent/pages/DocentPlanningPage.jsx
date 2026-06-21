@@ -56,6 +56,7 @@ export default function DocentPlanningPage() {
   const [nieuwModal, setNieuwModal] = useState(false);
   const [nieuwDossierId, setNieuwDossierId] = useState("");
   const [nieuwDatum, setNieuwDatum] = useState("");
+  const [nieuwUur, setNieuwUur] = useState("10:00");
   const [nieuwLocatie, setNieuwLocatie] = useState("");
   const [nieuwDeelnemers, setNieuwDeelnemers] = useState("");
   const [nieuwType, setNieuwType] = useState("Bedrijfsbezoek");
@@ -115,6 +116,7 @@ export default function DocentPlanningPage() {
     setNieuwModal(true);
     setFout("");
     setNieuwDatum("");
+    setNieuwUur("10:00");
     setNieuwLocatie("");
     setNieuwDeelnemers("");
     setNieuwType("Bedrijfsbezoek");
@@ -131,9 +133,11 @@ export default function DocentPlanningPage() {
       setFout("");
       const isPresentatie = nieuwType === "Eindpresentatie";
       const endpoint = isPresentatie ? "/docent/planning/presentation" : "/docent/planning/visit";
+      // Datum + uur samenvoegen tot één tijdstip (prototype gebruikt aparte velden).
+      const geplandOp = `${nieuwDatum}T${nieuwUur || "00:00"}`;
       await api.post(endpoint, {
         dossierId: Number(nieuwDossierId),
-        geplandOp: nieuwDatum,
+        geplandOp,
         locatie: nieuwLocatie,
         ...(isPresentatie ? { deelnemers: nieuwDeelnemers } : {}),
       });
@@ -308,12 +312,18 @@ export default function DocentPlanningPage() {
                 )}
               </div>
               <div className="form_group">
-                <label className="form_label">Datum en uur <span style={{ color: "var(--red)" }}>*</span></label>
-                <input className="form_input" type="datetime-local" value={nieuwDatum} onChange={(e) => setNieuwDatum(e.target.value)} />
+                <label className="form_label">Plaats</label>
+                <input className="form_input" type="text" placeholder="bv. Bij het bedrijf — adres, of Online (Teams)" value={nieuwLocatie} onChange={(e) => setNieuwLocatie(e.target.value)} />
               </div>
-              <div className="form_group">
-                <label className="form_label">Locatie</label>
-                <input className="form_input" type="text" placeholder="bv. Bedrijfsadres of Online (Teams)" value={nieuwLocatie} onChange={(e) => setNieuwLocatie(e.target.value)} />
+              <div style={{ display: "flex", gap: 10 }}>
+                <div className="form_group" style={{ flex: 1 }}>
+                  <label className="form_label">Datum <span style={{ color: "var(--red)" }}>*</span></label>
+                  <input className="form_input" type="date" value={nieuwDatum} onChange={(e) => setNieuwDatum(e.target.value)} />
+                </div>
+                <div className="form_group" style={{ width: 120 }}>
+                  <label className="form_label">Uur <span style={{ color: "var(--red)" }}>*</span></label>
+                  <input className="form_input" type="time" step="900" value={nieuwUur} onChange={(e) => setNieuwUur(e.target.value)} />
+                </div>
               </div>
               {nieuwType === "Eindpresentatie" && (
                 <div className="form_group">

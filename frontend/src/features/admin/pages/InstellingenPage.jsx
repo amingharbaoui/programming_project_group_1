@@ -39,6 +39,12 @@ export default function InstellingenPage() {
   const [resetChecklistSaving, setResetChecklistSaving] = useState(false);
   const [verwijderTarget, setVerwijderTarget] = useState(null);
 
+  const [rubriekCriteria, setRubriekCriteria] = useState([]);
+  const [nieuwRubriek, setNieuwRubriek] = useState("");
+  const [nieuwRubriekSaving, setNieuwRubriekSaving] = useState(false);
+  const [bewerkRubriek, setBewerkRubriek] = useState(null);
+  const [verwijderRubriek, setVerwijderRubriek] = useState(null);
+
   const [toast, setToast] = useState(null);
 
   function showToast(msg, type = "ok") {
@@ -55,6 +61,7 @@ export default function InstellingenPage() {
         setStageRegels(regels);
         setDocSoorten(cached.documentSoorten || []);
         setChecklistItems(cached.checklistItems || []);
+        setRubriekCriteria(cached.rubriekCriteria || []);
         const initForm = {};
         regels.forEach((r) => {
           initForm[r.id] = {
@@ -77,6 +84,7 @@ export default function InstellingenPage() {
       setStageRegels(regels);
       setDocSoorten(data.documentSoorten || []);
       setChecklistItems(data.checklistItems || []);
+      setRubriekCriteria(data.rubriekCriteria || []);
       const initForm = {};
       regels.forEach((r) => {
         initForm[r.id] = {
@@ -250,6 +258,65 @@ export default function InstellingenPage() {
       cacheDelete("admin_settings");
     } catch (err) {
       setChecklistItems((prev) => [...prev, item]);
+      showToast(err.response?.data?.message || "Verwijderen mislukt", "error");
+    }
+  }
+
+  // ── Rubriek eindpresentatie (telt 20% mee in het eindcijfer) ──
+  async function voegRubriekToe(e) {
+    e.preventDefault();
+    const titel = nieuwRubriek.trim();
+    if (!titel) return;
+    setNieuwRubriekSaving(true);
+    try {
+      const res = await api.post("/admin/rubriek-criteria", { titel, volgorde: rubriekCriteria.length + 1 });
+      const nieuw = res.data.data || { id: Date.now(), titel, max_score: 5, volgorde: rubriekCriteria.length + 1, actief: 1 };
+      setRubriekCriteria((prev) => [...prev, nieuw]);
+      setNieuwRubriek("");
+      showToast("Rubriekcriterium toegevoegd.");
+      cacheDelete("admin_settings");
+    } catch (err) {
+      showToast(err.response?.data?.message || "Toevoegen mislukt", "error");
+    } finally {
+      setNieuwRubriekSaving(false);
+    }
+  }
+
+  async function bewaarRubriek() {
+    const titel = (bewerkRubriek?.titel || "").trim();
+    if (!titel) return;
+    setRubriekCriteria((prev) => prev.map((i) => i.id === bewerkRubriek.id ? { ...i, titel } : i));
+    setBewerkRubriek(null);
+    try {
+      await api.patch(`/admin/rubriek-criteria/${bewerkRubriek.id}`, { titel });
+      showToast("Rubriekcriterium opgeslagen.");
+      cacheDelete("admin_settings");
+    } catch (err) {
+      showToast(err.response?.data?.message || "Opslaan mislukt", "error");
+    }
+  }
+
+  async function toggleRubriekActief(item) {
+    setRubriekCriteria((prev) => prev.map((i) => i.id === item.id ? { ...i, actief: !item.actief } : i));
+    try {
+      await api.patch(`/admin/rubriek-criteria/${item.id}`, { actief: !item.actief });
+      cacheDelete("admin_settings");
+    } catch (err) {
+      setRubriekCriteria((prev) => prev.map((i) => i.id === item.id ? { ...i, actief: item.actief } : i));
+      showToast(err.response?.data?.message || "Wijzigen mislukt", "error");
+    }
+  }
+
+  async function bevestigVerwijderRubriek() {
+    const item = verwijderRubriek;
+    setVerwijderRubriek(null);
+    setRubriekCriteria((prev) => prev.filter((i) => i.id !== item.id));
+    try {
+      await api.delete(`/admin/rubriek-criteria/${item.id}`);
+      showToast("Rubriekcriterium verwijderd.");
+      cacheDelete("admin_settings");
+    } catch (err) {
+      setRubriekCriteria((prev) => [...prev, item]);
       showToast(err.response?.data?.message || "Verwijderen mislukt", "error");
     }
   }
@@ -536,6 +603,124 @@ export default function InstellingenPage() {
           {nieuwItemError && <p className="modal_error" style={{ marginTop: 8 }}>{nieuwItemError}</p>}
         </form>
       </div>
+
+      {/* ── Rubriek eindpresentatie ── */}
+      <div className="card inst_card">
+        <div className="inst_card_title">Rubriek eindpresentatie</div>
+        <p className="inst_sub">De docent scoort deze criteria bij de eindpresentatie. Samen tellen ze voor <b>20%</b> van het eindcijfer (competenties 80%).</p>
+
+        <table className="tbl inst_tbl">
+          <thead>
+            <tr>
+              <th>Criterium</th>
+              <th style={{ textAlign: "center", width: 90 }}>Actief</th>
+              <th style={{ textAlign: "right", width: 140 }}>Actie</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rubriekCriteria.length === 0 && (
+              <tr><td colSpan="3" style={{ color: "var(--faint)", fontSize: 13, padding: "16px 8px" }}>Nog geen rubriekcriteria — voeg er hieronder een toe.</td></tr>
+            )}
+            {rubriekCriteria.map((item) => {
+              const isBewerken = bewerkRubriek?.id === item.id;
+              return (
+                <tr key={item.id}>
+                  <td>
+                    {isBewerken ? (
+                      <input
+                        type="text"
+                        value={bewerkRubriek.titel}
+                        onChange={(e) => setBewerkRubriek({ ...bewerkRubriek, titel: e.target.value })}
+                        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); bewaarRubriek(); } if (e.key === "Escape") setBewerkRubriek(null); }}
+                        style={{ width: "100%", fontSize: 13, fontFamily: "var(--font)", color: "var(--dark)", border: "0.5px solid var(--border)", borderRadius: 7, padding: "7px 10px", outline: "none", background: "var(--white)", boxSizing: "border-box" }}
+                        onFocus={(e) => e.target.style.borderColor = "var(--red)"}
+                        onBlur={(e) => e.target.style.borderColor = "var(--border)"}
+                        autoFocus
+                      />
+                    ) : (
+                      <span style={{ fontSize: 13, color: item.actief ? "var(--dark)" : "var(--faint)", fontWeight: 500 }}>{item.titel}</span>
+                    )}
+                  </td>
+                  <td style={{ textAlign: "center" }}>
+                    {!isBewerken && (
+                      <label className="inst_toggle" style={{ gap: 4 }}>
+                        <input type="checkbox" checked={!!item.actief} onChange={() => toggleRubriekActief(item)} />
+                        <span className="inst_toggle_label">{item.actief ? "Actief" : "Uit"}</span>
+                      </label>
+                    )}
+                  </td>
+                  <td style={{ textAlign: "right" }}>
+                    <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                      {isBewerken ? (
+                        <>
+                          <button className="btn sm primary" onClick={bewaarRubriek}>
+                            <IconCheck size={14} stroke={2} /> Opslaan
+                          </button>
+                          <button className="btn sm" onClick={() => setBewerkRubriek(null)}>Annuleren</button>
+                        </>
+                      ) : (
+                        <>
+                          <button className="btn sm" onClick={() => setBewerkRubriek({ id: item.id, titel: item.titel })}>
+                            <IconPencil size={14} stroke={1.8} /> Bewerken
+                          </button>
+                          <button className="btn sm" style={{ color: "var(--red)" }} onClick={() => setVerwijderRubriek(item)}>
+                            <IconTrash size={14} stroke={1.8} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+
+        <form onSubmit={voegRubriekToe} className="inst_new_doc">
+          <div className="inst_new_doc_title">
+            <IconCirclePlus size={16} stroke={1.8} />
+            Nieuw rubriekcriterium toevoegen
+          </div>
+          <div className="inst_new_doc_row">
+            <div className="modal_field inst_doc_field">
+              <label className="modal_label">Criterium <span className="modal_required">*</span></label>
+              <input
+                className="modal_input"
+                placeholder="bv. Communicatie en presentatie..."
+                value={nieuwRubriek}
+                onChange={(e) => setNieuwRubriek(e.target.value)}
+              />
+            </div>
+            <div className="inst_new_doc_btn_wrap">
+              <label className="modal_label inst_label_spacer">&nbsp;</label>
+              <button className="btn primary" type="submit" disabled={nieuwRubriekSaving}>
+                <IconPlus size={16} stroke={1.8} />
+                {nieuwRubriekSaving ? "Bezig..." : "Toevoegen"}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      {verwijderRubriek && (
+        <div className="modal_overlay" onClick={() => setVerwijderRubriek(null)}>
+          <div className="modal_box modal_box_sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal_header">
+              <span className="modal_title">Rubriekcriterium verwijderen</span>
+              <button className="icon_btn" onClick={() => setVerwijderRubriek(null)} type="button"><IconX size={16} stroke={1.8} /></button>
+            </div>
+            <div className="modal_body">
+              <p style={{ margin: 0, fontSize: 14, color: "var(--dark)" }}>
+                Wil je "{verwijderRubriek.titel}" verwijderen? Bestaande presentatiescores blijven bewaard.
+              </p>
+            </div>
+            <div className="modal_footer">
+              <button className="btn" onClick={() => setVerwijderRubriek(null)}>Annuleren</button>
+              <button className="btn primary" style={{ background: "var(--red)" }} onClick={bevestigVerwijderRubriek}>Verwijderen</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {bevestigRegelId !== null && (
         <div className="modal_overlay" onClick={() => setBevestigRegelId(null)}>

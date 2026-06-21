@@ -1,9 +1,86 @@
 const db = require("../config/db");
+const fs = require("fs");
+const path = require("path");
 const { ok, fail } = require("../utils/response");
 const { meld } = require("../utils/notify");
 const { buildSimplePdf } = require("../utils/pdf");
 
 const GELDIGE_TYPES = ["tussentijds", "finaal"];
+
+// Document-soort opzoeken of aanmaken (zelfde patroon als internshipController.ensureDocumentType).
+async function ensureDocumentSoort(conn, type, naam) {
+  const [bestaand] = await conn.query(
+    "SELECT id FROM document_soorten WHERE type = ? AND status = 'actief' ORDER BY id LIMIT 1",
+    [type]
+  );
+  if (bestaand.length > 0) return bestaand[0].id;
+  const [r] = await conn.query(
+    `INSERT INTO document_soorten (naam, type, is_verplicht, is_vast, status, aangemaakt_op, aangepast_op)
+     VALUES (?, ?, 0, 0, 'actief', NOW(), NOW())`,
+    [naam, type]
+  );
+  return r.insertId;
+}
+
+// Genereert een PDF-overzicht van een (tussentijdse of finale) evaluatie en hangt het als document aan het
+// dossier, zichtbaar voor student/mentor/docent. Faalt zacht: een mislukking blokkeert de registratie niet.
+async function genereerEvaluatieDocument(evaluatie) {
+  const conn = await db.getConnection();
+  try {
+    const [scoreRows] = await conn.query(
+      `SELECT c.naam AS competentie, es.rol, es.score, es.motivering
+       FROM competentie_scores es
+       JOIN competenties c ON c.id = es.competentie_id
+       WHERE es.evaluatie_id = ?
+       ORDER BY c.naam, FIELD(es.rol, 'student','mentor','docent')`,
+      [evaluatie.id]
+    );
+    const [info] = await conn.query(
+      `SELECT d.dossiernummer, d.id AS dossier_id,
+              gs.voornaam AS s_v, gs.achternaam AS s_a
+       FROM stagedossiers d
+       LEFT JOIN gebruikers gs ON gs.id = d.student_id
+       WHERE d.id = ? LIMIT 1`,
+      [evaluatie.stagedossier_id]
+    );
+    const d = info[0] || {};
+    const typeLabel = evaluatie.type === "finaal" ? "Finale evaluatie" : "Tussentijdse evaluatie";
+    const rolLabel = { student: "Zelf", mentor: "Mentor", docent: "Docent" };
+    const lines = [
+      `${typeLabel} — stage`,
+      `Dossier: ${d.dossiernummer || evaluatie.stagedossier_id}`,
+      `Student: ${[d.s_v, d.s_a].filter(Boolean).join(" ") || "-"}`,
+      `Geregistreerd op: ${new Date().toISOString().slice(0, 10)}`,
+      "",
+      "Scores per competentie:",
+    ];
+    for (const r of scoreRows) {
+      lines.push(`  ${r.competentie} — ${rolLabel[r.rol] || r.rol}: ${r.score ?? "-"}/5${r.motivering ? ` (${String(r.motivering).slice(0, 120)})` : ""}`);
+    }
+    if (evaluatie.verslag) { lines.push("", "Eindfeedback:", `  ${String(evaluatie.verslag).slice(0, 500)}`); }
+
+    const uploadsDir = path.join(__dirname, "../../uploads/evaluaties");
+    fs.mkdirSync(uploadsDir, { recursive: true });
+    const safe = String(d.dossiernummer || evaluatie.stagedossier_id).replace(/[^a-zA-Z0-9_-]/g, "-");
+    const bestandsnaam = `evaluatie-${evaluatie.type}-${safe}-${evaluatie.id}.pdf`;
+    fs.writeFileSync(path.join(uploadsDir, bestandsnaam), buildSimplePdf(lines));
+    const bestandUrl = `/uploads/evaluaties/${bestandsnaam}`;
+
+    const soortId = await ensureDocumentSoort(conn, `evaluatie_${evaluatie.type}`, `${typeLabel}`);
+    await conn.query(
+      `INSERT INTO documenten
+        (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam,
+         opgeladen_op, gecontroleerd_op, zichtbaar_voor_student, zichtbaar_voor_docent, zichtbaar_voor_mentor,
+         aangemaakt_op, aangepast_op)
+       VALUES (?, ?, 'geregistreerd', 1, ?, ?, NOW(), NOW(), 1, 1, 1, NOW(), NOW())`,
+      [evaluatie.stagedossier_id, soortId, bestandUrl, bestandsnaam]
+    );
+  } catch (e) {
+    console.error("genereerEvaluatieDocument:", e.message);
+  } finally {
+    conn.release();
+  }
+}
 
 function getUserId(req) {
   // Geen demo-fallback meer (auditpunt 312): zonder ingelogde gebruiker liever null dan stil user 1.
@@ -439,12 +516,38 @@ async function calculateResult(req, res) {
     const isFinaal = evaluatie.type === "finaal";
     // Competentiescore (1-5) omgezet naar /20.
     const competentie20 = Math.round(competentieScore * 4 * 100) / 100;
-    // Finaal eindcijfer = 80% competenties + 20% eindpresentatie (als die gescoord is), anders enkel competenties.
+    // Finaal eindcijfer = 80% competenties + 20% eindpresentatie, anders enkel competenties.
     let eindcijfer = null;
+    let presentatieScoreOpslaan = eindpresentatieScore;
     if (isFinaal) {
-      const presentatie = eindpresentatieScore != null
-        ? Number(eindpresentatieScore)
-        : (evaluatie.eindpresentatie_score != null ? Number(evaluatie.eindpresentatie_score) : null);
+      // De presentatiescore (20%) komt uit de flexibele rubriek: gemiddelde van score/max_score over de
+      // actieve criteria, geschaald naar /20. Ontbrekende criteria tellen als 0 (deadline-/0-logica).
+      let presentatie = null;
+      try {
+        const [rubriek] = await conn.query(
+          `SELECT rc.max_score, rs.score
+           FROM rubriek_criteria rc
+           LEFT JOIN rubriek_scores rs ON rs.rubriek_criterium_id = rc.id AND rs.evaluatie_id = ?
+           WHERE rc.actief = 1`,
+          [evaluationId]
+        );
+        if (rubriek.length > 0) {
+          const fractie = rubriek.reduce((s, r) => {
+            const max = Number(r.max_score) || 5;
+            const sc = r.score != null ? Number(r.score) : 0; // niet gescoord = 0
+            return s + Math.max(0, Math.min(sc, max)) / max;
+          }, 0) / rubriek.length;
+          presentatie = Math.round(fractie * 20 * 100) / 100;
+        }
+      } catch (_) {
+        // rubriek-tabellen nog niet gemigreerd → val terug op een los meegegeven/opgeslagen getal.
+      }
+      if (presentatie == null) {
+        presentatie = eindpresentatieScore != null
+          ? Number(eindpresentatieScore)
+          : (evaluatie.eindpresentatie_score != null ? Number(evaluatie.eindpresentatie_score) : null);
+      }
+      if (presentatie != null) presentatieScoreOpslaan = presentatie;
       eindcijfer = presentatie != null
         ? Math.round((competentie20 * 0.8 + presentatie * 0.2) * 100) / 100
         : competentie20;
@@ -458,23 +561,24 @@ async function calculateResult(req, res) {
            verslag = COALESCE(?, verslag),
            status = ?, docent_geregistreerd_op = NOW(), aangepast_op = NOW()
        WHERE id = ? AND status = 'klaar_voor_docent'`,
-      [competentieScore, eindcijfer, eindpresentatieScore, verslag, nieuweStatus, evaluationId]
+      [competentieScore, eindcijfer, presentatieScoreOpslaan, verslag, nieuweStatus, evaluationId]
     );
     if (berekenResult.affectedRows === 0) { await conn.rollback(); return fail(res, 409, "Deze evaluatie is ondertussen al verwerkt; vernieuw de pagina"); }
 
     await conn.commit();
 
-    // Tussentijds geregistreerd → student en mentor kunnen het verslag bekijken (mockup-belofte).
+    // Tussentijds geregistreerd → bewaar als document bij het dossier en verwittig student + mentor.
     if (!isFinaal) {
+      await genereerEvaluatieDocument({ id: evaluationId, type: evaluatie.type, stagedossier_id: evaluatie.stagedossier_id, verslag });
       await meld(evaluatie.student_id, {
         titel: "Tussentijdse evaluatie geregistreerd",
-        bericht: "De docent registreerde de tussentijdse bespreking. Je kan het verslag en de feedback bekijken.",
+        bericht: "De docent registreerde de tussentijdse bespreking. Je vindt de evaluatie als document bij Documenten — daar zie je de scores en feedback van iedereen.",
         aangemaaktDoorId: userId,
         stagedossierId: evaluatie.stagedossier_id,
       });
       await meld(evaluatie.mentor_id, {
         titel: "Tussentijdse evaluatie geregistreerd",
-        bericht: "De docent registreerde de tussentijdse bespreking van je stagiair.",
+        bericht: "De docent registreerde de tussentijdse bespreking van je stagiair. De evaluatie staat als document bij het dossier.",
         aangemaaktDoorId: userId,
         stagedossierId: evaluatie.stagedossier_id,
       });
@@ -741,4 +845,73 @@ async function downloadMyEindoverzicht(req, res) {
   }
 }
 
-module.exports = { openEvaluation, getEvaluationsForStudent, saveScores, calculateResult, releaseResult, getMyStudents, getMyFinalResult, downloadMyEindoverzicht };
+// ── Rubriek eindpresentatie: lezen + scoren door de docent ──
+
+// Actieve rubriek-criteria + de (eventuele) scores van deze evaluatie. Leesbaar voor alle betrokkenen.
+async function getRubriek(req, res) {
+  const evaluationId = Number(req.params.evaluationId);
+  if (!evaluationId) return fail(res, 400, "Ongeldig evaluatie-id");
+  try {
+    const [rows] = await db.query(
+      `SELECT rc.id, rc.titel, rc.beschrijving, rc.max_score, rc.volgorde,
+              rs.score, rs.feedback
+       FROM rubriek_criteria rc
+       LEFT JOIN rubriek_scores rs ON rs.rubriek_criterium_id = rc.id AND rs.evaluatie_id = ?
+       WHERE rc.actief = 1
+       ORDER BY rc.volgorde ASC, rc.id ASC`,
+      [evaluationId]
+    );
+    return ok(res, { criteria: rows }, "Rubriek opgehaald");
+  } catch (error) {
+    return fail(res, 500, "Rubriek ophalen mislukt", error.message);
+  }
+}
+
+// Docent slaat rubriekscores op (concept of definitief). De definitieve telt mee in calculateResult (20%).
+async function saveRubriekScores(req, res) {
+  const evaluationId = Number(req.params.evaluationId);
+  const role = req.user?.hoofdrol;
+  const userId = getUserId(req);
+  const scores = Array.isArray(req.body?.scores) ? req.body.scores : [];
+
+  if (!evaluationId) return fail(res, 400, "Ongeldig evaluatie-id");
+  if (role !== "docent") return fail(res, 403, "Enkel de docent vult de presentatie-rubriek in");
+  if (scores.length === 0) return fail(res, 400, "Geen rubriekscores meegegeven");
+
+  for (const s of scores) {
+    if (s.score === null || s.score === undefined || s.score === "") continue;
+    const w = Number(s.score);
+    if (!Number.isFinite(w) || w < 0) return fail(res, 400, "Rubriekscore is ongeldig");
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const evaluatie = await loadEvaluationWithDossier(conn, evaluationId);
+    if (!evaluatie) { await conn.rollback(); return fail(res, 404, "Evaluatie niet gevonden"); }
+    if (evaluatie.status === "vrijgegeven") { await conn.rollback(); return fail(res, 409, "Deze evaluatie is al vrijgegeven"); }
+    if (!userMayEditAsRole(evaluatie, "docent", userId)) { await conn.rollback(); return fail(res, 403, "Je bent niet gekoppeld aan deze evaluatie"); }
+
+    for (const s of scores) {
+      const critId = Number(s.rubriekCriteriumId ?? s.rubriek_criterium_id ?? s.id);
+      if (!critId) continue;
+      const score = (s.score === null || s.score === undefined || s.score === "") ? null : Number(s.score);
+      await conn.query(
+        `INSERT INTO rubriek_scores (evaluatie_id, rubriek_criterium_id, score, feedback, beoordeeld_door_id, aangemaakt_op, aangepast_op)
+         VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+         ON DUPLICATE KEY UPDATE score = VALUES(score), feedback = VALUES(feedback), beoordeeld_door_id = VALUES(beoordeeld_door_id), aangepast_op = NOW()`,
+        [evaluationId, critId, score, s.feedback || null, userId]
+      );
+    }
+
+    await conn.commit();
+    return ok(res, { evaluationId }, "Rubriekscores opgeslagen");
+  } catch (error) {
+    await conn.rollback();
+    return fail(res, 500, "Rubriekscores opslaan mislukt", error.message);
+  } finally {
+    conn.release();
+  }
+}
+
+module.exports = { openEvaluation, getEvaluationsForStudent, saveScores, calculateResult, releaseResult, getMyStudents, getMyFinalResult, downloadMyEindoverzicht, getRubriek, saveRubriekScores };

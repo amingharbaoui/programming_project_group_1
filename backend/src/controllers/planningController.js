@@ -112,16 +112,13 @@ async function createPlanningMoment(req, res, type) {
     );
 
     const planningId = result.insertId;
-    await meld(dossier.student_id, {
-      titel: type === "bedrijfsbezoek" ? "Bedrijfsbezoek voorgesteld" : "Eindpresentatie gepland",
-      bericht: type === "bedrijfsbezoek" ? "Je docent heeft een bedrijfsbezoek voorgesteld." : "Je docent heeft je eindpresentatie gepland.",
-      aangemaaktDoorId: docentId,
-      stagedossierId: dossierIdFinal
-    });
+    // Flow (prototype): bij het inplannen krijgt ENKEL de mentor een melding om te bevestigen of een ander
+    // moment voor te stellen. De student wordt pas verwittigd zodra het moment goedgekeurd is (confirmMentorPlanning).
+    const typeLabel = type === "bedrijfsbezoek" ? "bedrijfsbezoek" : "eindpresentatie";
     if (dossier.mentor_id) {
       await meld(dossier.mentor_id, {
-        titel: type === "bedrijfsbezoek" ? "Bedrijfsbezoek voorgesteld" : "Eindpresentatie gepland",
-        bericht: type === "bedrijfsbezoek" ? "Er is een bedrijfsbezoek voorgesteld." : "Er is een eindpresentatie gepland.",
+        titel: type === "bedrijfsbezoek" ? "Bedrijfsbezoek voorgesteld" : "Eindpresentatie voorgesteld",
+        bericht: `De docent stelde een ${typeLabel} voor. Bevestig het moment of stel een ander moment/uur/plaats voor.`,
         aangemaaktDoorId: docentId,
         stagedossierId: dossierIdFinal
       });
@@ -267,8 +264,9 @@ async function confirmMentorPlanning(req, res) {
     const dossier = await getMentorDossierByPlanning(planningId, mentorId);
     if (!dossier) return fail(res, 403, "Geen toegang tot dit planningmoment");
     if (["resultaat_vrijgegeven", "afgerond"].includes(dossier.dossier_status)) return fail(res, 409, "Het dossier is afgerond; planning kan niet meer gewijzigd worden");
-    if (dossier.planning_type !== "bedrijfsbezoek") return fail(res, 409, "Alleen een bedrijfsbezoek kan door de mentor behandeld worden");
+    if (!["bedrijfsbezoek", "eindpresentatie"].includes(dossier.planning_type)) return fail(res, 409, "Dit moment kan niet door de mentor behandeld worden");
     if (!["voorgesteld", "gepland"].includes(dossier.planning_status)) return fail(res, 409, "Dit moment kan in de huidige status niet meer aangepast worden");
+    const isPresentatie = dossier.planning_type === "eindpresentatie";
 
     // Conditioneel op de status zodat een dubbelklik of een gelijktijdige docentwijziging niet overschrijft (393).
     const [bevestigResult] = await db.query(
@@ -282,15 +280,19 @@ async function confirmMentorPlanning(req, res) {
     if (bevestigResult.affectedRows === 0) return fail(res, 409, "Dit planningmoment is ondertussen gewijzigd; vernieuw de pagina");
 
     await meld(dossier.stagebegeleider_id, {
-      titel: "Bedrijfsbezoek bevestigd",
-      bericht: "De mentor heeft het voorgestelde bedrijfsbezoek bevestigd.",
+      titel: isPresentatie ? "Eindpresentatie bevestigd" : "Bedrijfsbezoek bevestigd",
+      bericht: isPresentatie ? "De mentor heeft de voorgestelde eindpresentatie bevestigd." : "De mentor heeft het voorgestelde bedrijfsbezoek bevestigd.",
       aangemaaktDoorId: mentorId,
       stagedossierId: dossier.stagedossier_id
     });
     if (dossier.student_id) {
+      // Pas nu (na goedkeuring) krijgt de student bericht, inclusief de deadline voor de zelf-evaluatie:
+      // tot uiterlijk 1 week vóór het moment, anders telt die als 0 (flow/prototype).
       await meld(dossier.student_id, {
-        titel: "Bedrijfsbezoek bevestigd",
-        bericht: "Je mentor bevestigde het bedrijfsbezoek.",
+        titel: isPresentatie ? "Eindpresentatie bevestigd" : "Bedrijfsbezoek bevestigd",
+        bericht: isPresentatie
+          ? "Je eindpresentatie is bevestigd. Vul je finale zelf-evaluatie in tot uiterlijk 1 week vóór de presentatie — niet ingevuld telt als 0."
+          : "Het bedrijfsbezoek is bevestigd. Vul je tussentijdse zelf-evaluatie in tot uiterlijk 1 week vóór het bezoek — niet ingevuld telt als 0.",
         aangemaaktDoorId: mentorId,
         stagedossierId: dossier.stagedossier_id
       });
@@ -317,8 +319,9 @@ async function proposeAlternative(req, res) {
     const dossier = await getMentorDossierByPlanning(planningId, mentorId);
     if (!dossier) return fail(res, 403, "Geen toegang tot dit planningmoment");
     if (["resultaat_vrijgegeven", "afgerond"].includes(dossier.dossier_status)) return fail(res, 409, "Het dossier is afgerond; planning kan niet meer gewijzigd worden");
-    if (dossier.planning_type !== "bedrijfsbezoek") return fail(res, 409, "Alleen een bedrijfsbezoek kan door de mentor behandeld worden");
+    if (!["bedrijfsbezoek", "eindpresentatie"].includes(dossier.planning_type)) return fail(res, 409, "Dit moment kan niet door de mentor behandeld worden");
     if (!["voorgesteld", "gepland"].includes(dossier.planning_status)) return fail(res, 409, "Dit moment kan in de huidige status niet meer aangepast worden");
+    const isPresentatie = dossier.planning_type === "eindpresentatie";
 
     // Conditioneel op de status zodat een dubbelklik of een gelijktijdige docentwijziging niet overschrijft (393).
     const [altResult] = await db.query(
@@ -335,20 +338,14 @@ async function proposeAlternative(req, res) {
     );
     if (altResult.affectedRows === 0) return fail(res, 409, "Dit planningmoment is ondertussen gewijzigd; vernieuw de pagina");
 
+    const altLabel = isPresentatie ? "de eindpresentatie" : "het bedrijfsbezoek";
     await meld(dossier.stagebegeleider_id, {
-      titel: "Alternatief bezoekmoment voorgesteld",
-      bericht: "De mentor heeft een alternatief voorgesteld voor het bedrijfsbezoek.",
+      titel: isPresentatie ? "Alternatief presentatiemoment voorgesteld" : "Alternatief bezoekmoment voorgesteld",
+      bericht: `De mentor heeft een alternatief moment voorgesteld voor ${altLabel}. Plan het opnieuw in of bevestig.`,
       aangemaaktDoorId: mentorId,
       stagedossierId: dossier.stagedossier_id
     });
-    if (dossier.student_id) {
-      await meld(dossier.student_id, {
-        titel: "Ander bezoekmoment voorgesteld",
-        bericht: "Je mentor stelde een ander moment voor het bedrijfsbezoek voor.",
-        aangemaaktDoorId: mentorId,
-        stagedossierId: dossier.stagedossier_id
-      });
-    }
+    // Tijdens de planning-loop krijgt de student nog geen melding (pas na goedkeuring, in confirmMentorPlanning).
 
     return ok(res, { id: planningId, status: "alternatief_gevraagd" }, "Alternatief voorgesteld");
   } catch (error) {

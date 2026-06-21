@@ -7,7 +7,7 @@ const {
   generateEindoverzicht,
   sendContractReminder
 } = require("../controllers/internshipController");
-const { getSettings, updateStageRule, updateDocumentType, createDocumentType, resetDocumentTypes, deleteDocumentType, createChecklistItem, updateChecklistItem, deleteChecklistItem, resetChecklistItems } = require("../controllers/settingsController");
+const { getSettings, updateStageRule, updateDocumentType, createDocumentType, resetDocumentTypes, deleteDocumentType, createChecklistItem, updateChecklistItem, deleteChecklistItem, resetChecklistItems, createRubriekCriterium, updateRubriekCriterium, deleteRubriekCriterium } = require("../controllers/settingsController");
 const { inviteMentor, inviteUser, resendInvitation, resendUserInvitation } = require("../controllers/userController");
 const { approveDocument, rejectDocument } = require("../controllers/documentController");
 const { adminDownloadContractPdf, registerOvereenkomst } = require("../controllers/contractController");
@@ -45,6 +45,10 @@ router.post("/checklist-items/reset", resetChecklistItems);
 router.post("/checklist-items", createChecklistItem);
 router.patch("/checklist-items/:id", updateChecklistItem);
 router.delete("/checklist-items/:id", deleteChecklistItem);
+
+router.post("/rubriek-criteria", createRubriekCriterium);
+router.patch("/rubriek-criteria/:id", updateRubriekCriterium);
+router.delete("/rubriek-criteria/:id", deleteRubriekCriterium);
 
 router.post("/invitations", inviteMentor);
 router.post("/invitations/:id/resend", resendInvitation);
