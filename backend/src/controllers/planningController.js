@@ -105,6 +105,17 @@ async function createPlanningMoment(req, res, type) {
     if (!dossier.mentor_id) {
       return fail(res, 409, "Koppel eerst een mentor aan dit dossier voor je een moment inplant");
     }
+    // 475: per type maximaal één actief moment. Een nieuw moment aanmaken naast een nog lopend/bevestigd moment
+    // maakt de finale gates onvoorspelbaar — herplannen gebeurt via wijzigen, niet via een tweede rij.
+    const [actief] = await db.query(
+      `SELECT COUNT(*) AS aantal FROM planning_momenten
+       WHERE stagedossier_id = ? AND type = ? AND status IN ('voorgesteld', 'gepland', 'bevestigd', 'alternatief_gevraagd')`,
+      [dossierIdFinal, type]
+    );
+    if (actief[0].aantal > 0) {
+      const label = type === "bedrijfsbezoek" ? "bedrijfsbezoek" : "eindpresentatie";
+      return fail(res, 409, `Er is al een actief ${label} ingepland; pas dat moment aan of annuleer het eerst.`);
+    }
 
     const status = type === "bedrijfsbezoek" ? "voorgesteld" : "gepland";
     const [result] = await db.query(
