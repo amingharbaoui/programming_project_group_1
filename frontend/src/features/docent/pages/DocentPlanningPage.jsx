@@ -34,8 +34,6 @@ function getStatusLabel(status) {
   return labels[status] || status || "-";
 }
 
-const AFGEHANDELD = ["gegeven", "geweest", "geannuleerd"];
-
 const TYPE_OPTIES = [
   { key: "alle", label: "Alle types" },
   { key: "bedrijfsbezoek", label: "Bedrijfsbezoek" },
@@ -235,7 +233,6 @@ export default function DocentPlanningPage() {
             <tbody>
               {gefilterd.map((p) => {
                 const initialen = (p.student_naam || "?").split(" ").filter(Boolean).map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-                const afgehandeld = AFGEHANDELD.includes(p.status);
                 return (
                   <tr key={p.id}>
                     <td>
@@ -257,13 +254,16 @@ export default function DocentPlanningPage() {
                       </span>
                     </td>
                     <td style={{ textAlign: "right" }}>
-                      {!afgehandeld && (
+                      {/* De actie zet het moment op geweest/gegeven; dat mag backendmatig enkel vanuit
+                          bevestigd/gepland. Voor voorgesteld/alternatief_gevraagd toont de statuskolom
+                          al "Wacht op bevestiging"/"ander moment gevraagd" — daar hoort geen knop. */}
+                      {["bevestigd", "gepland"].includes(p.status) && (
                         <button
                           className="btn sm"
                           disabled={gegevenId === p.id}
                           onClick={() => markeerGegeven(p.id, p.type)}
                         >
-                          <IconCheck size={14} stroke={2} /> Bevestigen
+                          <IconCheck size={14} stroke={2} /> {p.type === "bedrijfsbezoek" ? "Markeer als geweest" : "Markeer als gegeven"}
                         </button>
                       )}
                     </td>
