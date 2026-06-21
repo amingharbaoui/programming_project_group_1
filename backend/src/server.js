@@ -113,6 +113,13 @@ app.use((err, req, res, next) => {
 
 const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  // Toon duidelijk welke database live is (auditpunt 384): zo ziet iedereen meteen of hij op de
+  // gedeelde DB zit en voorkomen we per ongeluk testen tegen de verkeerde database.
+  console.log(`Database: "${process.env.DB_NAME || "(niet gezet!)"}" op ${process.env.DB_HOST || "(niet gezet!)"}:${process.env.DB_PORT || 3306}`);
+  const ontbrekend = ["DB_HOST", "DB_USER", "DB_NAME"].filter((k) => !process.env[k]);
+  if (ontbrekend.length) {
+    console.warn(`[WAARSCHUWING] Ontbrekende DB-omgevingsvariabelen: ${ontbrekend.join(", ")} — zet ze in backend/.env.`);
+  }
 });
 
 // Vangnet: laat één onafgevangen fout de server NIET platleggen (anders staat alles plat).

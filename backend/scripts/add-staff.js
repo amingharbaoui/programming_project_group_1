@@ -4,7 +4,7 @@
  * Zorgt dat elke staf-rol meerdere accounts heeft (commissie/docent/administratie elk 3).
  *
  * Gebruik:  node scripts/add-staff.js
- * Wachtwoord voor deze accounts:  Stagify!2026
+ * Wachtwoord voor deze accounts:  Demo!2026
  */
 const crypto = require("crypto");
 const db = require("../src/config/db");
