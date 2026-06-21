@@ -348,9 +348,14 @@ export default function DocentPlanningPage() {
               <div className="form_group">
                 <label className="form_label">Type <span style={{ color: "var(--red)" }}>*</span></label>
                 <select className="form_input" value={nieuwType} onChange={(e) => setNieuwType(e.target.value)}>
-                  <option value="Bedrijfsbezoek">Bedrijfsbezoek</option>
+                  <option value="Bedrijfsbezoek">Bedrijfsbezoek + tussentijdse evaluatie</option>
                   <option value="Eindpresentatie">Eindpresentatie</option>
                 </select>
+                {nieuwType === "Eindpresentatie" && (
+                  <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+                    <i className="ti ti-info-circle" /> Een eindpresentatie kan pas ingepland worden nadat het bedrijfsbezoek heeft plaatsgevonden én de tussentijdse evaluatie geregistreerd is.
+                  </p>
+                )}
               </div>
               <div className="form_group">
                 <label className="form_label">Student <span style={{ color: "var(--red)" }}>*</span></label>
