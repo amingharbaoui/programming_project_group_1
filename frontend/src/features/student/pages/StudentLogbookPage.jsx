@@ -1024,8 +1024,8 @@ export default function StudentLogbookPage() {
     );
   }
 
-  // Gate: stagevoorstel moet goedgekeurd zijn
-  if (voorstelStatus !== "goedgekeurd") {
+  // Gate: stagevoorstel moet goedgekeurd zijn (ook 'met uitzondering' telt als goedgekeurd — auditpunt 423).
+  if (!["goedgekeurd", "goedgekeurd_met_uitzondering"].includes(voorstelStatus)) {
     const uitleg =
       !voorstelStatus || voorstelStatus === "concept" || voorstelStatus === "ingediend"
         ? "Je stagevoorstel is nog niet goedgekeurd door de stagecommissie."
