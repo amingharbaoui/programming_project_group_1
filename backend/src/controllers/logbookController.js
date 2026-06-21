@@ -634,7 +634,9 @@ async function mentorCheckLogbookWeek(req, res) {
 
     const validMentorId = await getValidMentorIdForWeek(connection, weekId, requestedMentorId);
 
-    await connection.query(
+    // Conditioneel op 'ingediend' zodat een dubbelklik of een student die net herindient elkaar niet
+    // overschrijven (auditpunt 389).
+    const [mentorCheckResult] = await connection.query(
       `
       UPDATE logboek_weken
       SET status = ?,
@@ -644,7 +646,7 @@ async function mentorCheckLogbookWeek(req, res) {
           herindiening_nodig = ?,
           blokkade = COALESCE(?, blokkade),
           aangepast_op = NOW()
-      WHERE id = ?
+      WHERE id = ? AND status = 'ingediend'
       `,
       [
         needsResubmission ? "teruggestuurd_door_mentor" : "afgecheckt_door_mentor",
@@ -655,6 +657,9 @@ async function mentorCheckLogbookWeek(req, res) {
         weekId
       ]
     );
+    if (mentorCheckResult.affectedRows === 0) {
+      return fail(res, 409, "Deze week is ondertussen gewijzigd; vernieuw de pagina");
+    }
 
     const [rows] = await connection.query(
       "SELECT * FROM logboek_weken WHERE id = ?",
@@ -736,7 +741,8 @@ async function docentReviewLogbookWeek(req, res) {
 
     const validDocentId = await getValidDocentIdForWeek(connection, weekId, requestedDocentId);
 
-    await connection.query(
+    // Conditioneel op 'afgecheckt_door_mentor' zodat een dubbelklik/statuswijziging niet overschrijft (389).
+    const [docentReviewResult] = await connection.query(
       `
       UPDATE logboek_weken
       SET status = ?,
@@ -746,7 +752,7 @@ async function docentReviewLogbookWeek(req, res) {
           herindiening_nodig = ?,
           blokkade = COALESCE(?, blokkade),
           aangepast_op = NOW()
-      WHERE id = ?
+      WHERE id = ? AND status = 'afgecheckt_door_mentor'
       `,
       [
         needsResubmission ? "teruggestuurd_door_docent" : "goedgekeurd_door_docent",
@@ -757,6 +763,9 @@ async function docentReviewLogbookWeek(req, res) {
         weekId
       ]
     );
+    if (docentReviewResult.affectedRows === 0) {
+      return fail(res, 409, "Deze week is ondertussen gewijzigd; vernieuw de pagina");
+    }
 
     const [rows] = await connection.query(
       "SELECT * FROM logboek_weken WHERE id = ?",
@@ -1203,7 +1212,8 @@ async function saveLogbookDay(req, res) {
     const competentiesJson = competenties && competenties.length > 0 ? JSON.stringify(competenties) : null;
     if (bestaand.length > 0) {
       await conn.query(
-        `UPDATE logboek_dagen SET status = ?, titel = ?, uitgevoerde_taken = ?, reflectie = ?, problemen = ?, leerpunten = ?, competenties = ?, aantal_uren = ?, aangepast_op = NOW() WHERE id = ?`,
+        // Inhoud gewijzigd → mentor_bevestigd_op wissen: de mentor moet de aangepaste dag opnieuw bevestigen (390).
+        `UPDATE logboek_dagen SET status = ?, titel = ?, uitgevoerde_taken = ?, reflectie = ?, problemen = ?, leerpunten = ?, competenties = ?, aantal_uren = ?, mentor_bevestigd_op = NULL, aangepast_op = NOW() WHERE id = ?`,
         [status, titel || null, uitgevoerdeTaken || null, reflectie || null, problemen || null, leerpunten || null, competentiesJson, aantalUren, bestaand[0].id]
       );
     } else {
@@ -1351,8 +1361,9 @@ async function updateLogbookEntry(req, res) {
     }
 
     params.push(entryId);
+    // Inhoud gewijzigd → mentor_bevestigd_op wissen zodat de mentor de aangepaste dag opnieuw bevestigt (390).
     await connection.query(
-      `UPDATE logboek_dagen SET ${velden.join(", ")}, aangepast_op = NOW() WHERE id = ?`,
+      `UPDATE logboek_dagen SET ${velden.join(", ")}, mentor_bevestigd_op = NULL, aangepast_op = NOW() WHERE id = ?`,
       params
     );
 
