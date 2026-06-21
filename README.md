@@ -1,4 +1,4 @@
-# Stagify
+# Stageify
 
 A centralized internship management platform built for Erasmushogeschool Brussel.
 
