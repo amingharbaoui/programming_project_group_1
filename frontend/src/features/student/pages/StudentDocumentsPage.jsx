@@ -223,7 +223,8 @@ export default function StudentDocumentsPage() {
       setDocumenten(docsRes.data ?? []);
       // Reflectiebijlage en Eindoverzicht niet tonen (automatisch/niet van toepassing)
       const VERBERG = new Set(["reflectiebijlage", "eindoverzicht"]);
-      setSoorten((soortenRes.data ?? []).filter((s) => !VERBERG.has(s.type) && !VERBERG.has(s.naam?.toLowerCase())));
+      // Alleen verplichte, actieve documentsoorten als "verplichte documenten" tonen (optionele/gearchiveerde niet).
+      setSoorten((soortenRes.data ?? []).filter((s) => !VERBERG.has(s.type) && !VERBERG.has(s.naam?.toLowerCase()) && s.is_verplicht !== 0));
     } catch (err) {
       setFout(err.response?.data?.message || "Documenten konden niet geladen worden.");
     } finally {
