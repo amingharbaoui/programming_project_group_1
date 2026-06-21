@@ -19,7 +19,7 @@ const FASE_IDX = {
   concept: 0, ingetrokken: 0,
   ingediend: 1, aanpassingen_gevraagd: 1, heringediend: 1, afgekeurd: 1,
   goedgekeurd: 2,
-  resultaat_vrijgegeven: 4, afgerond: 4,
+  resultaat_vrijgegeven: 5, afgerond: 5,
 };
 
 function isStageGestart(startdatum) {
@@ -31,7 +31,8 @@ function isStageGestart(startdatum) {
   return vandaag >= start;
 }
 
-function getFaseIdx(status, contractGetekend, gestart) {
+function getFaseIdx(status, contractGetekend, gestart, dossierStatus) {
+  if (["resultaat_vrijgegeven", "afgerond", "voltooid"].includes(dossierStatus)) return 5;
   if (status === "goedgekeurd" && contractGetekend && gestart) return 4;
   if (status === "goedgekeurd" && contractGetekend) return 3;
   return FASE_IDX[status] ?? 0;
@@ -55,9 +56,9 @@ function getSubs(status, contractGetekend, gestart) {
   return map[status] ?? ["Nog niet gestart", "—", "—", "—", "—"];
 }
 
-function ProgressBar({ status, contractGetekend, startdatum }) {
+function ProgressBar({ status, contractGetekend, startdatum, dossierStatus }) {
   const gestart = isStageGestart(startdatum);
-  const idx  = getFaseIdx(status, contractGetekend, gestart);
+  const idx  = getFaseIdx(status, contractGetekend, gestart, dossierStatus);
   const subs = getSubs(status, contractGetekend, gestart);
   return (
     <div className="steps">
@@ -563,7 +564,7 @@ export default function MyInternshipPage() {
               <span className="status s_rood"><i className="ti ti-alert-circle" /> Je contract- of documentstatus kon niet geladen worden. Herlaad de pagina — de volgende taak hieronder klopt mogelijk niet.</span>
             </div>
           )}
-          <ProgressBar status={currentStatus} contractGetekend={volledigGetekend} startdatum={internship?.startdatum} />
+          <ProgressBar status={currentStatus} contractGetekend={volledigGetekend} startdatum={internship?.startdatum} dossierStatus={dossierStatus} />
           <TaakKaart status={currentStatus} contractStudentGekend={contractStudentGekend} volledigGetekend={volledigGetekend} docsOk={docsOk} navigate={navigate} startdatum={internship?.startdatum} dossierStatus={dossierStatus} />
           <div className="grid_2" style={{ marginTop: 16, alignItems: "stretch" }}>
             <DossierKaart
