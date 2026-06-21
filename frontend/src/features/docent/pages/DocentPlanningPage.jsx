@@ -261,7 +261,11 @@ export default function DocentPlanningPage() {
   }
 
   // De eindpresentatie-flow is pas "aan de beurt" zodra er een bezoek geweest is (de tussentijdse fase loopt).
+  // 531: de eindpresentatie is pas inplanbaar nadat het bezoek geweest is én de tussentijdse evaluatie
+  // geregistreerd is — exact dezelfde regel als de backend-gate (499), zodat de knop niet 409 geeft.
   const bezoekGeweest = bezoeken.some((p) => ["geweest", "gegeven"].includes(p.status));
+  const tussentijdsKlaar = studenten.some((s) => Number(s.tussentijds_geregistreerd) > 0);
+  const eindpresentatieKlaar = bezoekGeweest && tussentijdsKlaar;
 
   return (
     <div className="page-inner">
@@ -310,13 +314,13 @@ export default function DocentPlanningPage() {
           <div className="card doc_students_card">
             <div className="card_title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <span><i className="ti ti-presentation" style={{ color: "var(--red)", marginRight: 6 }} />Eindpresentatie</span>
-              <button className="btn primary sm" disabled={!bezoekGeweest} title={bezoekGeweest ? "" : "Eerst het bedrijfsbezoek + tussentijdse evaluatie"} onClick={() => openModal("Eindpresentatie")}>
+              <button className="btn primary sm" disabled={!eindpresentatieKlaar} title={eindpresentatieKlaar ? "" : "Eerst het bedrijfsbezoek + tussentijdse evaluatie"} onClick={() => openModal("Eindpresentatie")}>
                 <IconPlus size={14} stroke={2} /> Inplannen
               </button>
             </div>
-            {!bezoekGeweest && (
+            {!eindpresentatieKlaar && (
               <p className="muted" style={{ fontSize: 12.5, marginTop: 0 }}>
-                <i className="ti ti-info-circle" /> Nog niet aan de beurt — plan eerst het bedrijfsbezoek en registreer de tussentijdse evaluatie.
+                <i className="ti ti-info-circle" /> Nog niet aan de beurt — {!bezoekGeweest ? "markeer eerst het bedrijfsbezoek als geweest" : "registreer eerst de tussentijdse evaluatie"}.
               </p>
             )}
             {planningTabel(presentaties, "Nog geen eindpresentatie ingepland.")}

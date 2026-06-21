@@ -46,7 +46,9 @@ async function getDocentStudents(req, res) {
           WHERE pm.stagedossier_id = sd.id AND pm.type = 'eindpresentatie'
             AND pm.status NOT IN ('geannuleerd', 'alternatief_gevraagd')) AS aantal_presentaties,
         (SELECT COUNT(*) FROM planning_momenten pm
-          WHERE pm.stagedossier_id = sd.id AND pm.type = 'bedrijfsbezoek' AND pm.status = 'geweest') AS bezoek_geweest
+          WHERE pm.stagedossier_id = sd.id AND pm.type = 'bedrijfsbezoek' AND pm.status = 'geweest') AS bezoek_geweest,
+        (SELECT COUNT(*) FROM evaluaties e
+          WHERE e.stagedossier_id = sd.id AND e.type = 'tussentijds' AND e.status IN ('geregistreerd', 'vrijgegeven')) AS tussentijds_geregistreerd
       FROM stagedossiers sd
       JOIN studenten   st ON st.gebruiker_id = sd.student_id
       JOIN gebruikers   g ON g.id             = st.gebruiker_id
