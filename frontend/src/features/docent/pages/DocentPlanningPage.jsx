@@ -104,6 +104,11 @@ export default function DocentPlanningPage() {
     return true;
   });
 
+  // Planning kan enkel voor dossiers die geregistreerd zijn of lopen (backend blokkeert de rest).
+  const planbareStudenten = studenten.filter((s) =>
+    ["geregistreerd", "stage_loopt", "actief"].includes(s.dossier_status)
+  );
+
   function openModal() {
     setNieuwModal(true);
     setFout("");
@@ -111,7 +116,7 @@ export default function DocentPlanningPage() {
     setNieuwLocatie("");
     setNieuwDeelnemers("");
     setNieuwType("Bedrijfsbezoek");
-    setNieuwDossierId(studenten[0]?.dossier_id ? String(studenten[0].dossier_id) : "");
+    setNieuwDossierId(planbareStudenten[0]?.dossier_id ? String(planbareStudenten[0].dossier_id) : "");
   }
 
   async function planNieuw() {
@@ -284,12 +289,17 @@ export default function DocentPlanningPage() {
                 <label className="form_label">Student <span style={{ color: "var(--red)" }}>*</span></label>
                 <select className="form_input" value={nieuwDossierId} onChange={(e) => setNieuwDossierId(e.target.value)}>
                   <option value="">-- Kies een student --</option>
-                  {studenten.map((s) => (
+                  {planbareStudenten.map((s) => (
                     <option key={s.dossier_id} value={s.dossier_id}>
                       {s.voornaam} {s.achternaam}
                     </option>
                   ))}
                 </select>
+                {planbareStudenten.length === 0 && (
+                  <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
+                    Geen planbare studenten — planning kan pas zodra een stage geregistreerd is of loopt.
+                  </p>
+                )}
               </div>
               <div className="form_group">
                 <label className="form_label">Datum en uur <span style={{ color: "var(--red)" }}>*</span></label>

@@ -7,10 +7,15 @@ export function kiesMentorStagiair(lijst, searchParams) {
   const vSt = Number(searchParams?.get("student")) || null;
   const vDos = Number(searchParams?.get("dossier")) || null;
   const onthouden = Number(sessionStorage.getItem(KEY)) || null;
+  // Bij geen expliciete keuze (query/onthouden): eerst een lopend/actief dossier kiezen,
+  // pas als laatste een afgerond dossier — anders opent de mentor standaard in een historisch dossier.
+  const afgerondeFases = ["afgerond", "voltooid", "resultaat_vrijgegeven"];
+  const eersteActief = lijst.find((s) => !afgerondeFases.includes(s.dossier_status));
   return (
     lijst.find((s) => s.id === vSt) ||
     lijst.find((s) => s.dossier_id === vDos) ||
     lijst.find((s) => s.dossier_id === onthouden) ||
+    eersteActief ||
     lijst[0] ||
     null
   );

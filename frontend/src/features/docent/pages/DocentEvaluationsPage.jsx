@@ -28,6 +28,28 @@ function getEvalStatusLabel(status) {
   return status || "-";
 }
 
+// Korte fase-omschrijving van het dossier voor de evaluatielijst.
+function faseLabelKort(status) {
+  if (["afgerond", "voltooid", "resultaat_vrijgegeven"].includes(status)) return "Afgerond";
+  if (["actief", "stage_loopt"].includes(status)) return "Stage loopt";
+  if (status === "geregistreerd") return "Startklaar";
+  if (status === "document_afgekeurd") return "Document afgekeurd";
+  if (status === "in_controle_bij_administratie") return "In controle";
+  if (status === "wacht_op_bedrijf") return "Wacht op ondertekening";
+  if (status === "wacht_op_student") return "Wacht op student";
+  return status || "—";
+}
+
+// Evaluatie-actie/-status per student, afgeleid uit de velden van /docent/students.
+function evalActieBadge(s) {
+  if (["afgerond", "voltooid", "resultaat_vrijgegeven"].includes(s.dossier_status)) return { cls: "s_grijs", txt: "Afgerond" };
+  if (Number(s.eval_te_vrijgeven) > 0) return { cls: "s_rood", txt: "Vrij te geven" };
+  if (Number(s.eval_te_registreren) > 0) return { cls: "s_rood", txt: "Te registreren" };
+  if (s.actie_type === "evaluatie") return { cls: "s_amber", txt: s.volgende_actie || "Actie nodig" };
+  if (["geregistreerd", "stage_loopt", "actief"].includes(s.dossier_status)) return { cls: "s_grijs", txt: "Geen open actie" };
+  return { cls: "s_grijs", txt: "Nog niet van toepassing" };
+}
+
 function ScoreKnoppen({ waarde, onChange, leesOnly }) {
   return (
     <div className="doc_scale">
@@ -535,6 +557,8 @@ export default function DocentEvaluationsPage() {
                 <th>Student</th>
                 <th>Bedrijf</th>
                 <th>Mentor</th>
+                <th>Fase</th>
+                <th>Evaluatie</th>
                 <th style={{ textAlign: "right" }}>Acties</th>
               </tr>
             </thead>
@@ -555,6 +579,10 @@ export default function DocentEvaluationsPage() {
                     <td className="doc_sub">{s.bedrijf || "-"}</td>
                     <td className="doc_sub">
                       {s.mentor_voornaam ? `${s.mentor_voornaam} ${s.mentor_achternaam}` : "-"}
+                    </td>
+                    <td className="doc_sub">{faseLabelKort(s.dossier_status)}</td>
+                    <td>
+                      {(() => { const b = evalActieBadge(s); return <span className={`status ${b.cls}`}>{b.txt}</span>; })()}
                     </td>
                     <td style={{ textAlign: "right" }}>
                       <button className="btn sm" onClick={() => handleBekijken(s)}>
