@@ -252,9 +252,10 @@ export default function MentorDossierPage() {
     try {
       setBezigAfspraken(true);
       await api.patch(`/mentor/dossier/${dossierId}/afspraken`, { afspraken: afsprakenWaarde });
+      // Cache wissen i.p.v. velden:null cachen: de backend behoudt de gestructureerde velden bij een
+      // tekst-update, dus de volgende load haalt ze vers op (anders toont de afsprakenpagina ze leeg).
       cacheDelete(`mentor_afspraken_${dossierId}`);
       const nu = new Date().toISOString();
-      cacheSet(`mentor_afspraken_${dossierId}`, { tekst: afsprakenWaarde, gedeeldOp: nu, velden: null });
       setAfspraken(afsprakenWaarde);
       setGedeeldOp(nu);
       setEditAfspraken(false);

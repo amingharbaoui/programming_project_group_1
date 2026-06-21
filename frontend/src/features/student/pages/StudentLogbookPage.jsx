@@ -570,12 +570,15 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
 
             <div className="vdag-actions">
               <button type="button" className="btn primary" onClick={handleDagOpslaan}>
-                <IconCircleCheck size={15} /> Dag invullen
+                <IconCircleCheck size={15} /> Dag toevoegen aan week
               </button>
               <button type="button" className="btn ghost" onClick={handleGeenStagedag}>
                 <IconCalendarOff size={15} /> Vandaag was geen stagedag
               </button>
             </div>
+            <p style={{ fontSize: 11.5, color: "var(--sub)", marginTop: 8 }}>
+              Een dag wordt pas definitief bewaard wanneer je onderaan <strong>Week indienen</strong> klikt.
+            </p>
           </div>
         )}
       </div>
