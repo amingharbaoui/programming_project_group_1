@@ -418,7 +418,7 @@ export default function MentorDossierPage() {
             {/* Bedrijfsbezoek / planning */}
             {momenten.map((m) => {
               const bb = bezoekBadge(m.status);
-              const teBevestigen = !dossierAfgerond && m.type === "bedrijfsbezoek" && ["voorgesteld", "gepland"].includes(m.status);
+              const teBevestigen = !dossierAfgerond && ["bedrijfsbezoek", "eindpresentatie"].includes(m.type) && ["voorgesteld", "gepland"].includes(m.status);
               return (
                 <div className="card" key={m.id} style={teBevestigen ? { borderLeft: "3px solid var(--red)" } : {}}>
                   <div className="card_title">
