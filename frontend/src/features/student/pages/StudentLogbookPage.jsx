@@ -289,7 +289,8 @@ function berekenWeekDatums(startDatum, weekNummer) {
     basis = new Date();
     basis.setHours(12, 0, 0, 0);
     const dag = basis.getDay(); // 0 = zon, 1 = ma, ...
-    const naarMaandag = dag === 0 ? -6 : 1 - dag;
+    // Zondag → volgende maandag (+1); zaterdag → vorige maandag (-5); ma-vr → huidige maandag
+    const naarMaandag = dag === 0 ? 1 : 1 - dag;
     basis.setDate(basis.getDate() + naarMaandag);
   }
 
@@ -495,6 +496,8 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
   const dag = logbook.dagen[activeDag];
   const ddatum = dagDatum(activeDag);
   const isVandaag = ddatum === vandaagIso;
+  // Toekomstige dag: datum nog niet aangebroken → mag nog niet ingevuld worden
+  const dagIsToedkomst = ddatum > vandaagIso;
 
   // Weekdatum bereik label bv. "1–5 jun"
   const weekBereikLabel = logbook.weekStart
@@ -534,8 +537,16 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
           </span>
         </div>
 
-        {/* Form body — verborgen als dag al ingevuld */}
-        {!ingediendeDagen[activeDag] && (
+        {/* Toekomstige dag — nog niet beschikbaar */}
+        {!ingediendeDagen[activeDag] && dagIsToedkomst && (
+          <div className="vdag-body" style={{ display: "flex", alignItems: "center", gap: 10, color: "var(--sub)", padding: "20px 0" }}>
+            <IconLock size={16} style={{ flexShrink: 0 }} />
+            <span>Deze dag ({fmtLang(ddatum)}) is nog niet aangebroken — je kan hem dan pas invullen.</span>
+          </div>
+        )}
+
+        {/* Form body — verborgen als dag al ingevuld of dag is in de toekomst */}
+        {!ingediendeDagen[activeDag] && !dagIsToedkomst && (
           <div className="vdag-body">
             <div className="form_row">
               <div className="form_group">
@@ -648,12 +659,14 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
             {[0,1,2,3,4].map((i) => {
               const ingevuld = ingediendeDagen[i];
               const actief = i === activeDag;
+              const isToekomst = dagDatum(i) > vandaagIso;
               return (
                 <span
                   key={i}
-                  className={`wda${actief ? " actief" : ""}${ingevuld ? " klaar" : ""}`}
+                  className={`wda${actief ? " actief" : ""}${ingevuld ? " klaar" : ""}${isToekomst ? " toekomst" : ""}`}
                   onClick={() => { if (!ingevuld) setActiveDag(i); }}
-                  style={{ cursor: ingevuld ? "default" : "pointer" }}
+                  style={{ cursor: isToekomst ? "not-allowed" : ingevuld ? "default" : "pointer", opacity: isToekomst ? 0.45 : 1 }}
+                  title={isToekomst ? `Beschikbaar op ${fmtLang(dagDatum(i))}` : undefined}
                 >
                   {dagAfk(i)}
                 </span>
@@ -1100,28 +1113,21 @@ export default function StudentLogbookPage() {
     );
   }
 
-  // "Bevestigd" telt enkel weken die de mentor aftekende of de docent goedkeurde — niet elke ingediende week.
-  const BEVESTIGD_STATUSSEN = ["afgecheckt_door_mentor", "goedgekeurd_door_docent"];
-  const totaalUrenIngediend = weken.reduce(
-    (sum, w) => sum + (Number(w.totaal_uren) || 0),
-    0
-  );
+  // Uren tellen mee zodra de mentor de dag bevestigt (mentor_bevestigd_op ingevuld).
   const totaalUrenBevestigd = weken.reduce(
-    (sum, w) => sum + (BEVESTIGD_STATUSSEN.includes(w.status) ? (Number(w.totaal_uren) || 0) : 0),
-    0
+    (sum, w) => sum + (w.dagen || []).reduce(
+      (s, d) => s + (d.mentor_bevestigd_op ? (Number(d.aantal_uren) || 0) : 0), 0
+    ), 0
   );
-  // Uren van de lopende (nog niet ingediende) week — telt mee zodra een dag bevestigd is
-  const urenHuidigWeek = (!editWeek && !submitted)
-    ? logbook.dagen.reduce(
-        (s, d) => s + ((d._bevestigd || d.status === "geen_stagedag") ? (Number(d.aantalUren) || 0) : 0),
-        0
-      )
-    : 0;
-  const totaalUrenTonen = totaalUrenIngediend + urenHuidigWeek;
+  // Totaal ingediende uren (nog niet bevestigd)
+  const totaalUrenIngediend = weken.reduce(
+    (sum, w) => sum + (Number(w.totaal_uren) || 0), 0
+  );
+  const urenNogTeBevestigen = Math.max(0, totaalUrenIngediend - totaalUrenBevestigd);
+  const totaalUrenTonen = totaalUrenBevestigd;
   const MIN_UREN = minUren;
   const urenPct = Math.min(100, Math.round((totaalUrenTonen / MIN_UREN) * 100));
   const urenResterend = Math.max(0, MIN_UREN - totaalUrenTonen);
-  const urenNogTeBevestigen = Math.max(0, totaalUrenIngediend - totaalUrenBevestigd);
 
   return (
     <div className="page-inner">
@@ -1141,12 +1147,7 @@ export default function StudentLogbookPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 180 }}>
             <div style={{ fontSize: 12, color: "var(--sub)" }}>
-              Gepresteerde uren
-              {urenHuidigWeek > 0 && (
-                <span style={{ marginLeft: 6, color: "var(--red)" }}>
-                  (inclusief {urenHuidigWeek}u huidige week)
-                </span>
-              )}
+              Bevestigde uren
             </div>
             <div className="prog-wrap" style={{ marginTop: 7 }}>
               <div className="prog-fill" style={{ width: `${urenPct}%` }} />
@@ -1159,7 +1160,7 @@ export default function StudentLogbookPage() {
             <span style={{ fontSize: 12, color: "var(--sub)" }}> / min. {MIN_UREN}u</span>
             <div style={{ fontSize: 11, color: "var(--sub)" }}>
               {urenResterend > 0 ? `nog ${urenResterend}u te gaan` : "minimum behaald ✓"}
-              {urenNogTeBevestigen > 0 && ` · ${urenNogTeBevestigen}u ingediend, wacht op bevestiging`}
+              {urenNogTeBevestigen > 0 && ` · ${urenNogTeBevestigen}u wacht nog op bevestiging mentor`}
             </div>
           </div>
         </div>

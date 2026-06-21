@@ -412,6 +412,12 @@ export default function DocentLogbooksPage() {
                               {comps.map((c) => <span key={c} className="lb_dag_chip">{c}</span>)}
                             </div>
                           )}
+                          {dag.mentor_opmerking && (
+                            <div className="lb_dag_veld">
+                              <span className="lb_veld_k">Opmerking mentor</span>
+                              <span>{dag.mentor_opmerking}</span>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
