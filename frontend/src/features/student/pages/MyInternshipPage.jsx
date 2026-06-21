@@ -142,10 +142,14 @@ function BegeleidingKaart({ data, wacht, style }) {
         </div>
       )}
       <div className="prof">
-        <div className="prof-av grijs"><i className="ti ti-user-question" style={{ fontSize: 16 }}></i></div>
+        {data?.stagebegeleider_naam
+          ? <div className="prof-av">{data.stagebegeleider_naam.split(" ").map(w => w[0]).slice(0,2).join("").toUpperCase()}</div>
+          : <div className="prof-av grijs"><i className="ti ti-user-question" style={{ fontSize: 16 }}></i></div>
+        }
         <div>
-          <div className="p-naam">Stagebegeleider wordt toegewezen</div>
+          <div className="p-naam">{data?.stagebegeleider_naam ?? "Stagebegeleider wordt toegewezen"}</div>
           <div className="p-rol">{wacht ? "Definitief na goedkeuring" : "Erasmushogeschool Brussel"}</div>
+          {data?.stagebegeleider_email && <div className="p-mail">{data.stagebegeleider_email}</div>}
         </div>
       </div>
     </div>
