@@ -184,6 +184,8 @@ async function uploadDocument(req, res) {
     );
   } catch (error) {
     await connection.rollback();
+    // De transactie is teruggedraaid → het net geüploade bestand is een wees en wordt opgeruimd (310).
+    if (req.file?.path) { try { fs.unlinkSync(req.file.path); } catch { /* al weg */ } }
     return fail(res, 500, "Upload mislukt", error.message);
   } finally {
     connection.release();
@@ -251,6 +253,8 @@ async function uploadEigenDocument(req, res) {
     );
   } catch (error) {
     await connection.rollback();
+    // De transactie is teruggedraaid → het net geüploade bestand is een wees en wordt opgeruimd (310).
+    if (req.file?.path) { try { fs.unlinkSync(req.file.path); } catch { /* al weg */ } }
     return fail(res, 500, "Upload mislukt", error.message);
   } finally {
     connection.release();
