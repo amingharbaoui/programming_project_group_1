@@ -851,7 +851,15 @@ async function downloadMyEindoverzicht(req, res) {
 async function getRubriek(req, res) {
   const evaluationId = Number(req.params.evaluationId);
   if (!evaluationId) return fail(res, 400, "Ongeldig evaluatie-id");
+  const role = req.user?.hoofdrol;
+  const userId = getUserId(req);
   try {
+    // Toegangscontrole: enkel admin of de aan dit dossier gekoppelde student/mentor/docent mag de rubriek lezen.
+    const evaluatie = await loadEvaluationWithDossier(db, evaluationId);
+    if (!evaluatie) return fail(res, 404, "Evaluatie niet gevonden");
+    if (role !== "administratie" && !userMayEditAsRole(evaluatie, role, userId)) {
+      return fail(res, 403, "Je bent niet gekoppeld aan deze evaluatie");
+    }
     const [rows] = await db.query(
       `SELECT rc.id, rc.titel, rc.beschrijving, rc.max_score, rc.volgorde,
               rs.score, rs.feedback
@@ -892,10 +900,18 @@ async function saveRubriekScores(req, res) {
     if (evaluatie.status === "vrijgegeven") { await conn.rollback(); return fail(res, 409, "Deze evaluatie is al vrijgegeven"); }
     if (!userMayEditAsRole(evaluatie, "docent", userId)) { await conn.rollback(); return fail(res, 403, "Je bent niet gekoppeld aan deze evaluatie"); }
 
+    // Max-score per criterium ophalen zodat een score nooit boven het maximum kan (backend = bron van waarheid).
+    const [criteria] = await conn.query("SELECT id, max_score FROM rubriek_criteria WHERE actief = 1");
+    const maxPerCrit = new Map(criteria.map((c) => [Number(c.id), Number(c.max_score) || 5]));
+
     for (const s of scores) {
       const critId = Number(s.rubriekCriteriumId ?? s.rubriek_criterium_id ?? s.id);
       if (!critId) continue;
       const score = (s.score === null || s.score === undefined || s.score === "") ? null : Number(s.score);
+      if (score !== null && maxPerCrit.has(critId) && score > maxPerCrit.get(critId)) {
+        await conn.rollback();
+        return fail(res, 400, `Rubriekscore mag niet boven het maximum (${maxPerCrit.get(critId)}) liggen`);
+      }
       await conn.query(
         `INSERT INTO rubriek_scores (evaluatie_id, rubriek_criterium_id, score, feedback, beoordeeld_door_id, aangemaakt_op, aangepast_op)
          VALUES (?, ?, ?, ?, ?, NOW(), NOW())

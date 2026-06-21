@@ -407,6 +407,10 @@ async function listMyPlanning(req, res) {
 
   if (!roleWhere) return fail(res, 403, "Geen planning voor deze rol");
 
+  // De student ziet pas een moment nadat het goedgekeurd is — onbevestigde voorstellen blijven verborgen
+  // tot mentor/docent akkoord zijn (zelfde flow als de meldingen).
+  const statusFilter = role === "student" ? " AND pm.status NOT IN ('voorgesteld', 'alternatief_gevraagd')" : "";
+
   try {
     const [rows] = await db.query(
       `
@@ -427,7 +431,7 @@ async function listMyPlanning(req, res) {
       LEFT JOIN gebruikers gm ON gm.id = sd.mentor_id
       LEFT JOIN gebruikers gd ON gd.id = sd.stagebegeleider_id
       JOIN bedrijven b ON b.id = sd.bedrijf_id
-      WHERE ${roleWhere}
+      WHERE ${roleWhere}${statusFilter}
       ORDER BY pm.gepland_op IS NULL, pm.gepland_op ASC, pm.id DESC
       `,
       [role === "administratie" ? 1 : userId]

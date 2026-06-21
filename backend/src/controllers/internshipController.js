@@ -1541,7 +1541,7 @@ async function assignDossier(req, res) {
   if (docentId == null && mentorId == null) return fail(res, 400, "Geef minstens een docent of mentor op");
 
   try {
-    const [d] = await db.query("SELECT id, student_id, status, stagebegeleider_id FROM stagedossiers WHERE id = ? LIMIT 1", [dossierId]);
+    const [d] = await db.query("SELECT id, student_id, status, stagebegeleider_id, mentor_id FROM stagedossiers WHERE id = ? LIMIT 1", [dossierId]);
     if (d.length === 0) return fail(res, 404, "Dossier niet gevonden");
     // Geen herassign meer nadat het resultaat vrijgegeven of het dossier afgerond is.
     if (["resultaat_vrijgegeven", "afgerond"].includes(d[0].status)) {

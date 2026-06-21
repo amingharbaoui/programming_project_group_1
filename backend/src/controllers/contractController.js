@@ -228,11 +228,21 @@ async function registerOvereenkomst(req, res) {
 
     // Verzekering in orde + dossier startklaar registreren. Forward-only: nooit een dossier dat al verder
     // staat terugzetten naar 'geregistreerd' (auditpunt 404).
-    await conn.query(
+    const [dossierResult] = await conn.query(
       `UPDATE stagedossiers SET status = 'geregistreerd', verzekering_in_orde = 1, aangepast_op = NOW()
        WHERE id = ? AND status NOT IN ('geregistreerd', 'stage_loopt', 'resultaat_vrijgegeven', 'afgerond')`,
       [dossierId]
     );
+    // Raakte de dossierupdate 0 rijen, dan mag het contract enkel als 'geregistreerd' tellen wanneer het
+    // dossier al consistent geregistreerd/lopend is. Staat het in een eindfase of onverwachte status, dan is
+    // de overgang incoherent → rollback i.p.v. een contract op 'geregistreerd' met een dossier dat niet volgde (443).
+    if (dossierResult.affectedRows === 0) {
+      const [[huidig]] = await conn.query("SELECT status FROM stagedossiers WHERE id = ? LIMIT 1", [dossierId]);
+      if (!huidig || !["geregistreerd", "stage_loopt"].includes(huidig.status)) {
+        await conn.rollback();
+        return fail(res, 409, "Dossierstatus is ondertussen gewijzigd; vernieuw de pagina");
+      }
+    }
 
     // De overeenkomst-documentrij mee op geregistreerd zetten (indien aanwezig).
     await conn.query(

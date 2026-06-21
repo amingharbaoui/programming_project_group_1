@@ -38,7 +38,7 @@ function contractBadge(c) {
 function bezoekBadge(status) {
   if (status === "bevestigd") return { cls: "s_ok", icon: "ti-check", txt: "Bevestigd door jou" };
   if (status === "alternatief_gevraagd") return { cls: "s_amber", icon: "ti-hourglass", txt: "Nieuw moment gevraagd" };
-  if (status === "gegeven") return { cls: "s_ok", icon: "ti-check", txt: "Heeft plaatsgevonden" };
+  if (status === "gegeven" || status === "geweest") return { cls: "s_ok", icon: "ti-check", txt: "Heeft plaatsgevonden" };
   if (status === "geannuleerd") return { cls: "s_rood", icon: "ti-x", txt: "Geannuleerd" };
   return { cls: "s_rood", icon: "ti-hourglass", txt: "Te bevestigen" };
 }

@@ -39,11 +39,13 @@ function volledigeNaam(voornaam, achternaam) {
 export default function ToewijzingenPage() {
   const [dossiers, setDossiers] = useState([]);
   const [docenten, setDocenten] = useState([]);
+  const [mentoren, setMentoren] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const [modal, setModal] = useState(null);
   const [geselecteerdeDocent, setGeselecteerdeDocent] = useState("");
+  const [geselecteerdeMentor, setGeselecteerdeMentor] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
   const [modalError, setModalError] = useState("");
 
@@ -64,6 +66,7 @@ export default function ToewijzingenPage() {
       if (cachedDos && cachedUsr) {
         setDossiers(cachedDos);
         setDocenten(cachedUsr.filter((u) => u.hoofdrol === "docent" && u.status === "actief"));
+        setMentoren(cachedUsr.filter((u) => u.hoofdrol === "mentor" && ["actief", "uitgenodigd"].includes(u.status)));
         setLoading(false);
         return;
       }
@@ -78,6 +81,7 @@ export default function ToewijzingenPage() {
       cacheSet("admin_users", usr);
       setDossiers(dos);
       setDocenten(usr.filter((u) => u.hoofdrol === "docent" && u.status === "actief"));
+      setMentoren(usr.filter((u) => u.hoofdrol === "mentor" && ["actief", "uitgenodigd"].includes(u.status)));
     } catch (err) {
       setError(err.response?.data?.message || "Gegevens ophalen mislukt");
     } finally {
@@ -88,19 +92,20 @@ export default function ToewijzingenPage() {
   useEffect(() => { load(); }, [load]);
 
   function openModal(dossier) {
-    const huidig = dossier.stagebegeleider_id ? String(dossier.stagebegeleider_id) : "";
-    setGeselecteerdeDocent(huidig);
+    setGeselecteerdeDocent(dossier.stagebegeleider_id ? String(dossier.stagebegeleider_id) : "");
+    setGeselecteerdeMentor(dossier.mentor_id ? String(dossier.mentor_id) : "");
     setModalError("");
     setModal({ dossier });
   }
 
   async function doKoppelen() {
-    if (!geselecteerdeDocent) { setModalError("Kies een docent."); return; }
+    if (!geselecteerdeDocent && !geselecteerdeMentor) { setModalError("Kies minstens een docent of een mentor."); return; }
     setActionLoading(true);
     try {
-      await api.patch(`/admin/dossiers/${modal.dossier.id}/assign`, {
-        stagebegeleiderId: Number(geselecteerdeDocent),
-      });
+      const payload = {};
+      if (geselecteerdeDocent) payload.stagebegeleiderId = Number(geselecteerdeDocent);
+      if (geselecteerdeMentor) payload.mentorId = Number(geselecteerdeMentor);
+      await api.patch(`/admin/dossiers/${modal.dossier.id}/assign`, payload);
       cacheDelete("admin_dossiers");
       setModal(null);
       load();
@@ -307,20 +312,38 @@ export default function ToewijzingenPage() {
               )}
               <div className="modal_field" style={{ marginTop: 12 }}>
                 <label className="modal_label">
-                  Docent <span className="modal_required">*</span>
+                  Docent (stagebegeleider)
                 </label>
                 <select
                   className="tw_modal_select"
                   value={geselecteerdeDocent}
                   onChange={(e) => { setGeselecteerdeDocent(e.target.value); setModalError(""); }}
                 >
-                  <option value="">- kies docent -</option>
+                  <option value="">- geen docent -</option>
                   {docenten.map((doc) => (
                     <option key={doc.id} value={String(doc.id)}>
                       {volledigeNaam(doc.voornaam, doc.achternaam)}
                     </option>
                   ))}
                 </select>
+              </div>
+              <div className="modal_field" style={{ marginTop: 12 }}>
+                <label className="modal_label">
+                  Mentor (bedrijf)
+                </label>
+                <select
+                  className="tw_modal_select"
+                  value={geselecteerdeMentor}
+                  onChange={(e) => { setGeselecteerdeMentor(e.target.value); setModalError(""); }}
+                >
+                  <option value="">- geen mentor -</option>
+                  {mentoren.map((m) => (
+                    <option key={m.id} value={String(m.id)}>
+                      {volledigeNaam(m.voornaam, m.achternaam)}{m.status === "uitgenodigd" ? " (uitgenodigd)" : ""}
+                    </option>
+                  ))}
+                </select>
+                <span className="modal_hint" style={{ fontSize: 12, color: "var(--sub)" }}>Koppel zowel een docent als een mentor zodat de stage kan starten.</span>
                 {modalError && <span className="modal_error">{modalError}</span>}
               </div>
             </div>
