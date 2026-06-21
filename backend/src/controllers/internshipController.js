@@ -99,12 +99,12 @@ async function getDefaultDocentId(connection) {
   return rows[0]?.gebruiker_id || null;
 }
 
-async function getMentorIdByEmail(connection, email) {
+async function getMentorIdByEmail(connection, email, bedrijfId = null) {
   if (!email) return null;
 
   const [rows] = await connection.query(
     `
-    SELECT m.gebruiker_id
+    SELECT m.gebruiker_id, m.bedrijf_id
     FROM mentoren m
     JOIN gebruikers g ON g.id = m.gebruiker_id
     WHERE g.email = ?
@@ -113,7 +113,13 @@ async function getMentorIdByEmail(connection, email) {
     [email]
   );
 
-  return rows[0]?.gebruiker_id || null;
+  if (!rows[0]) return null;
+  // 491: een bestaande mentor enkel automatisch koppelen als die bij hetzelfde bedrijf hoort. Hoort het
+  // e-mailadres bij een mentor van een ánder bedrijf, dan niet stil koppelen — admin koppelt dan bewust.
+  if (bedrijfId != null && rows[0].bedrijf_id != null && Number(rows[0].bedrijf_id) !== Number(bedrijfId)) {
+    return null;
+  }
+  return rows[0].gebruiker_id || null;
 }
 
 async function getDefaultMentorId(connection) {
@@ -1048,7 +1054,7 @@ async function createDossierAfterApproval(connection, stagevoorstelId, pendingMa
     throw new Error("Geen stagebegeleider gevonden voor stagedossier");
   }
 
-  let mentorId = await getMentorIdByEmail(connection, data.mentor_email);
+  let mentorId = await getMentorIdByEmail(connection, data.mentor_email, data.bedrijf_id);
 
   // Mentor bestaat al maar account is nog niet actief → stuur opnieuw een uitnodiging
   if (mentorId && data.mentor_email) {
