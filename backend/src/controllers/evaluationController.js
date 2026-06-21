@@ -48,9 +48,10 @@ async function openEvaluation(req, res) {
     if (req.user?.hoofdrol === "docent" && Number(dossier[0].stagebegeleider_id) !== Number(req.user?.id)) {
       return fail(res, 403, "Je bent niet de stagebegeleider van deze student");
     }
-    // Evaluatie pas openen wanneer de stage administratief geregistreerd is of loopt (niet in contract-/controlefase).
-    if (!["geregistreerd", "stage_loopt", "resultaat_vrijgegeven", "afgerond"].includes(dossier[0].status)) {
-      return fail(res, 409, "Een evaluatie kan pas geopend worden zodra het stagedossier geregistreerd is");
+    // Evaluatie enkel openen wanneer de stage geregistreerd is of loopt — niet in de contract-/controlefase
+    // en ook niet meer nadat het resultaat vrijgegeven of het dossier afgerond is (eindfase = read-only).
+    if (!["geregistreerd", "stage_loopt"].includes(dossier[0].status)) {
+      return fail(res, 409, "Een evaluatie kan enkel geopend worden zolang het stagedossier geregistreerd is of loopt");
     }
 
     const [existing] = await db.query(
@@ -211,9 +212,14 @@ async function saveScores(req, res) {
         return fail(res, 409, "Je mentorinput is al ingediend en kan niet meer gewijzigd worden");
       }
     } else if (role === "docent") {
-      if (!["klaar_voor_docent", "geregistreerd", "klaar_voor_vrijgave"].includes(evStatus)) {
+      // Docent scoort enkel in het eigen venster; na registratie/berekening is de evaluatie afgesloten
+      // (gelijk aan de read-only UI). Correcties daarna vereisen een bewuste heropening, geen stille update.
+      if (evStatus !== "klaar_voor_docent") {
         await conn.rollback();
-        return fail(res, 409, "De docent kan pas scoren wanneer student en mentor hebben ingediend");
+        const reden = ["geregistreerd", "klaar_voor_vrijgave", "vrijgegeven"].includes(evStatus)
+          ? "Deze evaluatie is al geregistreerd en kan niet meer gewijzigd worden"
+          : "De docent kan pas scoren wanneer student en mentor hebben ingediend";
+        return fail(res, 409, reden);
       }
     }
 
@@ -363,10 +369,14 @@ async function calculateResult(req, res) {
     if (!evaluatie) { await conn.rollback(); return fail(res, 404, "Evaluatie niet gevonden"); }
     if (!mayActAsDocent(evaluatie, role, userId)) { await conn.rollback(); return fail(res, 403, "Alleen de gekoppelde docent of administratie kan dit doen"); }
     if (evaluatie.status === "vrijgegeven") { await conn.rollback(); return fail(res, 409, "Resultaat is al vrijgegeven"); }
-    // Berekenen kan pas nadat student en mentor hun evaluatie indienden (status klaar_voor_docent of later).
-    if (!["klaar_voor_docent", "geregistreerd", "klaar_voor_vrijgave"].includes(evaluatie.status)) {
+    // Berekenen kan enkel vanuit klaar_voor_docent. Daarna is het resultaat geregistreerd/klaar voor vrijgave
+    // en mag het niet stil herberekend worden (anders wijzigt een geregistreerd resultaat ongemerkt).
+    if (evaluatie.status !== "klaar_voor_docent") {
       await conn.rollback();
-      return fail(res, 409, "De student en de mentor moeten eerst hun evaluatie indienen");
+      const reden = ["geregistreerd", "klaar_voor_vrijgave"].includes(evaluatie.status)
+        ? "Het resultaat is al berekend en geregistreerd; het kan niet opnieuw berekend worden"
+        : "De student en de mentor moeten eerst hun evaluatie indienen";
+      return fail(res, 409, reden);
     }
 
     const [rows] = await conn.query(

@@ -95,9 +95,10 @@ async function createPlanningMoment(req, res, type) {
   try {
     const dossier = await getDocentDossier(dossierIdFinal, docentId);
     if (!dossier) return fail(res, 403, "Geen toegang tot dit dossier");
-    // Planning is pas zinvol zodra de stage geregistreerd is (niet in de contract-/controlefase).
-    if (!["geregistreerd", "stage_loopt", "resultaat_vrijgegeven"].includes(dossier.status)) {
-      return fail(res, 409, "Planning kan pas zodra de stage geregistreerd is");
+    // Planning is pas zinvol zodra de stage geregistreerd is (niet in de contract-/controlefase),
+    // en niet meer nadat het dossier is vrijgegeven/afgerond.
+    if (!["geregistreerd", "stage_loopt"].includes(dossier.status)) {
+      return fail(res, 409, "Planning kan enkel zolang de stage geregistreerd is of loopt");
     }
 
     const status = type === "bedrijfsbezoek" ? "voorgesteld" : "gepland";
@@ -152,22 +153,37 @@ async function updateDocentPlanning(req, res) {
   const allowedStatuses = ["voorgesteld", "bevestigd", "alternatief_gevraagd", "gepland", "gegeven", "geweest", "geannuleerd"];
   if (status && !allowedStatuses.includes(status)) return fail(res, 400, "Ongeldige planningstatus");
 
-  // Overgangscontrole: "gegeven/geweest" alleen vanuit een logische status, en een geannuleerd moment niet heropenen.
-  if (status) {
-    const [huidig] = await db.query(
-      `SELECT pm.status, pm.type FROM planning_momenten pm
-       JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
-       WHERE pm.id = ? AND sd.stagebegeleider_id = ? LIMIT 1`,
-      [planningId, docentId]
-    );
-    if (huidig.length === 0) return fail(res, 403, "Geen toegang tot dit planningmoment");
-    const huidigeStatus = huidig[0].status;
-    if (["gegeven", "geweest"].includes(status) && !["bevestigd", "gepland"].includes(huidigeStatus)) {
-      return fail(res, 409, "Dit moment kan niet als gegeven/geweest gemarkeerd worden vanuit de huidige status");
-    }
-    if (huidigeStatus === "geannuleerd" && status !== "geannuleerd") {
-      return fail(res, 409, "Een geannuleerd moment kan niet opnieuw geactiveerd worden");
-    }
+  // Altijd de huidige status + dossierfase ophalen — ook bij louter inhoudelijke wijzigingen
+  // (datum/locatie/verslag/deelnemers), zodat een afgesloten moment of afgerond dossier niet
+  // stilletjes nog aangepast kan worden.
+  const [huidig] = await db.query(
+    `SELECT pm.status, pm.type, sd.status AS dossier_status FROM planning_momenten pm
+     JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
+     WHERE pm.id = ? AND sd.stagebegeleider_id = ? LIMIT 1`,
+    [planningId, docentId]
+  );
+  if (huidig.length === 0) return fail(res, 403, "Geen toegang tot dit planningmoment");
+  const huidigeStatus = huidig[0].status;
+
+  // Eindfase van het dossier: planning is historisch en read-only.
+  if (["resultaat_vrijgegeven", "afgerond"].includes(huidig[0].dossier_status)) {
+    return fail(res, 409, "Het dossier is afgerond; planning kan niet meer gewijzigd worden");
+  }
+
+  const wijzigtDatumLocatieDeelnemers =
+    Boolean(geplandOp || datum) || locatie !== undefined || deelnemers !== undefined;
+
+  // Een geannuleerd moment niet heropenen of inhoudelijk wijzigen.
+  if (huidigeStatus === "geannuleerd" && status !== "geannuleerd") {
+    return fail(res, 409, "Een geannuleerd moment kan niet opnieuw geactiveerd of gewijzigd worden");
+  }
+  // Een moment dat al heeft plaatsgevonden: enkel het verslag mag nog, geen datum/locatie/deelnemers.
+  if (["gegeven", "geweest"].includes(huidigeStatus) && wijzigtDatumLocatieDeelnemers) {
+    return fail(res, 409, "Dit moment heeft al plaatsgevonden; enkel het verslag kan nog aangepast worden");
+  }
+  // Overgangscontrole: "gegeven/geweest" alleen vanuit een logische status.
+  if (status && ["gegeven", "geweest"].includes(status) && !["bevestigd", "gepland"].includes(huidigeStatus)) {
+    return fail(res, 409, "Dit moment kan niet als gegeven/geweest gemarkeerd worden vanuit de huidige status");
   }
 
   const fields = [];

@@ -50,8 +50,16 @@ async function updateChecklistItem(req, res) {
 
   const fields = [];
   const vals = [];
-  if (req.body.tekst !== undefined) { fields.push("tekst = ?"); vals.push(String(req.body.tekst).trim()); }
-  if (req.body.volgorde !== undefined) { fields.push("volgorde = ?"); vals.push(Number(req.body.volgorde)); }
+  if (req.body.tekst !== undefined) {
+    const tekst = String(req.body.tekst).trim();
+    if (!tekst) return fail(res, 400, "Tekst mag niet leeg zijn");
+    fields.push("tekst = ?"); vals.push(tekst);
+  }
+  if (req.body.volgorde !== undefined) {
+    const volgorde = Number(req.body.volgorde);
+    if (!Number.isInteger(volgorde) || volgorde < 0) return fail(res, 400, "Volgorde moet een geheel getal ≥ 0 zijn");
+    fields.push("volgorde = ?"); vals.push(volgorde);
+  }
   if (req.body.actief !== undefined) { fields.push("actief = ?"); vals.push(req.body.actief ? 1 : 0); }
   if (fields.length === 0) return fail(res, 400, "Geen velden om aan te passen");
 
@@ -152,7 +160,11 @@ async function updateDocumentType(req, res) {
 
   const fields = [];
   const vals = [];
-  if (req.body.naam !== undefined) { fields.push("naam = ?"); vals.push(String(req.body.naam).trim()); }
+  if (req.body.naam !== undefined) {
+    const naam = String(req.body.naam).trim();
+    if (!naam) return fail(res, 400, "Naam mag niet leeg zijn");
+    fields.push("naam = ?"); vals.push(naam);
+  }
   if (req.body.isVerplicht !== undefined || req.body.is_verplicht !== undefined) {
     fields.push("is_verplicht = ?");
     vals.push((req.body.isVerplicht ?? req.body.is_verplicht) ? 1 : 0);
@@ -172,9 +184,10 @@ async function updateDocumentType(req, res) {
 }
 
 async function createDocumentType(req, res) {
-  const { naam, type, isVerplicht, is_verplicht, opleiding, academiejaar } = req.body;
+  const { type, isVerplicht, is_verplicht, opleiding, academiejaar } = req.body;
   const adminId = Number(req.user?.id);
 
+  const naam = String(req.body.naam ?? "").trim();
   if (!naam) return fail(res, 400, "Naam is verplicht");
 
   try {
