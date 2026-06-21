@@ -384,7 +384,9 @@ export default function StudentEvaluationPage() {
 
   const isIngediend   = !!actief?.student_ingediend_op;
   const isVrijgegeven = actief?.status === "vrijgegeven";
-  const kanInvullen   = actief?.status === "open" && !isIngediend;
+  // De student mag invullen zolang die zelf nog niet indiende — ook als de mentor al eerst indiende
+  // (status 'mentor_ingediend'), net zoals de backend toelaat.
+  const kanInvullen   = ["open", "mentor_ingediend"].includes(actief?.status) && !isIngediend;
 
   const ingevuld = competenties.filter((c) => scores[c.id]?.score).length;
   const totaal   = competenties.length;
