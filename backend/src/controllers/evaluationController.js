@@ -549,8 +549,28 @@ async function calculateResult(req, res) {
       );
       if (pres.length === 0 || !["gegeven", "geweest"].includes(pres[0].status)) ontbreekt.push("een gegeven eindpresentatie");
 
-      // De eindpresentatiescore (20%) is verplicht voor een finale berekening — nu meegegeven of al opgeslagen.
-      if (eindpresentatieScore == null && evaluatie.eindpresentatie_score == null) ontbreekt.push("de eindpresentatiescore");
+      // 526: de presentatiescore (20%) komt uit de rubriek wanneer er actieve criteria zijn. Bestaan die,
+      // dan is de losse eindpresentatiescore NIET meer vereist — vraag dan dat alle criteria gescoord zijn.
+      let heeftActieveRubriek = false;
+      try {
+        const [rubriek] = await conn.query(
+          `SELECT rc.id, rs.score
+           FROM rubriek_criteria rc
+           LEFT JOIN rubriek_scores rs ON rs.rubriek_criterium_id = rc.id AND rs.evaluatie_id = ?
+           WHERE rc.actief = 1`,
+          [evaluationId]
+        );
+        heeftActieveRubriek = rubriek.length > 0;
+        if (heeftActieveRubriek) {
+          const ongescoord = rubriek.filter((r) => r.score === null || r.score === undefined);
+          if (ongescoord.length > 0) ontbreekt.push("een score voor elk rubriekcriterium van de eindpresentatie");
+        }
+      } catch (_) {
+        // rubriek-tabellen nog niet gemigreerd → val terug op de losse eindpresentatiescore.
+      }
+      if (!heeftActieveRubriek && eindpresentatieScore == null && evaluatie.eindpresentatie_score == null) {
+        ontbreekt.push("de eindpresentatiescore");
+      }
 
       if (ontbreekt.length > 0) {
         await conn.rollback();

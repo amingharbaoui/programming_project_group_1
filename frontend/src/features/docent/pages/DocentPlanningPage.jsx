@@ -157,10 +157,11 @@ export default function DocentPlanningPage() {
       cacheDelete("docent_planning");
       cacheDelete("docent_students");
       await loadPlanning(true);
+      // 534: na een gegeven eindpresentatie de prototype-tekst tonen die naar de finale beoordeling leidt.
       setSuccesModal(
         nieuweStatus === "geweest"
-          ? "Het bedrijfsbezoek is bevestigd en gemarkeerd als geweest. De status is bijgewerkt in het dossier van de student."
-          : "De eindpresentatie is bevestigd en gemarkeerd als gegeven. De status is bijgewerkt in het dossier van de student."
+          ? "Het bedrijfsbezoek is gemarkeerd als geweest. Je kan nu de tussentijdse evaluatie registreren."
+          : "Eindpresentatie geregistreerd. Je kan nu de finale beoordeling invullen."
       );
     } catch (err) {
       setFoutModal(err.response?.data?.message || "Markeren mislukt");
@@ -328,22 +329,12 @@ export default function DocentPlanningPage() {
         <div className="modal_overlay" onClick={() => setNieuwModal(false)}>
           <div className="modal_box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal_header">
-              <span className="modal_title">Moment inplannen</span>
+              <span className="modal_title">
+                {nieuwType === "Eindpresentatie" ? "Eindpresentatie inplannen" : "Bedrijfsbezoek + tussentijdse inplannen"}
+              </span>
               <button className="icon_btn" onClick={() => setNieuwModal(false)}><IconX size={16} stroke={1.8} /></button>
             </div>
             <div className="modal_body">
-              <div className="form_group">
-                <label className="form_label">Type <span style={{ color: "var(--red)" }}>*</span></label>
-                <select className="form_input" value={nieuwType} onChange={(e) => setNieuwType(e.target.value)}>
-                  <option value="Bedrijfsbezoek">Bedrijfsbezoek + tussentijdse evaluatie</option>
-                  <option value="Eindpresentatie">Eindpresentatie</option>
-                </select>
-                {nieuwType === "Eindpresentatie" && (
-                  <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-                    <i className="ti ti-info-circle" /> Een eindpresentatie kan pas ingepland worden nadat het bedrijfsbezoek heeft plaatsgevonden én de tussentijdse evaluatie geregistreerd is.
-                  </p>
-                )}
-              </div>
               <div className="form_group">
                 <label className="form_label">Student <span style={{ color: "var(--red)" }}>*</span></label>
                 <select className="form_input" value={nieuwDossierId} onChange={(e) => setNieuwDossierId(e.target.value)}>
