@@ -111,6 +111,8 @@ async function getDocentProposals(req, res) {
         sv.uren_per_week,
         sv.totaal_uren,
         sp.status AS voorstel_status,
+        sp.ingediend_op,
+        sp.goedgekeurd_op,
         d.id AS dossier_id,
         d.status AS dossier_status,
         CONCAT(gs.voornaam, ' ', gs.achternaam) AS student_naam,
@@ -148,6 +150,8 @@ async function getDocentProposalById(req, res) {
       SELECT
         sv.*,
         sp.status AS voorstel_status,
+        sp.ingediend_op,
+        sp.goedgekeurd_op,
         d.id AS dossier_id,
         d.status AS dossier_status,
         CONCAT(gs.voornaam, ' ', gs.achternaam) AS student_naam,

@@ -107,10 +107,18 @@ export default function DocentProposalsPage() {
     <div className="page-inner">
       <div className="page-header">
         <div>
-          <h1>Stagevoorstellen</h1>
-          <p>Voorstellen van jouw studenten — alleen-lezen (de stagecommissie beslist).</p>
+          <h1>Voorstellen</h1>
+          <p>Read-only — de stagecommissie beslist over stagevoorstellen.</p>
         </div>
         <button className="btn primary" onClick={() => loadVoorstellen(true)}><IconRefresh size={14} stroke={1.8} /> Vernieuwen</button>
+      </div>
+
+      <div className="banner blauw" style={{ marginBottom: 16 }}>
+        <IconEye size={18} stroke={1.8} />
+        <div>
+          <div className="b-title">Voorstel inkijken — beslissing door stagecommissie</div>
+          <div className="b-text">Je bent (voorlopig) gekoppeld als stagebegeleider. Je kan elk stagevoorstel en de feedback inkijken, maar de stagecommissie neemt de beslissing.</div>
+        </div>
       </div>
 
       <div className="doc_filters" style={{ marginBottom: 16 }}>
@@ -148,8 +156,8 @@ export default function DocentProposalsPage() {
             <thead>
               <tr>
                 <th>Student</th>
-                <th>Bedrijf</th>
-                <th>Stagefunctie</th>
+                <th>Ingediend</th>
+                <th>Vergadering</th>
                 <th>Status</th>
                 <th style={{ textAlign: "right" }}>Detail</th>
               </tr>
@@ -168,8 +176,12 @@ export default function DocentProposalsPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="doc_sub">{v.bedrijf_naam || "-"}</td>
-                    <td className="doc_sub">{v.stagefunctie || "-"}</td>
+                    <td className="doc_sub" style={{ whiteSpace: "nowrap" }}>
+                      {v.ingediend_op ? `${formatDate(v.ingediend_op)} · v${v.versie_nummer ?? 1}` : "—"}
+                    </td>
+                    <td className="doc_sub" style={{ whiteSpace: "nowrap" }}>
+                      {v.goedgekeurd_op ? formatDate(v.goedgekeurd_op) : "—"}
+                    </td>
                     <td>
                       <span className={"status " + getStatusClass(v.voorstel_status)}>
                         {getStatusLabel(v.voorstel_status)}
