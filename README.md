@@ -1,4 +1,4 @@
-# Stagify
+# Stageify
 
 A centralized internship management platform built for Erasmushogeschool Brussel.
 
@@ -11,9 +11,9 @@ A centralized internship management platform built for Erasmushogeschool Brussel
 ![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=flat-square&logo=mysql&logoColor=white)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-## What is Stagify?
+## What is Stageify?
 
-Stagify is a web application built as a group project for EHB. It supports the full internship process for students, from proposal to final evaluation.
+Stageify is a web application built as a group project for EHB. It supports the full internship process for students, from proposal to final evaluation.
 
 The platform supports five roles: **student**, **stagecommissie**, **administratie**, **mentor** (company-side supervisor) and **docent** (teacher). Each role has its own interface and only sees what's relevant to them.
 

@@ -1,0 +1,61 @@
+/* ── Modal — exact zoals admin ── */
+.modal_overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.modal_box {
+  background: var(--white);
+  border-radius: 14px;
+  border: 0.5px solid var(--border);
+  width: 100%;
+  max-width: 460px;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.modal_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px 14px;
+  border-bottom: 0.5px solid var(--border);
+  flex-shrink: 0;
+}
+
+.modal_title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--dark);
+}
+
+.modal_body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  overflow-y: auto;
+}
+
+.icon_btn {
+  width: 30px;
+  height: 30px;
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  background: var(--white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.icon_btn:hover {
+  background: var(--muted);
+}

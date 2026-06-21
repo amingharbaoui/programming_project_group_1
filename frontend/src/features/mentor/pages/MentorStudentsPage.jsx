@@ -11,21 +11,18 @@ function initialen(s) {
   return (a + b).toUpperCase() || "?";
 }
 
+// Volledige statuslijst uit het schema — niet langer alles vóór stage_loopt
+// als "Stage loopt" tonen, dat klopte niet voor wacht_op_student/-bedrijf/
+// in_controle_bij_administratie/document_afgekeurd/geregistreerd.
 function faseLabel(status) {
-  const map = {
-    wacht_op_student: "Wacht op student",
-    wacht_op_bedrijf: "Wacht op bedrijf",
-    in_controle_bij_administratie: "In controle",
-    document_afgekeurd: "Document afgekeurd",
-    geregistreerd: "Startklaar",
-    stage_loopt: "Stage loopt",
-    resultaat_vrijgegeven: "Resultaat vrijgegeven",
-    afgerond: "Afgerond",
-    voltooid: "Afgerond",
-    in_aanvraag: "Niet gestart",
-    aangevraagd: "Niet gestart",
-  };
-  return map[status] || (status ? "In behandeling" : "Onbekend");
+  if (status === "afgerond" || status === "voltooid" || status === "resultaat_vrijgegeven") return "Afgerond";
+  if (status === "actief" || status === "stage_loopt") return "Stage loopt";
+  if (status === "geregistreerd") return "Geregistreerd — startklaar";
+  if (status === "document_afgekeurd") return "Document afgekeurd";
+  if (status === "in_controle_bij_administratie") return "In controle bij administratie";
+  if (status === "wacht_op_bedrijf") return "Wacht op ondertekening";
+  if (status === "wacht_op_student") return "Wacht op student";
+  return "Niet gestart";
 }
 
 function logboekBadge(status) {
