@@ -1052,11 +1052,26 @@ async function saveLogbookDay(req, res) {
     await conn.beginTransaction();
 
     const [dossiers] = await conn.query(
-      "SELECT id, status, startdatum FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1",
+      "SELECT id, status, startdatum, einddatum, aantal_weken FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1",
       [studentId]
     );
     if (dossiers.length === 0) { await conn.rollback(); return fail(res, 404, "Geen stagedossier gevonden"); }
     const dossierId = dossiers[0].id;
+
+    // Datum/week binnen de stageperiode — dezelfde grenzen als bij de week-indiening.
+    const dDatum = new Date(datum);
+    if (dossiers[0].aantal_weken && weekNummer > Number(dossiers[0].aantal_weken)) {
+      await conn.rollback();
+      return fail(res, 400, `Weeknummer ${weekNummer} valt buiten de stageperiode (max ${dossiers[0].aantal_weken} weken)`);
+    }
+    if (dossiers[0].startdatum && !Number.isNaN(dDatum.getTime()) && dDatum < new Date(dossiers[0].startdatum)) {
+      await conn.rollback();
+      return fail(res, 400, "De datum valt voor de start van de stage");
+    }
+    if (dossiers[0].einddatum && !Number.isNaN(dDatum.getTime()) && dDatum > new Date(dossiers[0].einddatum)) {
+      await conn.rollback();
+      return fail(res, 400, "De datum valt na het einde van de stage");
+    }
 
     // Logboek pas invulbaar nadat de student de stageovereenkomst getekend heeft.
     const [ovk] = await conn.query(
@@ -1223,7 +1238,11 @@ async function updateLogbookEntry(req, res) {
     const params = [];
     const setVeld = (kolom, waarde) => { velden.push(`${kolom} = ?`); params.push(waarde); };
 
-    if (b.status !== undefined) setVeld("status", b.status);
+    if (b.status !== undefined) {
+      const dagStatus = b.status === "geen_stagedag" ? "geen_stagedag" : "ingevuld";
+      setVeld("status", dagStatus);
+      if (dagStatus === "geen_stagedag") setVeld("aantal_uren", 0);
+    }
     if (b.titel !== undefined) setVeld("titel", b.titel || null);
     if (b.uitgevoerdeTaken !== undefined || b.uitgevoerde_taken !== undefined)
       setVeld("uitgevoerde_taken", b.uitgevoerdeTaken ?? b.uitgevoerde_taken ?? null);

@@ -129,10 +129,16 @@ async function getEvaluationsForStudent(req, res) {
     // Student en mentor mogen het berekende resultaat pas zien nadat de docent het vrijgegeven heeft.
     const verbergResultaat = role === "student" || role === "mentor";
     const result = evaluaties.map((e) => {
-      const basis = verbergResultaat && e.status !== "vrijgegeven"
+      const nogNietVrijgegeven = e.status !== "vrijgegeven";
+      const basis = verbergResultaat && nogNietVrijgegeven
         ? { ...e, eindcijfer: null, competentie_score: null, eindpresentatie_score: null }
         : e;
-      return { ...basis, scores: scores.filter((s) => s.evaluatie_id === e.id) };
+      let eigenScores = scores.filter((s) => s.evaluatie_id === e.id);
+      // Vóór vrijgave ziet student/mentor enkel de eigen ingevulde scores, niet die van de andere partijen.
+      if (verbergResultaat && nogNietVrijgegeven) {
+        eigenScores = eigenScores.filter((s) => s.rol === role);
+      }
+      return { ...basis, scores: eigenScores };
     });
 
     return ok(res, { stagedossierId: dossier.id, competenties, evaluaties: result }, "Evaluaties opgehaald");
@@ -212,8 +218,18 @@ async function saveScores(req, res) {
       }
     }
 
+    const active = await getActiveCompetencies(conn);
+    const activeIds = new Set(active.map((c) => c.id));
+    // Geen scores voor competenties die niet bij het actieve profiel horen.
+    for (const s of scores) {
+      const cid = Number(s.competentieId || s.competentie_id);
+      if (cid && !activeIds.has(cid)) {
+        await conn.rollback();
+        return fail(res, 400, "Score voor een competentie die niet bij het actieve profiel hoort");
+      }
+    }
+
     if (ingediend) {
-      const active = await getActiveCompetencies(conn);
       const ingevuld = scores
         .filter((s) => s.score !== null && s.score !== undefined && s.score !== "")
         .map((s) => Number(s.competentieId || s.competentie_id));
@@ -384,6 +400,9 @@ async function calculateResult(req, res) {
         [evaluatie.stagedossier_id]
       );
       if (pres.length === 0 || !["gegeven", "geweest"].includes(pres[0].status)) ontbreekt.push("een gegeven eindpresentatie");
+
+      // De eindpresentatiescore (20%) is verplicht voor een finale berekening — nu meegegeven of al opgeslagen.
+      if (eindpresentatieScore == null && evaluatie.eindpresentatie_score == null) ontbreekt.push("de eindpresentatiescore");
 
       if (ontbreekt.length > 0) {
         await conn.rollback();

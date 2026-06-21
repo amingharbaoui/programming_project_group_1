@@ -135,8 +135,12 @@ async function updateCompetency(req, res) {
   if (naam !== undefined) { fields.push("naam = ?"); values.push(String(naam).trim()); }
   if (beschrijving !== undefined) { fields.push("beschrijving = ?"); values.push(beschrijving || null); }
   if (gewichtPercentage !== undefined || gewicht_percentage !== undefined) {
+    const g = Number(gewichtPercentage ?? gewicht_percentage);
+    if (!Number.isFinite(g) || g < 0 || g > 100) {
+      return fail(res, 400, "Gewicht moet een getal tussen 0 en 100 zijn");
+    }
     fields.push("gewicht_percentage = ?");
-    values.push(Number(gewichtPercentage ?? gewicht_percentage));
+    values.push(g);
   }
   if (volgorde !== undefined) { fields.push("volgorde = ?"); values.push(volgorde); }
   if (isActief !== undefined || is_actief !== undefined) {
@@ -406,6 +410,16 @@ async function archiveProfile(req, res) {
   }
 
   try {
+    // Het enige actieve profiel niet archiveren — anders vallen evaluaties zonder actieve competenties.
+    const [[huidig]] = await db.query("SELECT status FROM competentie_profielen WHERE id = ? LIMIT 1", [profielId]);
+    if (!huidig) return fail(res, 404, "Profiel niet gevonden");
+    if (huidig.status === "actief") {
+      const [[telling]] = await db.query("SELECT COUNT(*) AS aantal FROM competentie_profielen WHERE status = 'actief'");
+      if (Number(telling.aantal) <= 1) {
+        return fail(res, 409, "Je kan het enige actieve competentieprofiel niet archiveren; publiceer eerst een ander profiel");
+      }
+    }
+
     const [result] = await db.query(
       "UPDATE competentie_profielen SET status = 'gearchiveerd', aangepast_op = NOW() WHERE id = ?",
       [profielId]

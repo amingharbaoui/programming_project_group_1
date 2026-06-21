@@ -155,6 +155,9 @@ async function createInternship(req, res) {
   if (!finalBedrijfNaam || !mentorNaam || !mentorEmail || !stagefunctie || !opdrachtomschrijving || !startdatum || !einddatum) {
     return fail(res, 400, "Verplichte velden ontbreken");
   }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(mentorEmail).trim())) {
+    return fail(res, 400, "Ongeldig e-mailadres van de mentor");
+  }
 
   const startDate = new Date(startdatum);
   const endDate = new Date(einddatum);
@@ -501,6 +504,10 @@ async function resubmitInternship(req, res) {
     const totaalUren = aantalWeken * finalUrenPerWeek;
 
     // Herindienen mag niet soepeler gevalideerd worden dan de eerste indiening.
+    const rMentorEmail = mentorEmail || voorstel.mentor_email;
+    if (rMentorEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(rMentorEmail).trim())) {
+      await conn.rollback(); return fail(res, 400, "Ongeldig e-mailadres van de mentor");
+    }
     const rStart = new Date(nieuwStartdatum);
     const rEind = new Date(nieuwEinddatum);
     if (Number.isNaN(rStart.getTime()) || Number.isNaN(rEind.getTime())) {

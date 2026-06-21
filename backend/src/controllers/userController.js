@@ -124,9 +124,17 @@ async function updateUser(req, res) {
     return fail(res, 400, `Ongeldige rol. Kies uit: ${GELDIGE_ROLLEN.join(", ")}`);
   }
 
-  // Eigen rol mag niet gewijzigd worden
+  // Eigen rol mag niet gewijzigd worden — maar je eigen naam/e-mail opslaan met dezelfde rol mag wel.
   if (id === me && hoofdrol) {
-    return fail(res, 400, "Je kan je eigen rol niet wijzigen");
+    const [eigen] = await db.query("SELECT hoofdrol FROM gebruikers WHERE id = ? LIMIT 1", [id]);
+    if (eigen.length > 0 && eigen[0].hoofdrol !== hoofdrol) {
+      return fail(res, 400, "Je kan je eigen rol niet wijzigen");
+    }
+  }
+
+  // E-mailformaat valideren (backend blijft de bron van waarheid, niet enkel de HTML-input).
+  if (email !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+    return fail(res, 400, "Ongeldig e-mailadres");
   }
 
   // Een rol mag niet naar een andere rolfamilie wisselen: dat zou student-/mentor-/medewerkerrijen
