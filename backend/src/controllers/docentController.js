@@ -41,7 +41,12 @@ async function getDocentStudents(req, res) {
           ORDER BY e.deadline_docent IS NULL, e.deadline_docent ASC LIMIT 1) AS actie_deadline,
         (SELECT COUNT(*) FROM planning_momenten pm
           WHERE pm.stagedossier_id = sd.id AND pm.type = 'bedrijfsbezoek'
-            AND pm.status NOT IN ('geannuleerd', 'alternatief_gevraagd')) AS aantal_bezoeken
+            AND pm.status NOT IN ('geannuleerd', 'alternatief_gevraagd')) AS aantal_bezoeken,
+        (SELECT COUNT(*) FROM planning_momenten pm
+          WHERE pm.stagedossier_id = sd.id AND pm.type = 'eindpresentatie'
+            AND pm.status NOT IN ('geannuleerd', 'alternatief_gevraagd')) AS aantal_presentaties,
+        (SELECT COUNT(*) FROM planning_momenten pm
+          WHERE pm.stagedossier_id = sd.id AND pm.type = 'bedrijfsbezoek' AND pm.status = 'geweest') AS bezoek_geweest
       FROM stagedossiers sd
       JOIN studenten   st ON st.gebruiker_id = sd.student_id
       JOIN gebruikers   g ON g.id             = st.gebruiker_id
@@ -64,6 +69,8 @@ async function getDocentStudents(req, res) {
       if (Number(r.eval_te_registreren) > 0) return { titel: "Evaluatie registreren", type: "evaluatie" };
       if (Number(r.te_review_weken) > 0) return { titel: "Logboekweek nalezen", type: "logboek" };
       if (planbaar(r.dossier_status) && Number(r.aantal_bezoeken) === 0) return { titel: "Bedrijfsbezoek plannen", type: "planning" };
+      // 454: bezoek is geweest en er is nog geen eindpresentatie ingepland → dat is de volgende planningsactie.
+      if (planbaar(r.dossier_status) && Number(r.bezoek_geweest) > 0 && Number(r.aantal_presentaties) === 0) return { titel: "Eindpresentatie plannen", type: "planning" };
       if (r.dossier_status === "resultaat_vrijgegeven" || r.dossier_status === "afgerond") return { titel: "Afgerond", type: "geen" };
       return { titel: "—", type: "geen" };
     };

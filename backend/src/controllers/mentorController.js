@@ -29,7 +29,14 @@ async function getMentorStudents(req, res) {
           WHERE lw.stagedossier_id = sd.id
           ORDER BY lw.week_nummer DESC
           LIMIT 1
-        ) AS logboek_status
+        ) AS logboek_status,
+        -- 455: echte evaluatiestatus i.p.v. afgeleid uit de dossierstatus. Toon het meest actuele moment.
+        (
+          SELECT e.status FROM evaluaties e
+          WHERE e.stagedossier_id = sd.id
+          ORDER BY FIELD(e.status, 'student_ingediend','open','mentor_ingediend','klaar_voor_docent','geregistreerd','klaar_voor_vrijgave','vrijgegeven','niet_open'), e.id DESC
+          LIMIT 1
+        ) AS evaluatie_status
       FROM stagedossiers sd
       JOIN studenten  st ON st.gebruiker_id = sd.student_id
       JOIN gebruikers  g ON g.id             = st.gebruiker_id
