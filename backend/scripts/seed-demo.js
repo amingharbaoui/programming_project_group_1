@@ -193,13 +193,13 @@ async function main() {
 
     /* ---------- DOSSIER-helper (contract/startklaar/loopt/afgerond) ---------- */
     let did = 1;
-    async function dossier(studentId, voorstelId, docentId, status, startdatum) {
+    async function dossier(studentId, voorstelId, docentId, status, startdatum, einddatum = "2026-06-27") {
       const myId = did++;
       await q(`INSERT INTO stagedossiers (id, dossiernummer, stagevoorstel_id, student_id, bedrijf_id, stagebegeleider_id, mentor_id, status,
                  opleiding, academiejaar, startdatum, einddatum, aantal_weken, uren_per_week, totaal_uren, verzekering_in_orde, aangemaakt_op, aangepast_op)
-               VALUES (?, ?, ?, ?, 1, ?, 5, ?, 'Toegepaste Informatica','2025-2026', ?, '2026-06-27', 13, 38, 494, ?, NOW(), NOW())`,
+               VALUES (?, ?, ?, ?, 1, ?, 5, ?, 'Toegepaste Informatica','2025-2026', ?, ?, 13, 38, 494, ?, NOW(), NOW())`,
         [myId, `D-2026-${String(myId).padStart(4, "0")}`, voorstelId, studentId, docentId, status,
-         startdatum, ["geregistreerd", "stage_loopt", "resultaat_vrijgegeven", "afgerond"].includes(status) ? 1 : 0]);
+         startdatum, einddatum, ["geregistreerd", "stage_loopt", "resultaat_vrijgegeven", "afgerond"].includes(status) ? 1 : 0]);
       return myId;
     }
     function ovk(dossierId, status, { student = null, bedrijf = null, opleiding = null } = {}) {
@@ -220,7 +220,7 @@ async function main() {
     await doc(dContract, 3, "ontbreekt", null);
 
     // 15 — STARTKLAAR: volledig getekend, documenten goedgekeurd, geregistreerd (stage nog niet begonnen)
-    const dStart = await dossier(15, vStart, 3, "geregistreerd", "2026-09-15");
+    const dStart = await dossier(15, vStart, 3, "geregistreerd", "2026-09-15", "2026-12-12");
     await ovk(dStart, "geregistreerd", { student: new Date(), bedrijf: new Date(), opleiding: new Date() });
     await doc(dStart, 1, "geregistreerd", new Date());
     await doc(dStart, 2, "goedgekeurd", new Date());
