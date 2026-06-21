@@ -200,6 +200,8 @@ export default function StudentDocumentsPage() {
   const [soorten, setSoorten]       = useState([]);
   const [contractData, setContractData] = useState(null);
   const [dossierStatus, setDossierStatus] = useState(null);
+  const [dossierFout, setDossierFout] = useState(false);
+  const [soortenFout, setSoortenFout] = useState(false);
   const [loading, setLoading]       = useState(true);
   const [fout, setFout]             = useState(null);
   const [uploadFout, setUploadFout] = useState(null);
@@ -218,13 +220,19 @@ export default function StudentDocumentsPage() {
     try {
       const [docsRes, soortenRes] = await Promise.all([
         apiRequest("GET", "/documents/my"),
-        apiRequest("GET", "/documents/soorten").catch(() => ({ data: [] })),
+        // Markeer een mislukte call expliciet: anders lijkt een laadfout op "geen verplichte documenten" (338).
+        apiRequest("GET", "/documents/soorten").catch(() => ({ data: null, _failed: true })),
       ]);
       setDocumenten(docsRes.data ?? []);
-      // Reflectiebijlage en Eindoverzicht niet tonen (automatisch/niet van toepassing)
-      const VERBERG = new Set(["reflectiebijlage", "eindoverzicht"]);
-      // Alleen verplichte, actieve documentsoorten als "verplichte documenten" tonen (optionele/gearchiveerde niet).
-      setSoorten((soortenRes.data ?? []).filter((s) => !VERBERG.has(s.type) && !VERBERG.has(s.naam?.toLowerCase()) && s.is_verplicht !== 0));
+      if (soortenRes._failed) {
+        setSoortenFout(true);
+      } else {
+        setSoortenFout(false);
+        // Reflectiebijlage en Eindoverzicht niet tonen (automatisch/niet van toepassing)
+        const VERBERG = new Set(["reflectiebijlage", "eindoverzicht"]);
+        // Alleen verplichte, actieve documentsoorten als "verplichte documenten" tonen (optionele/gearchiveerde niet).
+        setSoorten((soortenRes.data ?? []).filter((s) => !VERBERG.has(s.type) && !VERBERG.has(s.naam?.toLowerCase()) && s.is_verplicht !== 0));
+      }
     } catch (err) {
       setFout(err.response?.data?.message || "Documenten konden niet geladen worden.");
     } finally {
@@ -241,10 +249,15 @@ export default function StudentDocumentsPage() {
     try {
       const r = await apiRequest("GET", "/internships/my");
       setDossierStatus(r.data?.dossier_status ?? null);
-    } catch { /* niet kritisch */ }
+      setDossierFout(false);
+    } catch {
+      // Status onbekend door een laadfout: conservatief read-only zodat we geen upload-UI tonen in een
+      // mogelijk afgerond dossier (de backend zou de upload toch met 409 weigeren) — auditpunt 342.
+      setDossierFout(true);
+    }
   }
 
-  const readOnlyDossier = ["resultaat_vrijgegeven", "afgerond"].includes(dossierStatus);
+  const readOnlyDossier = dossierFout || ["resultaat_vrijgegeven", "afgerond"].includes(dossierStatus);
 
   function groeperPerSoort(soortId) {
     return documenten
@@ -324,7 +337,9 @@ export default function StudentDocumentsPage() {
           <IconFile size={16} />
           Verplichte documenten
         </div>
-        {soorten.length === 0 ? (
+        {soortenFout ? (
+          <span className="status s_rood"><IconAlertCircle size={14} /> De verplichte documenttypes konden niet geladen worden. Herlaad de pagina.</span>
+        ) : soorten.length === 0 ? (
           <p style={{ fontSize: 13, color: "var(--sub)" }}>Geen verplichte documenten gevonden.</p>
         ) : (
           soorten.map((soort) => {
