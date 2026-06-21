@@ -116,6 +116,12 @@ function DossierKaart({ titel, data, formatDatum }) {
           <div className="card_title"><IconFileDescription size={16} />Opdracht</div>
           <p style={{ fontSize: 13.5, lineHeight: 1.65, color: "var(--sub)", margin: 0 }}>{data?.opdrachtomschrijving || "—"}</p>
         </div>
+        {data?.praktische_afspraken && data?.praktische_afspraken_gedeeld_op && (
+          <div className="card" style={{ marginTop: 16 }}>
+            <div className="card_title"><IconFileDescription size={16} />Praktische afspraken</div>
+            <p style={{ fontSize: 13.5, lineHeight: 1.65, color: "var(--sub)", margin: 0, whiteSpace: "pre-line" }}>{data.praktische_afspraken}</p>
+          </div>
+        )}
       </div>
     </div>
   );

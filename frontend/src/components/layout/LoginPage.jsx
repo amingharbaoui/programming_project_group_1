@@ -51,7 +51,8 @@ export default function LoginPage() {
   }
 
   function handleEhbLogin() {
-    login(email);
+    // Nog geen echte EhB-SSO: eerlijk communiceren i.p.v. een mislukte gewone login te starten.
+    setFout("Aanmelden met je EhB-account is binnenkort beschikbaar. Gebruik voorlopig je e-mailadres en wachtwoord.");
   }
 
   return (

@@ -103,9 +103,10 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId })
     setVrijgaveMelding({ tekst: "", type: "" });
   }, [evaluatie?.id]);
 
+  // De docent vult pas in nadat student én mentor hebben ingediend (status klaar_voor_docent).
   const kanInvullen =
     evaluatie &&
-    !["niet_open", "vrijgegeven", "geregistreerd", "klaar_voor_vrijgave"].includes(evaluatie.status);
+    evaluatie.status === "klaar_voor_docent";
 
   async function handleOpslaan() {
     if (!evaluatie) return;

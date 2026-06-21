@@ -86,7 +86,7 @@ export const STUDENT_FASES = {
     faseIdx: 4,
     fase: "Stage",
     actie: "Alles is in orde. Je logboek opent vanaf je startdatum.",
-    open: ["stage", "overeenkomst", "evaluatie", "documenten"],
+    open: ["stage", "overeenkomst", "documenten"],
     warn: [],
   },
   gestart: {

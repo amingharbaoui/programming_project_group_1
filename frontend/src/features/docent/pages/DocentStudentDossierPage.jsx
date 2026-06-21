@@ -22,6 +22,7 @@ function getStatusClass(status) {
 function getStappen(d, overeenkomst, evaluaties) {
   const stageAfgerond = ["afgerond", "voltooid", "resultaat_vrijgegeven"].includes(d?.status);
   const contractKlaar = overeenkomst?.status === "geregistreerd";
+  const stageLoopt = d?.status === "stage_loopt";
   const finaal = (evaluaties || []).find((e) => e.type === "finaal");
   const evalVrijgegeven = finaal?.status === "vrijgegeven";
   const evalLoopt = (evaluaties || []).some((e) => e.status && e.status !== "niet_open");
@@ -36,8 +37,8 @@ function getStappen(d, overeenkomst, evaluaties) {
     },
     {
       label: "Stage",
-      sub: stageAfgerond ? "Afgerond" : contractKlaar ? "Loopt" : "Nog niet gestart",
-      state: stageAfgerond ? "done" : contractKlaar ? "actief" : "todo",
+      sub: stageAfgerond ? "Afgerond" : stageLoopt ? "Loopt" : contractKlaar ? "Startklaar" : "Nog niet gestart",
+      state: stageAfgerond ? "done" : stageLoopt ? "actief" : contractKlaar ? "actief" : "todo",
     },
     {
       label: "Evaluatie",
