@@ -54,7 +54,7 @@ function deadlineVoorDocument(soort, documenten, contract) {
 }
 
 /* ── Verplicht document kaart ── */
-function DocumentKaart({ soort, documenten, onUpload, onFout, onBekijken }) {
+function DocumentKaart({ soort, documenten, onUpload, onFout, onBekijken, readOnly }) {
   const [bezig, setBezig] = useState(false);
   const inputRef = useRef(null);
 
@@ -107,10 +107,12 @@ function DocumentKaart({ soort, documenten, onUpload, onFout, onBekijken }) {
           </button>
         )}
 
-        <button className="btn sm primary" disabled={bezig} onClick={() => inputRef.current?.click()}>
-          <IconUpload size={14} />
-          {bezig ? "Bezig…" : heeftBestand ? "Nieuwe versie" : "Uploaden"}
-        </button>
+        {!readOnly && (
+          <button className="btn sm primary" disabled={bezig} onClick={() => inputRef.current?.click()}>
+            <IconUpload size={14} />
+            {bezig ? "Bezig…" : heeftBestand ? "Nieuwe versie" : "Uploaden"}
+          </button>
+        )}
         <input
           ref={inputRef}
           type="file"
@@ -196,6 +198,7 @@ export default function StudentDocumentsPage() {
   const [documenten, setDocumenten] = useState([]);
   const [soorten, setSoorten]       = useState([]);
   const [contractData, setContractData] = useState(null);
+  const [dossierStatus, setDossierStatus] = useState(null);
   const [loading, setLoading]       = useState(true);
   const [fout, setFout]             = useState(null);
   const [uploadFout, setUploadFout] = useState(null);
@@ -230,7 +233,14 @@ export default function StudentDocumentsPage() {
     } catch {
       setContractData(null);
     }
+    // Dossierstatus bepaalt of het dossier read-only is (na afronding/vrijgave).
+    try {
+      const r = await apiRequest("GET", "/internships/my");
+      setDossierStatus(r.data?.dossier_status ?? null);
+    } catch { /* niet kritisch */ }
   }
+
+  const readOnlyDossier = ["resultaat_vrijgegeven", "afgerond"].includes(dossierStatus);
 
   function groeperPerSoort(soortId) {
     return documenten
@@ -325,6 +335,7 @@ export default function StudentDocumentsPage() {
                 onUpload={laadData}
                 onFout={setUploadFout}
                 onBekijken={(url, naam) => setPreview({ url, naam })}
+                readOnly={readOnlyDossier}
               />
             );
           })
@@ -345,15 +356,19 @@ export default function StudentDocumentsPage() {
           </div>
         )}
 
-        <div
-          className="dropzone"
-          onClick={() => !eigenBezig && eigenInputRef.current?.click()}
-          style={{ cursor: eigenBezig ? "not-allowed" : "pointer", opacity: eigenBezig ? .6 : 1 }}
-        >
-          <i className="ti ti-upload"></i>
-          <div className="dz-t">{eigenBezig ? "Bezig met uploaden…" : "Document toevoegen"}</div>
-          {!eigenBezig && <div className="dz-s">pdf, docx, png, jpg</div>}
-        </div>
+        {readOnlyDossier ? (
+          <div className="dz-s" style={{ padding: "8px 0" }}>Je stage is afgerond; documenten kunnen niet meer toegevoegd of gewijzigd worden.</div>
+        ) : (
+          <div
+            className="dropzone"
+            onClick={() => !eigenBezig && eigenInputRef.current?.click()}
+            style={{ cursor: eigenBezig ? "not-allowed" : "pointer", opacity: eigenBezig ? .6 : 1 }}
+          >
+            <i className="ti ti-upload"></i>
+            <div className="dz-t">{eigenBezig ? "Bezig met uploaden…" : "Document toevoegen"}</div>
+            {!eigenBezig && <div className="dz-s">pdf, png, jpg</div>}
+          </div>
+        )}
         <input
           ref={eigenInputRef}
           type="file"
