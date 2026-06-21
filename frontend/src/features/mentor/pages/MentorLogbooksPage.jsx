@@ -73,6 +73,7 @@ export default function MentorLogbooksPage() {
   const [error, setError] = useState("");
   const [openWeeks, setOpenWeeks] = useState(new Set());
   const [feedbackByWeek, setFeedbackByWeek] = useState({});
+  const [opmerkingByDay, setOpmerkingByDay] = useState({}); // per dag: optionele mentor-opmerking
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
   useEffect(() => {
@@ -150,7 +151,8 @@ export default function MentorLogbooksPage() {
   async function confirmDag(dayId) {
     try {
       setActionLoadingId(`dag-${dayId}`);
-      await api.patch(`/mentor/logbooks/days/${dayId}/confirm`, {});
+      const opmerking = opmerkingByDay[dayId] || "";
+      await api.patch(`/mentor/logbooks/days/${dayId}/confirm`, { opmerking: opmerking || null });
       cacheDelete(`mentor_logbooks_${detailId}`);
       const res = await api.get(`/mentor/logbooks/${detailId}`);
       const data = res.data.data || [];
@@ -317,6 +319,26 @@ export default function MentorLogbooksPage() {
                           {comps.length > 0 && (
                             <div className="e-chips">
                               {comps.map((c) => <span key={c} className="e-chip">{c}</span>)}
+                            </div>
+                          )}
+                          {/* Bestaande opmerking tonen als de dag al bevestigd is */}
+                          {d.mentor_bevestigd_op && d.mentor_opmerking && (
+                            <div className="e-veld" style={{ marginTop: 4 }}>
+                              <b style={{ color: "var(--primary)" }}>Jouw opmerking</b>
+                              <span style={{ flex: 1 }}>{d.mentor_opmerking}</span>
+                            </div>
+                          )}
+                          {/* Opmerking invoerveld vóór bevestigen */}
+                          {kanDagBevestigen && !d.mentor_bevestigd_op && (
+                            <div style={{ marginTop: 6 }}>
+                              <input
+                                type="text"
+                                className="form_input"
+                                placeholder="Opmerking bij deze dag (optioneel)"
+                                value={opmerkingByDay[d.id] || ""}
+                                onChange={(e) => setOpmerkingByDay((prev) => ({ ...prev, [d.id]: e.target.value }))}
+                                style={{ fontSize: 12.5 }}
+                              />
                             </div>
                           )}
                         </>

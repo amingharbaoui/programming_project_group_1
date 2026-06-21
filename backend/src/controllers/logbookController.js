@@ -547,7 +547,8 @@ async function getLogbooksByStudent(req, res) {
         leerpunten,
         competenties,
         aantal_uren,
-        mentor_bevestigd_op
+        mentor_bevestigd_op,
+        mentor_opmerking
       FROM logboek_dagen
       WHERE logboek_week_id IN (?)
       ORDER BY datum ASC
@@ -1146,6 +1147,12 @@ async function saveLogbookDay(req, res) {
       await conn.rollback();
       return fail(res, 400, "De datum valt na het einde van de stage");
     }
+    // Toekomstige dag mag nog niet ingevuld worden.
+    const vandaag = new Date(); vandaag.setHours(23, 59, 59, 999);
+    if (!Number.isNaN(dDatum.getTime()) && dDatum > vandaag) {
+      await conn.rollback();
+      return fail(res, 400, "Je kan een dag pas invullen als die aangebroken is");
+    }
 
     // Logboek pas invulbaar nadat de student de stageovereenkomst getekend heeft.
     const [ovk] = await conn.query(
@@ -1255,10 +1262,11 @@ async function saveLogbookDay(req, res) {
   }
 }
 
-// PATCH /api/mentor/logbooks/days/:dayId/confirm — mentor bevestigt één logboekdag (story 31).
+// PATCH /api/mentor/logbooks/days/:dayId/confirm — mentor bevestigt één logboekdag met optionele opmerking (story 31).
 async function mentorConfirmLogbookDay(req, res) {
   const dayId = Number(req.params.dayId);
   const mentorId = Number(req.user?.id);
+  const opmerking = req.body?.opmerking ?? null;
   if (!dayId) return fail(res, 400, "Ongeldig dag-id");
 
   try {
@@ -1279,8 +1287,8 @@ async function mentorConfirmLogbookDay(req, res) {
     }
 
     await db.query(
-      "UPDATE logboek_dagen SET mentor_bevestigd_op = NOW(), aangepast_op = NOW() WHERE id = ?",
-      [dayId]
+      "UPDATE logboek_dagen SET mentor_bevestigd_op = NOW(), mentor_opmerking = ?, aangepast_op = NOW() WHERE id = ?",
+      [opmerking || null, dayId]
     );
     return ok(res, { id: dayId }, "Logboekdag bevestigd");
   } catch (error) {
