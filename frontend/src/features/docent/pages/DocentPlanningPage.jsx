@@ -63,6 +63,10 @@ export default function DocentPlanningPage() {
   const [fout, setFout] = useState("");
 
   const [gegevenId, setGegevenId] = useState(null);
+  const [altModal, setAltModal] = useState(null); // het planningmoment met mentor-alternatief
+  const [altCounterDatum, setAltCounterDatum] = useState("");
+  const [altCounterUur, setAltCounterUur] = useState("10:00");
+  const [altCounterPlaats, setAltCounterPlaats] = useState("");
 
   async function loadPlanning(force = false) {
     try {
@@ -173,12 +177,13 @@ export default function DocentPlanningPage() {
     }
   }
 
-  // 446: docent accepteert het door de mentor voorgestelde alternatieve moment → bevestigd.
+  // 446/480: docent accepteert het door de mentor voorgestelde alternatieve moment → bevestigd.
   // De mentor en student krijgen daarna de bevestigingsmelding (backend).
   async function accepteerAlternatief(id) {
     try {
       setGegevenId(id);
       await api.patch("/docent/planning/" + id, { status: "bevestigd" });
+      setAltModal(null);
       cacheDelete("docent_planning");
       cacheDelete("docent_students");
       await loadPlanning(true);
@@ -188,6 +193,37 @@ export default function DocentPlanningPage() {
     } finally {
       setGegevenId(null);
     }
+  }
+
+  // 480: docent stuurt een tegenvoorstel — past het bestaande moment aan en zet het terug op 'voorgesteld'
+  // zodat de mentor opnieuw bevestigt of een ander moment voorstelt (loop, geen dubbele planningrij).
+  async function stuurTegenvoorstel(id) {
+    if (!altCounterDatum) { setFoutModal("Kies een datum voor je tegenvoorstel."); return; }
+    try {
+      setGegevenId(id);
+      await api.patch("/docent/planning/" + id, {
+        status: "voorgesteld",
+        geplandOp: `${altCounterDatum}T${altCounterUur || "00:00"}`,
+        ...(altCounterPlaats ? { locatie: altCounterPlaats } : {}),
+      });
+      setAltModal(null);
+      cacheDelete("docent_planning");
+      cacheDelete("docent_students");
+      await loadPlanning(true);
+      setSuccesModal("Tegenvoorstel verstuurd. De mentor kan het bevestigen of opnieuw een ander moment voorstellen.");
+    } catch (err) {
+      setFoutModal(err.response?.data?.message || "Tegenvoorstel versturen mislukt");
+    } finally {
+      setGegevenId(null);
+    }
+  }
+
+  function openAltModal(p) {
+    const d = p.alternatief_gepland_op ? new Date(p.alternatief_gepland_op) : (p.gepland_op ? new Date(p.gepland_op) : null);
+    setAltCounterDatum(d ? d.toISOString().slice(0, 10) : "");
+    setAltCounterUur(d ? d.toTimeString().slice(0, 5) : "10:00");
+    setAltCounterPlaats(p.alternatief_locatie || p.locatie || "");
+    setAltModal(p);
   }
 
   const heeftFilters = typeFilter !== "alle" || zoek;
@@ -284,23 +320,12 @@ export default function DocentPlanningPage() {
                           <IconCheck size={14} stroke={2} /> {p.type === "bedrijfsbezoek" ? "Markeer als geweest" : "Markeer als gegeven"}
                         </button>
                       )}
-                      {/* 446: de mentor stelde een ander moment voor. Toon het voorstel en laat de docent het
-                          bevestigen (of via 'Inplannen' een nieuw moment voorstellen). */}
+                      {/* 480: de mentor stelde een ander moment voor — open de pop-up om te bekijken,
+                          accepteren of een tegenvoorstel te sturen. */}
                       {p.status === "alternatief_gevraagd" && (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
-                          {p.alternatief_voorstel && (
-                            <span className="doc_sub" style={{ fontStyle: "italic", maxWidth: 220 }}>
-                              Mentor: "{p.alternatief_voorstel}"
-                            </span>
-                          )}
-                          <button
-                            className="btn sm primary"
-                            disabled={gegevenId === p.id}
-                            onClick={() => accepteerAlternatief(p.id)}
-                          >
-                            <IconCheck size={14} stroke={2} /> Moment bevestigen
-                          </button>
-                        </div>
+                        <button className="btn sm primary" disabled={gegevenId === p.id} onClick={() => openAltModal(p)}>
+                          <IconCheck size={14} stroke={2} /> Voorstel bekijken
+                        </button>
                       )}
                     </td>
                   </tr>
@@ -369,6 +394,56 @@ export default function DocentPlanningPage() {
                   <IconCalendarPlus size={14} stroke={1.8} /> {bezig ? "Bezig..." : "Inplannen"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 480: docent bekijkt het mentor-alternatief — accepteren of tegenvoorstel sturen */}
+      {altModal && (
+        <div className="modal_overlay" onClick={() => setAltModal(null)}>
+          <div className="modal_box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal_header">
+              <span className="modal_title">Voorstel van de mentor</span>
+              <button className="icon_btn" onClick={() => setAltModal(null)}><IconX size={16} stroke={1.8} /></button>
+            </div>
+            <div className="modal_body">
+              <p style={{ fontSize: 13, color: "var(--sub)", marginTop: 0 }}>
+                De mentor stelde een ander moment voor {altModal.type === "eindpresentatie" ? "de eindpresentatie" : "het bedrijfsbezoek"} voor.
+              </p>
+              {altModal.alternatief_voorstel && (
+                <div className="card" style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 11.5, color: "var(--faint)" }}>Toelichting mentor</div>
+                  <div style={{ fontSize: 13, fontStyle: "italic" }}>"{altModal.alternatief_voorstel}"</div>
+                  {altModal.alternatief_gepland_op && (
+                    <div style={{ fontSize: 12.5, marginTop: 6 }}>Voorgesteld: <strong>{formatDateTime(altModal.alternatief_gepland_op)}</strong>{altModal.alternatief_locatie ? ` · ${altModal.alternatief_locatie}` : ""}</div>
+                  )}
+                </div>
+              )}
+              <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>Accepteer het voorstel, of stuur een tegenvoorstel:</div>
+              <div className="form_group">
+                <label className="form_label">Plaats</label>
+                <input className="form_input" type="text" value={altCounterPlaats} onChange={(e) => setAltCounterPlaats(e.target.value)} />
+              </div>
+              <div style={{ display: "flex", gap: 10 }}>
+                <div className="form_group" style={{ flex: 1 }}>
+                  <label className="form_label">Datum</label>
+                  <input className="form_input" type="date" value={altCounterDatum} onChange={(e) => setAltCounterDatum(e.target.value)} />
+                </div>
+                <div className="form_group" style={{ width: 120 }}>
+                  <label className="form_label">Uur</label>
+                  <input className="form_input" type="time" step="900" value={altCounterUur} onChange={(e) => setAltCounterUur(e.target.value)} />
+                </div>
+              </div>
+            </div>
+            <div className="modal_footer" style={{ flexWrap: "wrap", gap: 8 }}>
+              <button className="btn" onClick={() => setAltModal(null)}>Annuleren</button>
+              <button className="btn" disabled={gegevenId === altModal.id} onClick={() => stuurTegenvoorstel(altModal.id)}>
+                <IconCalendarPlus size={14} stroke={1.8} /> Tegenvoorstel sturen
+              </button>
+              <button className="btn primary" disabled={gegevenId === altModal.id} onClick={() => accepteerAlternatief(altModal.id)}>
+                <IconCheck size={14} stroke={2} /> Voorstel accepteren
+              </button>
             </div>
           </div>
         </div>

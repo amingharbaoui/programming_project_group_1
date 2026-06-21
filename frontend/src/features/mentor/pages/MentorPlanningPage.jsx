@@ -52,6 +52,9 @@ export default function MentorPlanningPage() {
   const [bezig, setBezig] = useState(null); // momentId dat actief is
   const [alternatifOpen, setAlternatifOpen] = useState(null); // momentId waarvan modal open is
   const [alternatifTekst, setAlternatifTekst] = useState("");
+  const [altDatum, setAltDatum] = useState("");
+  const [altUur, setAltUur] = useState("10:00");
+  const [altPlaats, setAltPlaats] = useState("");
   const [melding, setMelding] = useState({ id: null, tekst: "", type: "" });
 
   useEffect(() => {
@@ -119,13 +122,28 @@ export default function MentorPlanningPage() {
     }
   }
 
+  function openAlternatief(moment) {
+    setAlternatifOpen(moment.id);
+    setAlternatifTekst("");
+    // Voorvullen met het huidige moment zodat de mentor enkel hoeft aan te passen.
+    const d = moment.gepland_op ? new Date(moment.gepland_op) : null;
+    setAltDatum(d ? d.toISOString().slice(0, 10) : "");
+    setAltUur(d ? d.toTimeString().slice(0, 5) : "10:00");
+    setAltPlaats(moment.locatie || "");
+  }
+
   async function handleAlternatief(momentId) {
-    if (!alternatifTekst.trim()) return;
+    if (!alternatifTekst.trim()) { setMelding({ id: momentId, tekst: "Geef een korte reden of toelichting.", type: "s_rood" }); return; }
+    if (!altDatum) { setMelding({ id: momentId, tekst: "Kies een datum voor je voorstel.", type: "s_rood" }); return; }
     try {
       setBezig(momentId);
       setMelding({ id: null, tekst: "", type: "" });
-      await api.patch(`/mentor/planning/${momentId}/alternatief`, { bericht: alternatifTekst });
-      setMelding({ id: momentId, tekst: "Alternatief voorstel verstuurd. De docent plant het moment opnieuw in.", type: "s_ok" });
+      await api.patch(`/mentor/planning/${momentId}/alternatief`, {
+        bericht: alternatifTekst,
+        geplandOp: `${altDatum}T${altUur || "00:00"}`,
+        locatie: altPlaats || null,
+      });
+      setMelding({ id: momentId, tekst: "Alternatief voorstel verstuurd. De docent bekijkt je voorstel.", type: "s_ok" });
       setAlternatifOpen(null);
       setAlternatifTekst("");
       cacheDelete(`mentor_planning_${geselecteerdDossier}`);
@@ -241,33 +259,53 @@ export default function MentorPlanningPage() {
             )}
 
             {teBevestigen && (
-              <div style={{ marginTop: 12 }}>
-                {!isAlternatifOpen ? (
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                    <button className="btn primary" disabled={bezig === moment.id} onClick={() => handleBevestig(moment.id)}>
-                      <i className="ti ti-check" />{bezig === moment.id ? "Bezig..." : "Bevestigen"}
-                    </button>
-                    <button className="btn sm" disabled={bezig === moment.id} onClick={() => { setAlternatifOpen(moment.id); setAlternatifTekst(""); }}>
-                      <i className="ti ti-calendar-x" />Ander moment voorstellen
+              <div style={{ marginTop: 12, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button className="btn primary" disabled={bezig === moment.id} onClick={() => handleBevestig(moment.id)}>
+                  <i className="ti ti-check" />{bezig === moment.id ? "Bezig..." : "Bevestigen"}
+                </button>
+                <button className="btn sm" disabled={bezig === moment.id} onClick={() => openAlternatief(moment)}>
+                  <i className="ti ti-calendar-x" />Ander moment voorstellen
+                </button>
+              </div>
+            )}
+
+            {isAlternatifOpen && (
+              <div className="modal_overlay" onClick={() => setAlternatifOpen(null)}>
+                <div className="modal_box" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+                  <div className="modal_header">
+                    <span className="modal_title">Ander moment voorstellen</span>
+                    <button className="icon_btn" onClick={() => setAlternatifOpen(null)}><i className="ti ti-x" /></button>
+                  </div>
+                  <div className="modal_body">
+                    <div className="form_group">
+                      <label className="form_label">Plaats</label>
+                      <input className="form_input" type="text" placeholder="bv. Bij het bedrijf of Online (Teams)" value={altPlaats} onChange={(e) => setAltPlaats(e.target.value)} />
+                    </div>
+                    <div style={{ display: "flex", gap: 10 }}>
+                      <div className="form_group" style={{ flex: 1 }}>
+                        <label className="form_label">Datum <span style={{ color: "var(--red)" }}>*</span></label>
+                        <input className="form_input" type="date" value={altDatum} onChange={(e) => setAltDatum(e.target.value)} />
+                      </div>
+                      <div className="form_group" style={{ width: 120 }}>
+                        <label className="form_label">Uur <span style={{ color: "var(--red)" }}>*</span></label>
+                        <input className="form_input" type="time" step="900" value={altUur} onChange={(e) => setAltUur(e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="form_group">
+                      <label className="form_label">Toelichting / reden <span style={{ color: "var(--red)" }}>*</span></label>
+                      <textarea className="form_input" style={{ minHeight: 60, fontSize: 12.5 }} placeholder="Waarom stel je een ander moment voor?" value={alternatifTekst} onChange={(e) => setAlternatifTekst(e.target.value)} />
+                    </div>
+                    {melding.id === moment.id && melding.tekst && melding.type === "s_rood" && (
+                      <span className="status s_rood">{melding.tekst}</span>
+                    )}
+                  </div>
+                  <div className="modal_footer">
+                    <button className="btn" onClick={() => setAlternatifOpen(null)}>Annuleren</button>
+                    <button className="btn primary" disabled={bezig === moment.id} onClick={() => handleAlternatief(moment.id)}>
+                      <i className="ti ti-send" />{bezig === moment.id ? "Versturen..." : "Voorstel versturen"}
                     </button>
                   </div>
-                ) : (
-                  <>
-                    <textarea
-                      className="form_input"
-                      style={{ minHeight: 52, fontSize: 12.5, marginBottom: 8 }}
-                      placeholder="Geef een alternatief moment of reden op..."
-                      value={alternatifTekst}
-                      onChange={(e) => setAlternatifTekst(e.target.value)}
-                    />
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button className="btn primary" disabled={bezig === moment.id || !alternatifTekst.trim()} onClick={() => handleAlternatief(moment.id)}>
-                        <i className="ti ti-send" />{bezig === moment.id ? "Versturen..." : "Versturen"}
-                      </button>
-                      <button className="btn" onClick={() => setAlternatifOpen(null)}>Annuleren</button>
-                    </div>
-                  </>
-                )}
+                </div>
               </div>
             )}
           </div>

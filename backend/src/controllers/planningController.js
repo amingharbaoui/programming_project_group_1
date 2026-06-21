@@ -117,7 +117,9 @@ async function createPlanningMoment(req, res, type) {
       return fail(res, 409, `Er is al een actief ${label} ingepland; pas dat moment aan of annuleer het eerst.`);
     }
 
-    const status = type === "bedrijfsbezoek" ? "voorgesteld" : "gepland";
+    // 477: ook een eindpresentatie start als 'voorgesteld' (niet 'gepland'), zodat de student ze pas ziet
+    // nadat de mentor bevestigd heeft — net als het bedrijfsbezoek.
+    const status = "voorgesteld";
     const [result] = await db.query(
       `
       INSERT INTO planning_momenten
@@ -219,6 +221,15 @@ async function updateDocentPlanning(req, res) {
     fields.push("pm.status = ?");
     values.push(status);
   }
+  // 480: accepteert de docent het mentor-alternatief, dan wordt dat voorgestelde moment het officiële.
+  const accepteertAlternatief = status === "bevestigd" && huidigeStatus === "alternatief_gevraagd";
+  if (accepteertAlternatief) {
+    fields.push("pm.gepland_op = COALESCE(pm.alternatief_gepland_op, pm.gepland_op)");
+    fields.push("pm.locatie = COALESCE(pm.alternatief_locatie, pm.locatie)");
+    fields.push("pm.alternatief_gepland_op = NULL");
+    fields.push("pm.alternatief_locatie = NULL");
+    fields.push("pm.alternatief_voorstel = NULL");
+  }
   if (verslag !== undefined) {
     fields.push("pm.verslag = ?");
     values.push(verslag || null);
@@ -230,25 +241,32 @@ async function updateDocentPlanning(req, res) {
 
   if (fields.length === 0) return fail(res, 400, "Geen wijzigingen meegegeven");
 
+  const runUpdate = (setFields) => db.query(
+    `UPDATE planning_momenten pm
+     JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
+     SET ${setFields.join(", ")}, pm.aangepast_op = NOW()
+     WHERE pm.id = ? AND sd.stagebegeleider_id = ? AND pm.status = ?`,
+    [...values, planningId, docentId, huidigeStatus]
+  );
+
   try {
-    // Optimistische concurrency: enkel updaten als de status nog gelijk is aan wat we net lazen, zodat
-    // een gelijktijdige mentor-/docentactie niet o.b.v. een stale status overschreven wordt (393).
-    const [result] = await db.query(
-      `
-      UPDATE planning_momenten pm
-      JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
-      SET ${fields.join(", ")}, pm.aangepast_op = NOW()
-      WHERE pm.id = ? AND sd.stagebegeleider_id = ? AND pm.status = ?
-      `,
-      [...values, planningId, docentId, huidigeStatus]
-    );
+    // Optimistische concurrency: enkel updaten als de status nog gelijk is aan wat we net lazen (393).
+    let result;
+    try {
+      [result] = await runUpdate(fields);
+    } catch (kolomError) {
+      if (kolomError.code !== "ER_BAD_FIELD_ERROR") throw kolomError;
+      // patch_planning_alternatief.sql nog niet uitgevoerd → de alternatief-kopieervelden weglaten.
+      [result] = await runUpdate(fields.filter((f) => !f.includes("alternatief")));
+    }
 
     if (result.affectedRows === 0) return fail(res, 409, "Dit planningmoment is ondertussen gewijzigd; vernieuw de pagina");
 
-    // Student en mentor verwittigen van de wijziging.
+    // 488: de student krijgt enkel een melding bij een bevestigd/afgehandeld moment (niet bij elke tussentijdse
+    // wijziging tijdens de docent↔mentor-loop). De mentor wordt wel van wijzigingen op de hoogte gehouden.
     try {
       const [info] = await db.query(
-        `SELECT pm.type, pm.stagedossier_id, sd.student_id, sd.mentor_id
+        `SELECT pm.type, pm.status, pm.stagedossier_id, sd.student_id, sd.mentor_id
          FROM planning_momenten pm JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
          WHERE pm.id = ? LIMIT 1`,
         [planningId]
@@ -256,10 +274,14 @@ async function updateDocentPlanning(req, res) {
       const moment = info[0];
       if (moment) {
         const label = moment.type === "eindpresentatie" ? "de eindpresentatie" : "het bedrijfsbezoek";
-        for (const ontvangerId of [moment.student_id, moment.mentor_id].filter(Boolean)) {
+        const studentMag = ["bevestigd", "gegeven", "geweest"].includes(moment.status);
+        const ontvangers = [moment.mentor_id, ...(studentMag ? [moment.student_id] : [])].filter(Boolean);
+        for (const ontvangerId of ontvangers) {
           await meld(ontvangerId, {
-            titel: "Planning bijgewerkt",
-            bericht: `De docent heeft ${label} bijgewerkt.`,
+            titel: moment.status === "bevestigd" ? "Planningmoment bevestigd" : "Planning bijgewerkt",
+            bericht: moment.status === "bevestigd"
+              ? `${label[0].toUpperCase() + label.slice(1)} is bevestigd.`
+              : `De docent heeft ${label} bijgewerkt.`,
             aangemaaktDoorId: docentId,
             stagedossierId: moment.stagedossier_id
           });
@@ -329,7 +351,7 @@ async function confirmMentorPlanning(req, res) {
 async function proposeAlternative(req, res) {
   const mentorId = getUserId(req);
   const planningId = Number(req.params.id);
-  const { alternatief, reden, bericht, geplandOp, datum } = req.body;
+  const { alternatief, reden, bericht, geplandOp, datum, locatie } = req.body;
   const tekst = alternatief || reden || bericht;
   const geplandOpFinal = normalizeDateTime(geplandOp || datum);
 
@@ -344,19 +366,27 @@ async function proposeAlternative(req, res) {
     if (!["voorgesteld", "gepland"].includes(dossier.planning_status)) return fail(res, 409, "Dit moment kan in de huidige status niet meer aangepast worden");
     const isPresentatie = dossier.planning_type === "eindpresentatie";
 
+    // 479: het alternatief apart bewaren — de officiële gepland_op/locatie wijzigt pas als de docent accepteert.
     // Conditioneel op de status zodat een dubbelklik of een gelijktijdige docentwijziging niet overschrijft (393).
-    const [altResult] = await db.query(
-      `
-      UPDATE planning_momenten
-      SET status = 'alternatief_gevraagd',
-          alternatief_voorstel = ?,
-          gepland_op = COALESCE(?, gepland_op),
-          bevestigd_door_id = ?,
-          aangepast_op = NOW()
-      WHERE id = ? AND status IN ('voorgesteld', 'gepland')
-      `,
-      [tekst || null, geplandOpFinal, mentorId, planningId]
-    );
+    let altResult;
+    try {
+      [altResult] = await db.query(
+        `UPDATE planning_momenten
+         SET status = 'alternatief_gevraagd', alternatief_voorstel = ?, alternatief_gepland_op = ?,
+             alternatief_locatie = ?, bevestigd_door_id = ?, aangepast_op = NOW()
+         WHERE id = ? AND status IN ('voorgesteld', 'gepland')`,
+        [tekst || null, geplandOpFinal, locatie || null, mentorId, planningId]
+      );
+    } catch (kolomError) {
+      if (kolomError.code !== "ER_BAD_FIELD_ERROR") throw kolomError;
+      // patch_planning_alternatief.sql nog niet uitgevoerd → enkel de tekst bewaren, officieel moment ongemoeid.
+      [altResult] = await db.query(
+        `UPDATE planning_momenten
+         SET status = 'alternatief_gevraagd', alternatief_voorstel = ?, bevestigd_door_id = ?, aangepast_op = NOW()
+         WHERE id = ? AND status IN ('voorgesteld', 'gepland')`,
+        [tekst || null, mentorId, planningId]
+      );
+    }
     if (altResult.affectedRows === 0) return fail(res, 409, "Dit planningmoment is ondertussen gewijzigd; vernieuw de pagina");
 
     const altLabel = isPresentatie ? "de eindpresentatie" : "het bedrijfsbezoek";
