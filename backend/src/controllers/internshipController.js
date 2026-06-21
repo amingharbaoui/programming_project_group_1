@@ -911,11 +911,19 @@ async function decideApplication(req, res) {
 
     await connection.query(updateSql, updateParams);
 
+    const pendingMails = [];
     if (isGoedkeuring) {
-      await createDossierAfterApproval(connection, stagevoorstelId);
+      await createDossierAfterApproval(connection, stagevoorstelId, pendingMails);
     }
 
     await connection.commit();
+
+    // Externe mentoruitnodigingsmails pas NA de commit versturen (auditpunt 326): best-effort, mag de
+    // afgeronde goedkeuring nooit breken.
+    for (const mail of pendingMails) {
+      try { await sendMail(mail); }
+      catch (mailError) { console.error("Mentor-uitnodigingsmail mislukt:", mailError.message); }
+    }
 
     // Student verwittigen van de beslissing.
     try {
@@ -965,7 +973,7 @@ async function decideApplication(req, res) {
   }
 }
 
-async function createDossierAfterApproval(connection, stagevoorstelId) {
+async function createDossierAfterApproval(connection, stagevoorstelId, pendingMails = []) {
   const [existing] = await connection.query(
     "SELECT id FROM stagedossiers WHERE stagevoorstel_id = ? LIMIT 1",
     [stagevoorstelId]
@@ -1034,24 +1042,22 @@ async function createDossierAfterApproval(connection, stagevoorstelId) {
         [nieuweToken, mentorId]
       );
       const activatielink = `/mentor/activate?token=${nieuweToken}`;
-      try {
-        const volledigeLink = `${process.env.APP_URL || "http://localhost:5173"}${activatielink}`;
-        await sendMail({
-          to: data.mentor_email,
-          subject: "Uitnodiging als mentor — Stagify",
-          text: `Je bent uitgenodigd als mentor op Stagify.\n\nActiveer je account en kies een wachtwoord via:\n${volledigeLink}\n\nDeze link is 14 dagen geldig.`,
-          html: buildMailHtml({
-            title: "Uitnodiging als mentor",
-            body: `<p>Hallo,</p>
-                   <p>Je bent uitgenodigd als mentor op het stageplatform van <strong>Stagify</strong>.</p>
-                   <p>Klik op de knop hieronder om je account te activeren en een wachtwoord in te stellen. Deze link is <strong>14 dagen</strong> geldig.</p>`,
-            buttonText: "Account activeren",
-            buttonUrl: volledigeLink,
-          }),
-        });
-      } catch (mailError) {
-        console.error("Mentor-uitnodigingsmail (hernieuwd) mislukt:", mailError.message);
-      }
+      // Mail pas versturen NA de commit (auditpunt 326): anders kan de mentor een link krijgen naar
+      // een token/account dat door een rollback nooit bestaat.
+      const volledigeLink = `${process.env.APP_URL || "http://localhost:5173"}${activatielink}`;
+      pendingMails.push({
+        to: data.mentor_email,
+        subject: "Uitnodiging als mentor — Stagify",
+        text: `Je bent uitgenodigd als mentor op Stagify.\n\nActiveer je account en kies een wachtwoord via:\n${volledigeLink}\n\nDeze link is 14 dagen geldig.`,
+        html: buildMailHtml({
+          title: "Uitnodiging als mentor",
+          body: `<p>Hallo,</p>
+                 <p>Je bent uitgenodigd als mentor op het stageplatform van <strong>Stagify</strong>.</p>
+                 <p>Klik op de knop hieronder om je account te activeren en een wachtwoord in te stellen. Deze link is <strong>14 dagen</strong> geldig.</p>`,
+          buttonText: "Account activeren",
+          buttonUrl: volledigeLink,
+        }),
+      });
     }
   }
 
@@ -1094,24 +1100,21 @@ async function createDossierAfterApproval(connection, stagevoorstelId) {
          VALUES (?, 'herinnering', 'medium', ?, ?, 'nieuw', 'in_app', NOW())`,
         [mentorId, "Uitnodiging als mentor", `Je bent uitgenodigd als mentor. Activeer je account via ${activatielink}`]
       );
-      try {
-        const volledigeLink = `${process.env.APP_URL || "http://localhost:5173"}${activatielink}`;
-        await sendMail({
-          to: data.mentor_email,
-          subject: "Uitnodiging als mentor — Stagify",
-          text: `Je bent uitgenodigd als mentor op Stagify.\n\nActiveer je account en kies een wachtwoord via:\n${volledigeLink}\n\nDeze link is 14 dagen geldig.`,
-          html: buildMailHtml({
-            title: "Uitnodiging als mentor",
-            body: `<p>Hallo,</p>
-                   <p>Je bent uitgenodigd als mentor op het stageplatform van <strong>Stagify</strong>.</p>
-                   <p>Klik op de knop hieronder om je account te activeren en een wachtwoord in te stellen. Deze link is <strong>14 dagen</strong> geldig.</p>`,
-            buttonText: "Account activeren",
-            buttonUrl: volledigeLink,
-          }),
-        });
-      } catch (mailError) {
-        console.error("Mentor-uitnodigingsmail mislukt:", mailError.message);
-      }
+      // Mail pas versturen NA de commit (auditpunt 326).
+      const volledigeLink = `${process.env.APP_URL || "http://localhost:5173"}${activatielink}`;
+      pendingMails.push({
+        to: data.mentor_email,
+        subject: "Uitnodiging als mentor — Stagify",
+        text: `Je bent uitgenodigd als mentor op Stagify.\n\nActiveer je account en kies een wachtwoord via:\n${volledigeLink}\n\nDeze link is 14 dagen geldig.`,
+        html: buildMailHtml({
+          title: "Uitnodiging als mentor",
+          body: `<p>Hallo,</p>
+                 <p>Je bent uitgenodigd als mentor op het stageplatform van <strong>Stagify</strong>.</p>
+                 <p>Klik op de knop hieronder om je account te activeren en een wachtwoord in te stellen. Deze link is <strong>14 dagen</strong> geldig.</p>`,
+          buttonText: "Account activeren",
+          buttonUrl: volledigeLink,
+        }),
+      });
     }
   }
   if (!mentorId) {
@@ -1638,6 +1641,8 @@ async function generateEindoverzicht(req, res) {
   if (!dossierId) return fail(res, 400, "Ongeldig dossier-id");
 
   const conn = await db.getConnection();
+  // Pad van een NIEUW geschreven PDF; bij rollback opruimen zodat er geen wees-bestand achterblijft (323).
+  let nieuwePdfPad = null;
   try {
     await conn.beginTransaction();
 
@@ -1698,7 +1703,9 @@ async function generateEindoverzicht(req, res) {
       `Gegenereerd op: ${new Date().toISOString().slice(0, 10)}`
     ];
 
+    const pdfBestondAl = fs.existsSync(filePath);
     fs.writeFileSync(filePath, buildSimplePdf(lines));
+    if (!pdfBestondAl) nieuwePdfPad = filePath; // enkel een vers aangemaakt bestand mogen we bij rollback wissen
 
     const documentSoortId = await ensureDocumentType(conn, "eindoverzicht", "Eindoverzicht");
     const [docResult] = await conn.query(
@@ -1752,6 +1759,7 @@ async function generateEindoverzicht(req, res) {
     );
   } catch (error) {
     await conn.rollback();
+    if (nieuwePdfPad) { try { fs.unlinkSync(nieuwePdfPad); } catch { /* al weg */ } }
     return fail(res, 500, "Eindoverzicht genereren mislukt", error.message);
   } finally {
     conn.release();
