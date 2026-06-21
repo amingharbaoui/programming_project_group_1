@@ -41,6 +41,12 @@ const STATUS_CONFIG = {
 const CONTRACT_STATES  = ["wacht_op_student", "wacht_op_bedrijf", "in_controle_bij_administratie", "document_afgekeurd", "geregistreerd"];
 const AFSLUITING_STATES = ["resultaat_vrijgegeven", "afgerond"];
 
+function fileExt(naam) {
+  if (!naam) return "";
+  const dot = naam.lastIndexOf(".");
+  return dot !== -1 ? naam.slice(dot).toLowerCase() : "";
+}
+
 function fmtDate(iso) {
   if (!iso) return null;
   const d = new Date(iso);
@@ -388,7 +394,6 @@ export default function DossierDetailPage() {
           <span className="k">Stagebegeleider</span>
           <span className="v">
             {docent || "—"}
-            {docent && <span className="dd_muted"> · definitief gekoppeld</span>}
             {dossier.docent_email && <span className="dd_muted"> · {dossier.docent_email}</span>}
           </span>
         </div>
@@ -560,8 +565,8 @@ export default function DossierDetailPage() {
                       {doc.is_verplicht ? " · verplicht" : " · optioneel"}
                     </span>
                   </div>
-                  {doc.bestand_naam && (
-                    <div className="dd_doc_ctrl_meta">{doc.bestand_naam}</div>
+                  {doc.bestand_naam && doc.status !== "ontbreekt" && (
+                    <div className="dd_doc_ctrl_meta">{doc.naam}{fileExt(doc.bestand_naam)}</div>
                   )}
                   {doc.afkeurreden && (
                     <div className="dd_doc_ctrl_reden">{doc.afkeurreden}</div>
