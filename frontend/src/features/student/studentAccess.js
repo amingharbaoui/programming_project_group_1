@@ -126,6 +126,9 @@ export const STUDENT_FASES = {
 
 function normaliseerVoorstelStatus(status) {
   if (status === "aanpassingen_gevraagd") return "aanpassingen";
+  // Goedgekeurd met uitzondering is functioneel goedgekeurd: de backend maakt al een dossier aan, dus
+  // de student hoort dezelfde flow te krijgen (contract/documenten/...) i.p.v. een lege pagina (340).
+  if (status === "goedgekeurd_met_uitzondering") return "goedgekeurd";
   return status || "geen";
 }
 

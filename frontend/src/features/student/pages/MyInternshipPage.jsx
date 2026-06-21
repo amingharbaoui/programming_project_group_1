@@ -374,7 +374,10 @@ export default function MyInternshipPage() {
     );
   }
 
-  const currentStatus = internship?.status || (location.state?.ingediend ? "ingediend" : null);
+  const rawStatus = internship?.status || (location.state?.ingediend ? "ingediend" : null);
+  // Goedgekeurd met uitzondering volgt exact dezelfde studentflow als goedgekeurd; anders matcht geen
+  // hoofdblok en krijgt de student een lege pagina na die beslissing (auditpunt 340).
+  const currentStatus = rawStatus === "goedgekeurd_met_uitzondering" ? "goedgekeurd" : rawStatus;
   const dossierStatus = internship?.dossier_status ?? internship?.dossierStatus ?? null;
   const heeftVoorstel = !!internship || location.state?.ingediend;
   const isConcept     = currentStatus === "concept";
