@@ -693,7 +693,10 @@ async function getMyInternship(req, res) {
         d.status AS dossier_status,
         d.praktische_afspraken,
         d.praktische_afspraken_gedeeld_op,
-        st.academiejaar
+        st.academiejaar,
+
+        CONCAT(gd.voornaam, ' ', gd.achternaam) AS stagebegeleider_naam,
+        gd.email AS stagebegeleider_email
       FROM stagevoorstellen sp
       JOIN stagevoorstel_versies v
         ON v.stagevoorstel_id = sp.id
@@ -708,6 +711,7 @@ async function getMyInternship(req, res) {
           LIMIT 1
         )
       LEFT JOIN stagedossiers d ON d.stagevoorstel_id = sp.id
+      LEFT JOIN gebruikers gd ON gd.id = d.stagebegeleider_id
       WHERE sp.student_id = ?
       ORDER BY sp.aangemaakt_op DESC
       LIMIT 1
