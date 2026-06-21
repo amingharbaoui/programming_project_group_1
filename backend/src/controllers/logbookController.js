@@ -1101,7 +1101,7 @@ async function saveLogbookDay(req, res) {
     await conn.beginTransaction();
 
     const [dossiers] = await conn.query(
-      "SELECT id, status, startdatum, einddatum, aantal_weken FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1",
+      "SELECT id, status, startdatum, einddatum, aantal_weken, mentor_id FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1",
       [studentId]
     );
     if (dossiers.length === 0) { await conn.rollback(); return fail(res, 404, "Geen stagedossier gevonden"); }
@@ -1205,6 +1205,21 @@ async function saveLogbookDay(req, res) {
     );
 
     await conn.commit();
+
+    // Mentor verwittigen dat de student een dag heeft opgeslagen (story 31).
+    if (dossiers[0].mentor_id && status !== "geen_stagedag") {
+      try {
+        await meld(dossiers[0].mentor_id, {
+          titel: "Logboekdag ingevuld",
+          bericht: `Je stagiair heeft week ${weekNummer} (${datum}) ingevuld en is klaar voor nakijken.`,
+          aangemaaktDoorId: studentId,
+          logboekWeekId: weekId,
+        });
+      } catch (notifyErr) {
+        console.error("Melding dag-opslaan mislukt:", notifyErr.message);
+      }
+    }
+
     return ok(res, { weekId, weekNummer, datum, status }, "Logboekdag opgeslagen");
   } catch (error) {
     await conn.rollback();
@@ -1232,8 +1247,9 @@ async function mentorConfirmLogbookDay(req, res) {
     if (rows.length === 0) return fail(res, 404, "Logboekdag niet gevonden");
     if (Number(rows[0].mentor_id) !== mentorId) return fail(res, 403, "Je bent niet de mentor van deze stagiair");
     if (rows[0].status === "geen_stagedag") return fail(res, 400, "Een dag zonder stage kan niet bevestigd worden");
-    if (rows[0].week_status !== "ingediend") {
-      return fail(res, 409, "Je kan dagen alleen bevestigen wanneer de student de week heeft ingediend");
+    // Bevestigen mag zodra de student de dag opgeslagen heeft (in_opbouw) of de volledige week ingediend heeft.
+    if (!["ingediend", "in_opbouw"].includes(rows[0].week_status)) {
+      return fail(res, 409, "Je kan dagen alleen bevestigen wanneer de student ze heeft opgeslagen of ingediend");
     }
 
     await db.query(

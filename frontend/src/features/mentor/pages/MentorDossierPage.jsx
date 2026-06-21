@@ -453,34 +453,79 @@ export default function MentorDossierPage() {
               </div>
             </div>
 
+            {/* Documenten */}
+            <div className="card">
+              <div className="card_title"><i className="ti ti-folder" style={{ color: "var(--red)" }} />Documenten</div>
+              {contract ? (
+                <div className="kv">
+                  <span className="k" style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <i className="ti ti-file-certificate" />Stageovereenkomst
+                  </span>
+                  <span className="v" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <span style={{ fontSize: 11.5, color: "var(--faint)", fontWeight: 400 }}>
+                      {contract.status === "geregistreerd"
+                        ? `Geregistreerd op ${dat(contract.geregistreerd_op)}`
+                        : contract.bedrijf_getekend_op
+                        ? "Volledig ondertekend — in controle bij administratie"
+                        : "Wacht op ondertekening"}
+                    </span>
+                    <button className="btn sm" onClick={downloadContractPdf}><i className="ti ti-eye" />Bekijk</button>
+                  </span>
+                </div>
+              ) : (
+                <p style={{ fontSize: 12.5, color: "var(--faint)" }}>Nog geen documenten beschikbaar.</p>
+              )}
+            </div>
+
             {/* Uitklapbaar stagedossier */}
             {student && (
               <div className="dossier">
                 <button className={`dossier-kop ${dossierOpen ? "open" : ""}`} onClick={() => setDossierOpen((v) => !v)}>
-                  <i className="ti ti-chevron-right" />Stagedossier — stage en betrokkenen
+                  <i className="ti ti-chevron-right" />Stagedossier — stage, betrokkenen en opdracht
                 </button>
                 <div className={`dossier-body ${dossierOpen ? "open" : ""}`}>
                   <div className="grid-2c">
                     <div className="card">
                       <div className="card_title"><i className="ti ti-briefcase" style={{ color: "var(--red)" }} />Stage</div>
                       <div className="kv"><span className="k">Bedrijf</span><span className="v">{student.bedrijf || "-"}</span></div>
+                      <div className="kv"><span className="k">Periode</span><span className="v">{dat(student.startdatum)} – {dat(student.einddatum)}</span></div>
+                      <div className="kv"><span className="k">Omvang</span><span className="v">{student.aantal_weken || "-"} weken · {student.uren_per_week || 36}u/week</span></div>
                       <div className="kv"><span className="k">Studentennummer</span><span className="v">{student.studentennummer || "-"}</span></div>
-                      <div className="kv"><span className="k">Dossier</span><span className="v">#{student.dossier_id}</span></div>
                     </div>
                     <div className="card">
                       <div className="card_title"><i className="ti ti-users" style={{ color: "var(--red)" }} />Betrokkenen</div>
                       <div className="prof">
                         <div className="prof-av">{initialen(naam)}</div>
-                        <div style={{ minWidth: 0 }}><div className="p-naam">{naam} <span className="tag">student</span></div></div>
+                        <div style={{ minWidth: 0 }}>
+                          <div className="p-naam">{naam} <span className="tag">student</span></div>
+                          {student.email && <div className="p-mail">{student.email}</div>}
+                        </div>
                       </div>
                       {docentNaam && (
                         <div className="prof">
                           <div className="prof-av" style={{ background: "#0a0a0a" }}>{initialen(docentNaam)}</div>
-                          <div style={{ minWidth: 0 }}><div className="p-naam">{docentNaam} <span className="tag">docent</span></div></div>
+                          <div style={{ minWidth: 0 }}>
+                            <div className="p-naam">{docentNaam} <span className="tag">docent</span></div>
+                          </div>
                         </div>
                       )}
                     </div>
                   </div>
+                  {student.omschrijving && (
+                    <div className="card">
+                      <div className="card_title">
+                        <i className="ti ti-file-description" style={{ color: "var(--red)" }} />Opdracht
+                        <span style={{ fontSize: 11, color: "var(--faint)", fontWeight: 400, marginLeft: "auto" }}>uit het goedgekeurde stagevoorstel van de student</span>
+                      </div>
+                      <div style={{ display: "flex", gap: 10 }}>
+                        <div className="prof-av" style={{ width: 26, height: 26, fontSize: 10, flexShrink: 0 }}>{initialen(naam)}</div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 600 }}>{naam} <span className="tag">student</span></div>
+                          <p style={{ fontSize: 13, lineHeight: 1.65, color: "var(--sub)", marginTop: 3 }}>"{student.omschrijving}"</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

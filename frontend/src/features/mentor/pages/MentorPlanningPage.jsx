@@ -140,32 +140,27 @@ export default function MentorPlanningPage() {
   const geselecteerdeStudent = studenten.find((s) => s.dossier_id === geselecteerdDossier);
 
   return (
-    <div className="page_inner">
-      <div className="page_header">
-        <div>
-          <h1>Planning</h1>
-          <p>Bekijk geplande bezoeken en bevestig of stel een alternatief voor.</p>
-        </div>
+    <div className="page-inner">
+      <div className="page-header">
+        <h1>Planning</h1>
+        <p>Bekijk geplande bezoeken en bevestig of stel een alternatief voor</p>
       </div>
 
-      {/* Student selector */}
-      {!loading && studenten.length > 0 && (
-        <div className="card" style={{ marginBottom: "12px" }}>
-          <div className="card_title">Stagiair kiezen</div>
-          <div className="form_group" style={{ marginBottom: 0 }}>
-            <label className="form_label">Stagiair</label>
-            <select
-              className="form_input"
-              value={geselecteerdDossier || ""}
-              onChange={(e) => { const v = Number(e.target.value); setGeselecteerdDossier(v); onthoudMentorDossier(v); }}
-            >
-              {studenten.map((s) => (
-                <option key={s.dossier_id} value={s.dossier_id}>
-                  {s.voornaam} {s.achternaam} — {s.bedrijf}
-                </option>
-              ))}
-            </select>
-          </div>
+      {/* Student selector — enkel bij meerdere stagiairs */}
+      {!loading && studenten.length > 1 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div className="card_title">Stagiair</div>
+          <select
+            className="form_input"
+            value={geselecteerdDossier || ""}
+            onChange={(e) => { const v = Number(e.target.value); setGeselecteerdDossier(v); onthoudMentorDossier(v); }}
+          >
+            {studenten.map((s) => (
+              <option key={s.dossier_id} value={s.dossier_id}>
+                {s.voornaam} {s.achternaam} — {s.bedrijf}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -192,10 +187,7 @@ export default function MentorPlanningPage() {
           <div
             key={moment.id}
             className="card"
-            style={{
-              marginBottom: "12px",
-              borderColor: teBevestigen ? "var(--red)" : undefined,
-            }}
+            style={teBevestigen ? { marginBottom: 12, border: "1.5px solid #0a0a0a", boxShadow: "0 4px 14px rgba(0,0,0,.10)" } : { marginBottom: 12 }}
           >
             <div className="card_title">
               <i className="ti ti-calendar" style={{ color: "var(--red)" }} />
@@ -246,49 +238,32 @@ export default function MentorPlanningPage() {
             )}
 
             {teBevestigen && (
-              <div className="actions" style={{ marginTop: "12px" }}>
+              <div style={{ marginTop: 12 }}>
                 {!isAlternatifOpen ? (
-                  <>
-                    <button
-                      className="btn primary"
-                      disabled={bezig === moment.id}
-                      onClick={() => handleBevestig(moment.id)}
-                    >
-                      <i className="ti ti-check" /> {bezig === moment.id ? "Bezig..." : "Bevestigen"}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button className="btn primary" disabled={bezig === moment.id} onClick={() => handleBevestig(moment.id)}>
+                      <i className="ti ti-check" />{bezig === moment.id ? "Bezig..." : "Bevestigen"}
                     </button>
-                    <button
-                      className="btn"
-                      disabled={bezig === moment.id}
-                      onClick={() => { setAlternatifOpen(moment.id); setAlternatifTekst(""); }}
-                    >
-                      <i className="ti ti-calendar-x" /> Ander moment voorstellen
+                    <button className="btn sm" disabled={bezig === moment.id} onClick={() => { setAlternatifOpen(moment.id); setAlternatifTekst(""); }}>
+                      <i className="ti ti-calendar-x" />Ander moment voorstellen
                     </button>
-                  </>
-                ) : (
-                  <div style={{ width: "100%" }}>
-                    <div className="form_group">
-                      <label className="form_label">Jouw voorstel</label>
-                      <textarea
-                        className="form_textarea"
-                        placeholder="Geef een alternatief moment of reden op..."
-                        value={alternatifTekst}
-                        onChange={(e) => setAlternatifTekst(e.target.value)}
-                        rows={3}
-                      />
-                    </div>
-                    <div className="actions">
-                      <button
-                        className="btn primary"
-                        disabled={bezig === moment.id || !alternatifTekst.trim()}
-                        onClick={() => handleAlternatief(moment.id)}
-                      >
-                        {bezig === moment.id ? "Versturen..." : "Versturen"}
-                      </button>
-                      <button className="btn" onClick={() => setAlternatifOpen(null)}>
-                        Annuleren
-                      </button>
-                    </div>
                   </div>
+                ) : (
+                  <>
+                    <textarea
+                      className="form_input"
+                      style={{ minHeight: 52, fontSize: 12.5, marginBottom: 8 }}
+                      placeholder="Geef een alternatief moment of reden op..."
+                      value={alternatifTekst}
+                      onChange={(e) => setAlternatifTekst(e.target.value)}
+                    />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button className="btn primary" disabled={bezig === moment.id || !alternatifTekst.trim()} onClick={() => handleAlternatief(moment.id)}>
+                        <i className="ti ti-send" />{bezig === moment.id ? "Versturen..." : "Versturen"}
+                      </button>
+                      <button className="btn" onClick={() => setAlternatifOpen(null)}>Annuleren</button>
+                    </div>
+                  </>
                 )}
               </div>
             )}
