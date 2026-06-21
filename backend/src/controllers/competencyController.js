@@ -117,6 +117,16 @@ async function updateCompetency(req, res) {
     return fail(res, 400, "Ongeldig competentie-id");
   }
 
+  // Een actief profiel is read-only zodat lopende evaluaties niet stilzwijgend wijzigen — bewerk een concept-versie.
+  const [prof] = await db.query(
+    `SELECT p.status FROM competenties c JOIN competentie_profielen p ON p.id = c.competentie_profiel_id WHERE c.id = ? LIMIT 1`,
+    [id]
+  );
+  if (prof.length === 0) return fail(res, 404, "Competentie niet gevonden");
+  if (prof[0].status === "actief") {
+    return fail(res, 409, "Een actief competentieprofiel is read-only; dupliceer het en pas de nieuwe versie aan");
+  }
+
   const { naam, beschrijving, gewichtPercentage, gewicht_percentage, volgorde, isActief, is_actief } = req.body;
 
   const fields = [];
@@ -213,6 +223,16 @@ async function deleteCompetency(req, res) {
     return fail(res, 400, "Ongeldig competentie-id");
   }
 
+  // Een actief profiel is read-only — verwijderen mag enkel op een concept-versie.
+  const [prof] = await db.query(
+    `SELECT p.status FROM competenties c JOIN competentie_profielen p ON p.id = c.competentie_profiel_id WHERE c.id = ? LIMIT 1`,
+    [id]
+  );
+  if (prof.length === 0) return fail(res, 404, "Competentie niet gevonden");
+  if (prof[0].status === "actief") {
+    return fail(res, 409, "Een actief competentieprofiel is read-only; dupliceer het en pas de nieuwe versie aan");
+  }
+
   try {
     const [result] = await db.query(
       "DELETE FROM competenties WHERE id = ?",
@@ -256,6 +276,18 @@ async function createNewVersion(req, res) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
+
+    // Veiligheid: nooit een profiel resetten waarvan al evaluatiescores bestaan — dupliceer dan i.p.v. wissen.
+    const [scoreCount] = await conn.query(
+      `SELECT COUNT(*) AS aantal FROM competentie_scores cs
+       JOIN competenties c ON c.id = cs.competentie_id
+       WHERE c.competentie_profiel_id = ?`,
+      [profielId]
+    );
+    if (Number(scoreCount[0].aantal) > 0) {
+      await conn.rollback();
+      return fail(res, 409, "Dit profiel heeft al evaluaties; gebruik 'dupliceren' om een nieuwe versie te maken");
+    }
 
     // Verwijder alle huidige competenties (scores eerst vanwege FK constraint)
     const [bestaande] = await conn.query(

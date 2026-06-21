@@ -284,9 +284,11 @@ async function createLogbook(req, res) {
         [weekId]
       );
 
-      if (weekStatus[0]?.status === "afgesloten") {
+      // Alleen nog-bewerkbare weken mogen opnieuw ingediend worden — al nagekeken/ingediende weken niet overschrijven.
+      const herindienbaar = ["niet_gestart", "in_opbouw", "teruggestuurd_door_mentor", "teruggestuurd_door_docent"];
+      if (weekStatus.length > 0 && !herindienbaar.includes(weekStatus[0].status)) {
         await connection.rollback();
-        return fail(res, 409, "Deze week is afgesloten en kan niet meer aangepast worden");
+        return fail(res, 409, "Deze week is al ingediend of nagekeken en kan niet opnieuw worden ingediend");
       }
 
       await connection.query(
@@ -695,7 +697,7 @@ async function docentReviewLogbookWeek(req, res) {
     }
 
     // De docent kijkt pas na nadat de mentor de week heeft afgecheckt.
-    if (!["afgecheckt_door_mentor", "goedgekeurd_door_docent", "teruggestuurd_door_docent"].includes(existing[0].status)) {
+    if (!["afgecheckt_door_mentor"].includes(existing[0].status)) {
       return fail(res, 409, "De mentor moet de week eerst afchecken voor de docent ze nakijkt");
     }
 
@@ -757,13 +759,16 @@ async function studentAntwoordFeedback(req, res) {
   try {
     // Controleer of deze week bij de student hoort + haal mentor/docent op voor de melding.
     const [rows] = await db.query(
-      `SELECT lw.id, lw.week_nummer, d.mentor_id, d.stagebegeleider_id
+      `SELECT lw.id, lw.week_nummer, lw.status, d.mentor_id, d.stagebegeleider_id
        FROM logboek_weken lw
        JOIN stagedossiers d ON d.id = lw.stagedossier_id
        WHERE lw.id = ? AND d.student_id = ? LIMIT 1`,
       [weekId, studentId]
     );
     if (rows.length === 0) return fail(res, 403, "Geen toegang tot deze week");
+    if (!["teruggestuurd_door_mentor", "teruggestuurd_door_docent"].includes(rows[0].status)) {
+      return fail(res, 409, "Je kan alleen antwoorden wanneer de week is teruggestuurd voor aanpassing");
+    }
 
     await db.query(
       "UPDATE logboek_weken SET student_antwoord = ?, aangepast_op = NOW() WHERE id = ?",
@@ -1126,7 +1131,7 @@ async function mentorConfirmLogbookDay(req, res) {
 
   try {
     const [rows] = await db.query(
-      `SELECT ld.id, ld.status, d.mentor_id
+      `SELECT ld.id, ld.status, d.mentor_id, lw.status AS week_status
        FROM logboek_dagen ld
        JOIN logboek_weken lw ON lw.id = ld.logboek_week_id
        JOIN stagedossiers d ON d.id = lw.stagedossier_id
@@ -1136,6 +1141,9 @@ async function mentorConfirmLogbookDay(req, res) {
     if (rows.length === 0) return fail(res, 404, "Logboekdag niet gevonden");
     if (Number(rows[0].mentor_id) !== mentorId) return fail(res, 403, "Je bent niet de mentor van deze stagiair");
     if (rows[0].status === "geen_stagedag") return fail(res, 400, "Een dag zonder stage kan niet bevestigd worden");
+    if (rows[0].week_status !== "ingediend") {
+      return fail(res, 409, "Je kan dagen alleen bevestigen wanneer de student de week heeft ingediend");
+    }
 
     await db.query(
       "UPDATE logboek_dagen SET mentor_bevestigd_op = NOW(), aangepast_op = NOW() WHERE id = ?",

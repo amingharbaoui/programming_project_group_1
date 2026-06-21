@@ -355,6 +355,16 @@ async function saveDraft(req, res) {
     const aantalWeken = (startdatum && einddatum) ? calculateWeeks(startdatum, einddatum) : null;
     const totaalUren = aantalWeken ? aantalWeken * finalUrenPerWeek : null;
 
+    // Geen nieuw concept toelaten naast een al lopend voorstel.
+    const [actief] = await conn.query(
+      "SELECT id FROM stagevoorstellen WHERE student_id = ? AND status NOT IN ('concept','afgekeurd','ingetrokken') LIMIT 1",
+      [studentId]
+    );
+    if (actief.length > 0) {
+      await conn.rollback();
+      return fail(res, 409, "Je hebt al een lopend stagevoorstel; je kan geen nieuw concept aanmaken");
+    }
+
     const [existing] = await conn.query(
       "SELECT id, bedrijf_id FROM stagevoorstellen WHERE student_id = ? AND status = 'concept' ORDER BY aangemaakt_op DESC LIMIT 1",
       [studentId]
@@ -489,6 +499,25 @@ async function resubmitInternship(req, res) {
     const nieuwEinddatum = einddatum || voorstel.einddatum;
     const aantalWeken = (nieuwStartdatum && nieuwEinddatum) ? calculateWeeks(nieuwStartdatum, nieuwEinddatum) : voorstel.aantal_weken;
     const totaalUren = aantalWeken * finalUrenPerWeek;
+
+    // Herindienen mag niet soepeler gevalideerd worden dan de eerste indiening.
+    const rStart = new Date(nieuwStartdatum);
+    const rEind = new Date(nieuwEinddatum);
+    if (Number.isNaN(rStart.getTime()) || Number.isNaN(rEind.getTime())) {
+      await conn.rollback(); return fail(res, 400, "Ongeldige start- of einddatum");
+    }
+    if (rStart >= rEind) { await conn.rollback(); return fail(res, 400, "De startdatum moet voor de einddatum liggen"); }
+    if (!Number.isFinite(finalUrenPerWeek) || finalUrenPerWeek <= 0 || finalUrenPerWeek > 60) {
+      await conn.rollback(); return fail(res, 400, "Uren per week moet tussen 1 en 60 liggen");
+    }
+    const rStudent = await getStudentData(conn, studentId);
+    const rRegel = rStudent ? await getActiveStageRule(conn, rStudent.opleiding, rStudent.academiejaar) : null;
+    if (rRegel) {
+      if (rRegel.stagevenster_start && rStart < new Date(rRegel.stagevenster_start)) { await conn.rollback(); return fail(res, 400, "De startdatum valt buiten het stagevenster van de opleiding"); }
+      if (rRegel.stagevenster_einde && rEind > new Date(rRegel.stagevenster_einde)) { await conn.rollback(); return fail(res, 400, "De einddatum valt buiten het stagevenster van de opleiding"); }
+      if (rRegel.minimum_weken && aantalWeken < Number(rRegel.minimum_weken)) { await conn.rollback(); return fail(res, 400, `De stageperiode moet minstens ${rRegel.minimum_weken} weken bedragen (nu ${aantalWeken} weken).`); }
+      if (rRegel.minimum_uren && totaalUren < Number(rRegel.minimum_uren)) { await conn.rollback(); return fail(res, 400, `De stage moet minstens ${rRegel.minimum_uren} uren bedragen (nu ${totaalUren} uren).`); }
+    }
 
     // Nieuwe versie aanmaken
     await conn.query(
@@ -1343,12 +1372,21 @@ async function updateAdminDossierStatus(req, res) {
 
   try {
     const [existing] = await db.query(
-      "SELECT id FROM stagedossiers WHERE id = ? LIMIT 1",
+      "SELECT id, status FROM stagedossiers WHERE id = ? LIMIT 1",
       [dossierId]
     );
 
     if (existing.length === 0) {
       return fail(res, 404, "Dossier niet gevonden");
+    }
+
+    // Geen regressie vanuit een afgesloten dossier — voorkomt inconsistente terugzettingen.
+    const huidigeStatus = existing[0].status;
+    if (huidigeStatus === "afgerond" && nieuweStatus !== "afgerond") {
+      return fail(res, 409, "Een afgerond dossier kan niet meer van status veranderen");
+    }
+    if (huidigeStatus === "resultaat_vrijgegeven" && !["resultaat_vrijgegeven", "afgerond"].includes(nieuweStatus)) {
+      return fail(res, 409, "Na vrijgave van het resultaat kan het dossier niet terug naar een eerdere fase");
     }
 
     await db.query(

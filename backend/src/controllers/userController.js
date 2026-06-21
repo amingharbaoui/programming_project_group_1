@@ -94,8 +94,16 @@ async function reactivateUser(req, res) {
   if (!id) return fail(res, 400, "Ongeldig gebruikers-id");
 
   try {
-    const [r] = await db.query("UPDATE gebruikers SET status = 'actief', aangepast_op = NOW() WHERE id = ?", [id]);
-    if (r.affectedRows === 0) return fail(res, 404, "Gebruiker niet gevonden");
+    const [rows] = await db.query("SELECT status, wachtwoord_hash, auth_provider FROM gebruikers WHERE id = ? LIMIT 1", [id]);
+    if (rows.length === 0) return fail(res, 404, "Gebruiker niet gevonden");
+    const u = rows[0];
+    if (u.status === "uitgenodigd") return fail(res, 409, "Een uitgenodigde gebruiker kan niet heractiveerd worden; verstuur de uitnodiging opnieuw");
+    if (u.status === "actief") return fail(res, 409, "Gebruiker is al actief");
+    // Een lokaal account zonder wachtwoord kan niet inloggen — niet activeren tot er een wachtwoord is.
+    if ((u.auth_provider || "local") === "local" && !u.wachtwoord_hash) {
+      return fail(res, 409, "Deze gebruiker heeft nog geen wachtwoord ingesteld en kan niet geactiveerd worden");
+    }
+    await db.query("UPDATE gebruikers SET status = 'actief', aangepast_op = NOW() WHERE id = ?", [id]);
     return ok(res, { id, status: "actief" }, "Gebruiker geactiveerd");
   } catch (error) {
     return fail(res, 500, "Activeren mislukt", error.message);
@@ -290,6 +298,7 @@ async function getMentorInvitation(req, res) {
 async function activateMentor(req, res) {
   const { token, wachtwoord, telefoon } = req.body;
   if (!token) return fail(res, 400, "Token ontbreekt");
+  if (!wachtwoord || String(wachtwoord).length < 8) return fail(res, 400, "Kies een wachtwoord van minstens 8 tekens");
 
   try {
     const [rows] = await db.query(
@@ -309,7 +318,7 @@ async function activateMentor(req, res) {
       return fail(res, 410, "Uitnodiging is verlopen");
     }
 
-    const wachtwoordHash = wachtwoord ? hashLocalPassword(wachtwoord) : null;
+    const wachtwoordHash = hashLocalPassword(wachtwoord);
     await db.query(
       `
       UPDATE gebruikers

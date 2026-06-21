@@ -107,7 +107,7 @@ async function uploadDocument(req, res) {
     await connection.beginTransaction();
 
     const [dossiers] = await connection.query(
-      `SELECT id FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1`,
+      `SELECT id, status FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1`,
       [studentId]
     );
 
@@ -117,6 +117,10 @@ async function uploadDocument(req, res) {
     }
 
     const dossier_id = dossiers[0].id;
+    if (["resultaat_vrijgegeven", "afgerond"].includes(dossiers[0].status)) {
+      await connection.rollback();
+      return fail(res, 409, "Je stagedossier is afgerond; documenten kunnen niet meer gewijzigd worden");
+    }
 
     const bestandUrl = `/uploads/${req.file.filename}`;
 
@@ -194,7 +198,7 @@ async function uploadEigenDocument(req, res) {
     await connection.beginTransaction();
 
     const [dossiers] = await connection.query(
-      `SELECT id FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1`,
+      `SELECT id, status FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1`,
       [studentId]
     );
 
@@ -204,6 +208,10 @@ async function uploadEigenDocument(req, res) {
     }
 
     const dossier_id = dossiers[0].id;
+    if (["resultaat_vrijgegeven", "afgerond"].includes(dossiers[0].status)) {
+      await connection.rollback();
+      return fail(res, 409, "Je stagedossier is afgerond; documenten kunnen niet meer gewijzigd worden");
+    }
     const bestandUrl = `/uploads/${req.file.filename}`;
 
     const [result] = await connection.query(
@@ -249,10 +257,13 @@ async function approveDocument(req, res) {
   if (!id) return fail(res, 400, "Ongeldig document-id");
 
   try {
-    const [docs] = await db.query("SELECT bestand_url, bestand_naam FROM documenten WHERE id = ? LIMIT 1", [id]);
+    const [docs] = await db.query("SELECT bestand_url, bestand_naam, status FROM documenten WHERE id = ? LIMIT 1", [id]);
     if (docs.length === 0) return fail(res, 404, "Document niet gevonden");
     if (!docs[0].bestand_url && !docs[0].bestand_naam) {
       return fail(res, 400, "Een document zonder geupload bestand kan niet goedgekeurd worden");
+    }
+    if (!["ingediend", "in_controle"].includes(docs[0].status)) {
+      return fail(res, 409, "Dit document is niet meer in behandeling en kan niet goedgekeurd worden");
     }
 
     const [r] = await db.query(
@@ -282,6 +293,12 @@ async function rejectDocument(req, res) {
   if (!reden) return fail(res, 400, "Een afkeuringsreden is verplicht");
 
   try {
+    const [docs] = await db.query("SELECT status FROM documenten WHERE id = ? LIMIT 1", [id]);
+    if (docs.length === 0) return fail(res, 404, "Document niet gevonden");
+    if (!["ingediend", "in_controle"].includes(docs[0].status)) {
+      return fail(res, 409, "Dit document is niet meer in behandeling en kan niet afgekeurd worden");
+    }
+
     const [r] = await db.query(
       `UPDATE documenten
        SET status = 'afgekeurd', afkeurreden = ?, gecontroleerd_door_id = ?, gecontroleerd_op = NOW(), aangepast_op = NOW()

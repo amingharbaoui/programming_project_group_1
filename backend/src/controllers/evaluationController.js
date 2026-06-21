@@ -43,8 +43,16 @@ async function openEvaluation(req, res) {
   if (!GELDIGE_TYPES.includes(finalType)) return fail(res, 400, "type moet 'tussentijds' of 'finaal' zijn");
 
   try {
-    const [dossier] = await db.query("SELECT id FROM stagedossiers WHERE id = ? LIMIT 1", [dossierId]);
+    const [dossier] = await db.query("SELECT id, status, stagebegeleider_id FROM stagedossiers WHERE id = ? LIMIT 1", [dossierId]);
     if (dossier.length === 0) return fail(res, 404, "Stagedossier niet gevonden");
+    // Docent mag enkel een evaluatie openen voor een dossier waaraan hij/zij gekoppeld is (admin mag alles).
+    if (req.user?.hoofdrol === "docent" && Number(dossier[0].stagebegeleider_id) !== Number(req.user?.id)) {
+      return fail(res, 403, "Je bent niet de stagebegeleider van deze student");
+    }
+    // Evaluatie pas openen wanneer de stage administratief geregistreerd is of loopt (niet in contract-/controlefase).
+    if (!["geregistreerd", "stage_loopt", "resultaat_vrijgegeven", "afgerond"].includes(dossier[0].status)) {
+      return fail(res, 409, "Een evaluatie kan pas geopend worden zodra het stagedossier geregistreerd is");
+    }
 
     const [existing] = await db.query(
       "SELECT id, status FROM evaluaties WHERE stagedossier_id = ? AND type = ? LIMIT 1",
@@ -137,6 +145,7 @@ async function loadEvaluationWithDossier(conn, evaluationId) {
   const [rows] = await conn.query(
     `SELECT e.id, e.type, e.status, e.stagedossier_id, e.eindcijfer,
             e.eindpresentatie_score, e.competentie_score, e.vrijgegeven_op,
+            e.student_ingediend_op, e.mentor_ingediend_op,
             d.student_id, d.mentor_id, d.stagebegeleider_id
      FROM evaluaties e
      JOIN stagedossiers d ON d.id = e.stagedossier_id
@@ -183,6 +192,25 @@ async function saveScores(req, res) {
     if (evaluatie.status === "niet_open") { await conn.rollback(); return fail(res, 409, "Deze evaluatie is nog niet geopend"); }
     if (evaluatie.status === "vrijgegeven") { await conn.rollback(); return fail(res, 409, "Deze evaluatie is al vrijgegeven"); }
     if (!userMayEditAsRole(evaluatie, role, userId)) { await conn.rollback(); return fail(res, 403, "Je bent niet gekoppeld aan deze evaluatie"); }
+
+    // Rolspecifieke fase-gate: elke partij vult enkel in tijdens haar eigen venster en niet meer na indienen.
+    const evStatus = evaluatie.status;
+    if (role === "student") {
+      if (evaluatie.student_ingediend_op || !["open", "mentor_ingediend"].includes(evStatus)) {
+        await conn.rollback();
+        return fail(res, 409, "Je zelfevaluatie is al ingediend en kan niet meer gewijzigd worden");
+      }
+    } else if (role === "mentor") {
+      if (evaluatie.mentor_ingediend_op || !["open", "student_ingediend"].includes(evStatus)) {
+        await conn.rollback();
+        return fail(res, 409, "Je mentorinput is al ingediend en kan niet meer gewijzigd worden");
+      }
+    } else if (role === "docent") {
+      if (!["klaar_voor_docent", "geregistreerd", "klaar_voor_vrijgave"].includes(evStatus)) {
+        await conn.rollback();
+        return fail(res, 409, "De docent kan pas scoren wanneer student en mentor hebben ingediend");
+      }
+    }
 
     if (ingediend) {
       const active = await getActiveCompetencies(conn);

@@ -38,7 +38,8 @@ async function getDocentDossier(dossierId, docentId) {
 async function getMentorDossierByPlanning(planningId, mentorId) {
   const [rows] = await db.query(
     `
-    SELECT pm.id AS planning_id, pm.stagedossier_id, sd.student_id, sd.mentor_id, sd.stagebegeleider_id
+    SELECT pm.id AS planning_id, pm.stagedossier_id, pm.status AS planning_status, pm.type AS planning_type,
+           sd.student_id, sd.mentor_id, sd.stagebegeleider_id
     FROM planning_momenten pm
     JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
     WHERE pm.id = ? AND sd.mentor_id = ?
@@ -147,6 +148,24 @@ async function updateDocentPlanning(req, res) {
   const allowedStatuses = ["voorgesteld", "bevestigd", "alternatief_gevraagd", "gepland", "gegeven", "geweest", "geannuleerd"];
   if (status && !allowedStatuses.includes(status)) return fail(res, 400, "Ongeldige planningstatus");
 
+  // Overgangscontrole: "gegeven/geweest" alleen vanuit een logische status, en een geannuleerd moment niet heropenen.
+  if (status) {
+    const [huidig] = await db.query(
+      `SELECT pm.status, pm.type FROM planning_momenten pm
+       JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
+       WHERE pm.id = ? AND sd.stagebegeleider_id = ? LIMIT 1`,
+      [planningId, docentId]
+    );
+    if (huidig.length === 0) return fail(res, 403, "Geen toegang tot dit planningmoment");
+    const huidigeStatus = huidig[0].status;
+    if (["gegeven", "geweest"].includes(status) && !["bevestigd", "gepland"].includes(huidigeStatus)) {
+      return fail(res, 409, "Dit moment kan niet als gegeven/geweest gemarkeerd worden vanuit de huidige status");
+    }
+    if (huidigeStatus === "geannuleerd" && status !== "geannuleerd") {
+      return fail(res, 409, "Een geannuleerd moment kan niet opnieuw geactiveerd worden");
+    }
+  }
+
   const fields = [];
   const values = [];
   if (geplandOp || datum) {
@@ -225,6 +244,8 @@ async function confirmMentorPlanning(req, res) {
   try {
     const dossier = await getMentorDossierByPlanning(planningId, mentorId);
     if (!dossier) return fail(res, 403, "Geen toegang tot dit planningmoment");
+    if (dossier.planning_type !== "bedrijfsbezoek") return fail(res, 409, "Alleen een bedrijfsbezoek kan door de mentor behandeld worden");
+    if (!["voorgesteld", "gepland"].includes(dossier.planning_status)) return fail(res, 409, "Dit moment kan in de huidige status niet meer aangepast worden");
 
     await db.query(
       `
@@ -270,6 +291,8 @@ async function proposeAlternative(req, res) {
   try {
     const dossier = await getMentorDossierByPlanning(planningId, mentorId);
     if (!dossier) return fail(res, 403, "Geen toegang tot dit planningmoment");
+    if (dossier.planning_type !== "bedrijfsbezoek") return fail(res, 409, "Alleen een bedrijfsbezoek kan door de mentor behandeld worden");
+    if (!["voorgesteld", "gepland"].includes(dossier.planning_status)) return fail(res, 409, "Dit moment kan in de huidige status niet meer aangepast worden");
 
     await db.query(
       `

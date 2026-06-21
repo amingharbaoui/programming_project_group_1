@@ -112,6 +112,25 @@ async function updateStageRule(req, res) {
   set("minimum_uren", b.minimumUren ?? b.minimum_uren);
   set("standaard_uren_per_week", b.standaardUrenPerWeek ?? b.standaard_uren_per_week);
 
+  // Basisvalidatie zodat er geen onlogische stageperiodes/uren opgeslagen worden.
+  const startD = b.stagevensterStart ?? b.stagevenster_start;
+  const eindD = b.stagevensterEinde ?? b.stagevenster_einde;
+  if (startD && eindD && new Date(startD) > new Date(eindD)) {
+    return fail(res, 400, "De startdatum van het stagevenster moet vóór de einddatum liggen");
+  }
+  const minW = b.minimumWeken ?? b.minimum_weken;
+  if (minW !== undefined && minW !== null && (!Number.isFinite(Number(minW)) || Number(minW) < 1 || Number(minW) > 52)) {
+    return fail(res, 400, "Minimum aantal weken moet tussen 1 en 52 liggen");
+  }
+  const minU = b.minimumUren ?? b.minimum_uren;
+  if (minU !== undefined && minU !== null && (!Number.isFinite(Number(minU)) || Number(minU) < 1)) {
+    return fail(res, 400, "Minimum aantal uren moet een positief getal zijn");
+  }
+  const stdU = b.standaardUrenPerWeek ?? b.standaard_uren_per_week;
+  if (stdU !== undefined && stdU !== null && (!Number.isFinite(Number(stdU)) || Number(stdU) < 1 || Number(stdU) > 60)) {
+    return fail(res, 400, "Standaarduren per week moeten tussen 1 en 60 liggen");
+  }
+
   if (fields.length === 0) return fail(res, 400, "Geen velden om aan te passen");
 
   try {
