@@ -80,8 +80,11 @@ export default function StageApplicationPage() {
           opdrachtTitel:         data.stagefunctie        || "",
           opdrachtOmschrijving:  data.opdrachtomschrijving || "",
         });
-      } catch {
-        // geen voorstel gevonden — lege form is ok
+      } catch (err) {
+        // Een leeg voorstel komt als data: null binnen (200, geen error) en is hierboven al afgehandeld.
+        // Een fout hier is een echte laad-/netwerkfout — die mogen we niet verbergen als "geen voorstel",
+        // anders lijkt een bestaande aanvraag verdwenen en begint de student onterecht opnieuw.
+        setError(err.response?.data?.message || "Je bestaande aanvraag kon niet geladen worden. Herlaad de pagina voor je iets wijzigt of indient.");
       }
     }
     laadBestaand();
