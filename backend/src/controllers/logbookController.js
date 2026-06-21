@@ -293,6 +293,9 @@ async function createLogbook(req, res) {
     );
 
     let weekId;
+    // Bewaar bestaande mentor-bevestigingen per datum: een weekindiening (DELETE+INSERT) mag een eerder
+    // door de mentor afgevinkte dag niet stilzwijgend onbevestigd maken (auditpunt 336).
+    const bevestigdPerDatum = {};
 
     if (existingWeeks.length > 0) {
       weekId = existingWeeks[0].id;
@@ -332,6 +335,12 @@ async function createLogbook(req, res) {
           weekId
         ]
       );
+
+      const [oudeDagen] = await connection.query(
+        "SELECT DATE_FORMAT(datum, '%Y-%m-%d') AS datum_key, mentor_bevestigd_op FROM logboek_dagen WHERE logboek_week_id = ? AND mentor_bevestigd_op IS NOT NULL",
+        [weekId]
+      );
+      for (const d of oudeDagen) bevestigdPerDatum[d.datum_key] = d.mentor_bevestigd_op;
 
       await connection.query(
         "DELETE FROM logboek_dagen WHERE logboek_week_id = ?",
@@ -373,6 +382,9 @@ async function createLogbook(req, res) {
 
     for (const day of finalDays) {
       const competenties = Array.isArray(day.competenties) ? day.competenties : [];
+      // Een al bevestigde dag behoudt zijn mentor_bevestigd_op over de heropbouw heen.
+      const datumKey = day.datum ? String(day.datum).slice(0, 10) : null;
+      const mentorBevestigd = datumKey ? (bevestigdPerDatum[datumKey] || null) : null;
       await connection.query(
         `
         INSERT INTO logboek_dagen
@@ -387,10 +399,11 @@ async function createLogbook(req, res) {
           leerpunten,
           competenties,
           aantal_uren,
+          mentor_bevestigd_op,
           aangemaakt_op,
           aangepast_op
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
         `,
         [
           weekId,
@@ -402,7 +415,8 @@ async function createLogbook(req, res) {
           day.problemen || null,
           day.leerpunten || null,
           competenties.length > 0 ? JSON.stringify(competenties) : null,
-          Number(day.aantalUren || day.aantal_uren || 0)
+          Number(day.aantalUren || day.aantal_uren || 0),
+          mentorBevestigd
         ]
       );
     }
@@ -1085,9 +1099,10 @@ async function saveLogbookDay(req, res) {
   const status = req.body.status === "geen_stagedag" ? "geen_stagedag" : "ingevuld";
   const { titel, uitgevoerdeTaken, reflectie, problemen, leerpunten } = req.body;
   const aantalUren = status === "geen_stagedag" ? 0 : Number(req.body.aantalUren ?? req.body.aantal_uren ?? 0);
-  // Optioneel: competenties die de student aan deze dag koppelt (array van competentie-id's).
+  // Optioneel: competenties die de student aan deze dag koppelt. Zelfde formaat als bij de volledige
+  // weekindiening (codes zoals 'LO1'); niet naar getallen filteren, anders verdwijnen ze (auditpunt 329).
   const competenties = Array.isArray(req.body.competenties)
-    ? req.body.competenties.map(Number).filter((id) => Number.isInteger(id) && id > 0)
+    ? req.body.competenties.filter((c) => c !== null && c !== undefined && c !== "")
     : null;
 
   if (!weekNummer || !datum) return fail(res, 400, "weekNummer en datum zijn verplicht");
