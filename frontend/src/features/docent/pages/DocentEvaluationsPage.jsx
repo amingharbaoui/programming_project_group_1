@@ -116,6 +116,7 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, d
   const [vrijgaveMelding, setVrijgaveMelding] = useState({ tekst: "", type: "" });
   const [foutModal, setFoutModal] = useState("");
   const [succesModal, setSuccesModal] = useState("");
+  const [vrijgaveBevestig, setVrijgaveBevestig] = useState(false);
   const [motOpen, setMotOpen] = useState({});
 
   // Reset scores als evaluatie verandert
@@ -192,9 +193,10 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, d
     }
   }
 
-  async function handleVrijgeven() {
+  // 524: vrijgeven bevestigen via een app-modal i.p.v. window.confirm (prototype-stijl).
+  async function bevestigVrijgave() {
     if (!evaluatie) return;
-    if (!window.confirm("Ben je zeker dat je het eindresultaat wil vrijgeven? De student zal dit kunnen zien.")) return;
+    setVrijgaveBevestig(false);
     try {
       setBezig(true);
       await api.post(`/evaluations/${evaluatie.id}/release`, {});
@@ -397,6 +399,26 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, d
         </div>
       )}
 
+      {vrijgaveBevestig && (
+        <div className="modal_overlay" onClick={() => setVrijgaveBevestig(false)}>
+          <div className="modal_box" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal_header">
+              <span className="modal_title">Eindresultaat vrijgeven</span>
+              <button className="icon_btn" onClick={() => setVrijgaveBevestig(false)}><IconX size={16} stroke={1.8} /></button>
+            </div>
+            <div className="modal_body">
+              <p style={{ margin: 0, fontSize: 14, color: "var(--dark)" }}>
+                Ben je zeker dat je het eindresultaat wil vrijgeven? De student kan het daarna zien en dit kan niet meer ongedaan gemaakt worden.
+              </p>
+            </div>
+            <div className="modal_footer">
+              <button className="btn" onClick={() => setVrijgaveBevestig(false)}>Annuleren</button>
+              <button className="btn primary" disabled={bezig} onClick={bevestigVrijgave}>{bezig ? "Bezig..." : "Vrijgeven"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {succesModal && (
         <div className="modal_overlay" onClick={() => setSuccesModal("")}>
           <div className="modal_box" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
@@ -554,7 +576,7 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, d
               <span>Na vrijgave kan de student het resultaat bekijken. Dit kan niet meer ongedaan gemaakt worden.</span>
             </div>
             <div className="actions">
-              <button className="btn primary" disabled={bezig} onClick={handleVrijgeven}>
+              <button className="btn primary" disabled={bezig} onClick={() => setVrijgaveBevestig(true)}>
                 {bezig ? "Bezig..." : "Eindresultaat vrijgeven"}
               </button>
             </div>

@@ -57,6 +57,18 @@ export default function MentorPlanningPage() {
   const [altUur, setAltUur] = useState("10:00");
   const [altPlaats, setAltPlaats] = useState("");
   const [melding, setMelding] = useState({ id: null, tekst: "", type: "" });
+  const [voorstelPopupId, setVoorstelPopupId] = useState(null); // 522: auto-popup voor een nieuw voorstel
+  const [gesloten, setGesloten] = useState(() => new Set()); // per planning-id: popup bewust gesloten
+
+  // 522: zodra de planning geladen is, automatisch de pop-up tonen voor het nieuwste nog te bevestigen
+  // (voorgesteld/gepland) moment dat de mentor nog niet bewust sloot — net als het prototype.
+  useEffect(() => {
+    const teBevestigen = momenten.find(
+      (m) => ["bedrijfsbezoek", "eindpresentatie"].includes(m.type)
+        && ["voorgesteld", "gepland"].includes(m.status) && !gesloten.has(m.id)
+    );
+    setVoorstelPopupId(teBevestigen ? teBevestigen.id : null);
+  }, [momenten, gesloten]);
 
   useEffect(() => {
     async function loadStudenten() {
@@ -127,7 +139,13 @@ export default function MentorPlanningPage() {
     }
   }
 
+  function sluitVoorstelPopup(id) {
+    setGesloten((prev) => new Set(prev).add(id));
+    setVoorstelPopupId(null);
+  }
+
   function openAlternatief(moment) {
+    setVoorstelPopupId(null); // de auto-popup sluiten; we openen de alternatief-modal
     setAlternatifOpen(moment.id);
     setAlternatifTekst("");
     // Voorvullen met het huidige moment zodat de mentor enkel hoeft aan te passen.
@@ -171,6 +189,45 @@ export default function MentorPlanningPage() {
         <h1>Planning</h1>
         <p>Bekijk geplande bezoeken en bevestig of stel een alternatief voor</p>
       </div>
+
+      {/* 522: automatische pop-up bij een nieuw voorgesteld moment, zoals het mentorprototype */}
+      {(() => {
+        const m = momenten.find((x) => x.id === voorstelPopupId);
+        if (!m || alternatifOpen) return null;
+        const isPres = m.type === "eindpresentatie";
+        return (
+          <div className="modal_overlay" onClick={() => sluitVoorstelPopup(m.id)}>
+            <div className="modal_box" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
+              <div className="modal_header">
+                <span className="modal_title">{isPres ? "Eindpresentatie voorgesteld" : "Bedrijfsbezoek voorgesteld"}</span>
+                <button className="icon_btn" onClick={() => sluitVoorstelPopup(m.id)}><i className="ti ti-x" /></button>
+              </div>
+              <div className="modal_body">
+                <p className="muted" style={{ marginTop: 0, fontSize: 12.5 }}>
+                  {m.voorgesteld_door_naam ? `${m.voorgesteld_door_naam} (docent)` : "De docent"} · voor de {isPres ? "finale" : "tussentijdse"} evaluatie
+                </p>
+                <div className="card" style={{ marginBottom: 10 }}>
+                  <div className="kv"><span className="k">Datum & tijdstip</span><span className="v">{formatDateTime(m.gepland_op)}</span></div>
+                  {m.locatie && <div className="kv"><span className="k">{isPres ? "Lokaal/plaats" : "Plaats"}</span><span className="v">{m.locatie}</span></div>}
+                </div>
+                <p style={{ fontSize: 12.5, color: "var(--sub)" }}>
+                  {isPres
+                    ? "Je bent welkom bij de eindpresentatie van je stagiair; daarna volgt de finale beoordeling."
+                    : "De docent komt langs op de werkvloer om samen met jou de voortgang van je stagiair te bespreken."}
+                </p>
+              </div>
+              <div className="modal_footer">
+                <button className="btn" disabled={bezig === m.id} onClick={() => openAlternatief(m)}>
+                  <i className="ti ti-calendar-x" /> Past niet — ander moment
+                </button>
+                <button className="btn primary" disabled={bezig === m.id} onClick={() => handleBevestig(m.id)}>
+                  <i className="ti ti-check" /> {bezig === m.id ? "Bezig..." : "Moment bevestigen"}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Student selector — enkel bij meerdere stagiairs */}
       {!loading && studenten.length > 1 && (
