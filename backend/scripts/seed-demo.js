@@ -69,6 +69,7 @@ async function main() {
       [15, "Aya", "Startklaar", "student.startklaar@ehb.be", "student", "actief"],
       [16, "Liam", "Loopt", "student.loopt@ehb.be", "student", "actief"],
       [17, "Nora", "Afgerond", "student.afgerond@ehb.be", "student", "actief"],
+      [23, "Tess", "Concept", "student.concept@ehb.be", "student", "actief"],
     ];
     for (const [id, vn, an, email, rol, status] of users) {
       const provider = rol === "mentor" ? "local" : "school_sso";
@@ -141,7 +142,8 @@ async function main() {
       (14,'S0014','Toegepaste Informatica','1TI-B','2025-2026'),
       (15,'S0015','Toegepaste Informatica','1TI-B','2025-2026'),
       (16,'S0016','Toegepaste Informatica','1TI-B','2025-2026'),
-      (17,'S0017','Toegepaste Informatica','1TI-B','2025-2026')`);
+      (17,'S0017','Toegepaste Informatica','1TI-B','2025-2026'),
+      (23,'S0023','Toegepaste Informatica','1TI-B','2025-2026')`);
 
     /* ---------- VOORSTELLEN (versie-helper) ---------- */
     let vid = 1, vvid = 1;
@@ -179,6 +181,8 @@ async function main() {
     const vStart = await voorstel(15, "goedgekeurd", { docent: 3 });
     const vLoopt = await voorstel(16, "goedgekeurd");
     const vAfgerond = await voorstel(17, "goedgekeurd", { docent: 3 });
+    // Conceptfase-demo (na de vaste 1-9 zodat de bestaande voorstel-ids stabiel blijven).
+    await voorstel(23, "concept");
 
     /* ---------- BESLISSINGEN (feedback/afkeur) ---------- */
     await q(`INSERT INTO voorstel_beslissingen (stagevoorstel_id, stagevoorstel_versie_id, beslist_door_id, beslissing, feedback, motivering, beslist_op)
@@ -193,13 +197,13 @@ async function main() {
 
     /* ---------- DOSSIER-helper (contract/startklaar/loopt/afgerond) ---------- */
     let did = 1;
-    async function dossier(studentId, voorstelId, docentId, status, startdatum) {
+    async function dossier(studentId, voorstelId, docentId, status, startdatum, einddatum = "2026-06-27") {
       const myId = did++;
       await q(`INSERT INTO stagedossiers (id, dossiernummer, stagevoorstel_id, student_id, bedrijf_id, stagebegeleider_id, mentor_id, status,
                  opleiding, academiejaar, startdatum, einddatum, aantal_weken, uren_per_week, totaal_uren, verzekering_in_orde, aangemaakt_op, aangepast_op)
-               VALUES (?, ?, ?, ?, 1, ?, 5, ?, 'Toegepaste Informatica','2025-2026', ?, '2026-06-27', 13, 38, 494, ?, NOW(), NOW())`,
+               VALUES (?, ?, ?, ?, 1, ?, 5, ?, 'Toegepaste Informatica','2025-2026', ?, ?, 13, 38, 494, ?, NOW(), NOW())`,
         [myId, `D-2026-${String(myId).padStart(4, "0")}`, voorstelId, studentId, docentId, status,
-         startdatum, ["geregistreerd", "stage_loopt", "resultaat_vrijgegeven", "afgerond"].includes(status) ? 1 : 0]);
+         startdatum, einddatum, ["geregistreerd", "stage_loopt", "resultaat_vrijgegeven", "afgerond"].includes(status) ? 1 : 0]);
       return myId;
     }
     function ovk(dossierId, status, { student = null, bedrijf = null, opleiding = null } = {}) {
@@ -220,7 +224,7 @@ async function main() {
     await doc(dContract, 3, "ontbreekt", null);
 
     // 15 — STARTKLAAR: volledig getekend, documenten goedgekeurd, geregistreerd (stage nog niet begonnen)
-    const dStart = await dossier(15, vStart, 3, "geregistreerd", "2026-09-15");
+    const dStart = await dossier(15, vStart, 3, "geregistreerd", "2026-09-15", "2026-12-12");
     await ovk(dStart, "geregistreerd", { student: new Date(), bedrijf: new Date(), opleiding: new Date() });
     await doc(dStart, 1, "geregistreerd", new Date());
     await doc(dStart, 2, "goedgekeurd", new Date());

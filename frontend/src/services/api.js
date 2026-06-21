@@ -16,6 +16,22 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Verlopen of ongeldig token: sessie wissen en terug naar login i.p.v. losse 401-fouten tonen.
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    const status = error.response?.status;
+    const url = error.config?.url || "";
+    if (status === 401 && typeof window !== "undefined" && !url.includes("/auth/login")
+        && !window.location.pathname.startsWith("/login")) {
+      setAuthToken(null);
+      try { localStorage.removeItem("stagify_user"); } catch { /* ignore */ }
+      window.location.assign("/login");
+    }
+    return Promise.reject(error);
+  }
+);
+
 export function setAuthToken(token) {
   authToken = token || null;
   if (typeof localStorage !== "undefined") {

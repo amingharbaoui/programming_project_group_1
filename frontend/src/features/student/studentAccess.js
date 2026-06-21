@@ -191,7 +191,8 @@ export function berekenStudentAccess(voorstel, contract) {
     return { key: "startklaar", startdatum, ...STUDENT_FASES.startklaar };
   }
 
-  if (dossierStatus === "afgerond" || contract?.status === "afgerond") {
+  // Na vrijgave van het resultaat zit de student in de eindfase (evaluatie/eindoverzicht), niet meer "Stage loopt".
+  if (dossierStatus === "afgerond" || dossierStatus === "resultaat_vrijgegeven" || contract?.status === "afgerond") {
     return { key: "afgerond", startdatum, ...STUDENT_FASES.afgerond };
   }
   if (dossierStatus === "presentatie") {

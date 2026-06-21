@@ -105,11 +105,11 @@
 	border-top: 0.5px solid var(--border);
 }
 .nav-section-label {
-	font-size: 10.5px;
+	font-size: 10px;
 	color: var(--faint);
 	text-transform: uppercase;
-	letter-spacing: 0.5px;
-	padding: 6px 16px 4px;
+	letter-spacing: 0.9px;
+	padding: 14px 16px 5px;
 	white-space: nowrap;
 }
 .sidebar.collapsed .nav-section-label { display: none; }
@@ -120,8 +120,8 @@
 	padding: 12px 13px;
 	background: var(--white);
 	border-radius: 9px;
-	border: 0.5px solid var(--border);
-	box-shadow: none;
+	border: 1.5px solid #0a0a0a;
+	box-shadow: 0 4px 12px rgba(0, 0, 0, .10);
 }
 .side-status .fase { font-size: 11px; color: var(--sub); }
 .side-status .fase-naam { font-size: 13.5px; font-weight: 600; margin: 2px 0 8px; }

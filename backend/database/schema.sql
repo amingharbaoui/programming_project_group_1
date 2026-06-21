@@ -148,6 +148,7 @@ CREATE TABLE `evaluaties` (
   `eindpresentatie_score` decimal(4,2) DEFAULT NULL,
   `competentie_score` decimal(4,2) DEFAULT NULL,
   `eindcijfer` decimal(4,2) DEFAULT NULL,
+  `mentor_algemene_feedback` text,
   `vrijgegeven_door_id` int DEFAULT NULL,
   `vrijgegeven_op` timestamp NULL DEFAULT NULL,
   `aangemaakt_op` timestamp NULL DEFAULT NULL,
@@ -173,6 +174,9 @@ CREATE TABLE `gebruikers` (
   `laatste_login_op` timestamp NULL DEFAULT NULL,
   `login_fout_teller` int DEFAULT '0',
   `geblokkeerd_tot` timestamp NULL DEFAULT NULL,
+  `uitnodiging_token` varchar(64) DEFAULT NULL,
+  `uitnodiging_status` varchar(20) DEFAULT NULL COMMENT 'niet_verstuurd, verstuurd, geactiveerd, verlopen',
+  `uitnodiging_vervalt_op` datetime DEFAULT NULL,
   `laatst_gesynchroniseerd_op` timestamp NULL DEFAULT NULL COMMENT 'Laatste moment waarop naam/email/rol uit schooldata werd gesynchroniseerd',
   `sync_bron` varchar(255) DEFAULT NULL COMMENT 'school_api, sso, import, manueel',
   `aangemaakt_op` timestamp NULL DEFAULT NULL,
@@ -273,6 +277,7 @@ CREATE TABLE `planning_momenten` (
   `bevestigd_door_id` int DEFAULT NULL,
   `alternatief_voorstel` text,
   `verslag` text,
+  `deelnemers` text,
   `aangemaakt_op` timestamp NULL DEFAULT NULL,
   `aangepast_op` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
@@ -511,6 +516,17 @@ CREATE TABLE `voorstel_checklist` (
   KEY `gecontroleerd_door_id` (`gecontroleerd_door_id`),
   CONSTRAINT `voorstel_checklist_ibfk_1` FOREIGN KEY (`stagevoorstel_versie_id`) REFERENCES `stagevoorstel_versies` (`id`),
   CONSTRAINT `voorstel_checklist_ibfk_2` FOREIGN KEY (`gecontroleerd_door_id`) REFERENCES `medewerkers` (`gebruiker_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
+DROP TABLE IF EXISTS `checklist_items`;
+CREATE TABLE `checklist_items` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `tekst` varchar(500) NOT NULL,
+  `volgorde` int NOT NULL DEFAULT '0',
+  `actief` tinyint(1) NOT NULL DEFAULT '1',
+  `aangemaakt_op` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `aangepast_op` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 SET FOREIGN_KEY_CHECKS = 1;

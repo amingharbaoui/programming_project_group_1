@@ -26,9 +26,6 @@ export const NAVIGATION = {
     { label: "Stagiairs",  path: "/mentor/students",   icon: "ti-users" },
     { label: "Logboeken",  path: "/mentor/logbooks",   icon: "ti-notebook" },
     { label: "Evaluatie",  path: "/mentor/evaluation", icon: "ti-clipboard-check" },
-    { label: "Contract",   path: "/mentor/contract",   icon: "ti-writing" },
-    { label: "Afspraken",  path: "/mentor/afspraken",  icon: "ti-calendar" },
-    { label: "Planning",   path: "/mentor/planning",   icon: "ti-calendar-event" },
   ],
 
   [ROLES.DOCENT]: [

@@ -259,10 +259,14 @@ export default function ToewijzingenPage() {
                   <td><div className="tw_cell_muted">{d.dossiernummer || "-"}</div></td>
                   <td><span className={`status ${statusCls(d.status)}`}>{STATUS_LABELS[d.status] || d.status}</span></td>
                   <td style={{ textAlign: "right" }}>
-                    <button className="btn sm" onClick={() => openModal(d)}>
-                      <IconPencil size={16} stroke={1.8} />
-                      Wijzigen
-                    </button>
+                    {["resultaat_vrijgegeven", "afgerond"].includes(d.status) ? (
+                      <span className="status s_grijs">Afgerond — read-only</span>
+                    ) : (
+                      <button className="btn sm" onClick={() => openModal(d)}>
+                        <IconPencil size={16} stroke={1.8} />
+                        Wijzigen
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

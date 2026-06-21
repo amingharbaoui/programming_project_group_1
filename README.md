@@ -1,4 +1,4 @@
-# Stagify
+# Stageify
 
 A centralized internship management platform built for Erasmushogeschool Brussel.
 
@@ -11,9 +11,9 @@ A centralized internship management platform built for Erasmushogeschool Brussel
 ![MySQL](https://img.shields.io/badge/MySQL-4479A1?style=flat-square&logo=mysql&logoColor=white)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
-## What is Stagify?
+## What is Stageify?
 
-Stagify is a web application built as a group project for EHB. It supports the full internship process for students, from proposal to final evaluation.
+Stageify is a web application built as a group project for EHB. It supports the full internship process for students, from proposal to final evaluation.
 
 The platform supports five roles: **student**, **stagecommissie**, **administratie**, **mentor** (company-side supervisor) and **docent** (teacher). Each role has its own interface and only sees what's relevant to them.
 
@@ -100,10 +100,13 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 
 ## Database
 
-Load the demo data (users for every phase plus their internship data):
+First import the schema (creates all tables), then load the demo data. The seed script only fills tables — it does not create them, so the schema import is required on a fresh database.
 
 ```bash
 cd backend
+# 1. Create the database and import the schema (tables)
+mysql -u <db_user> -p <db_name> < database/schema.sql
+# 2. Load the demo data (accounts for every phase + internship data; password Demo!2026 for all)
 node scripts/seed-demo.js
 ```
 

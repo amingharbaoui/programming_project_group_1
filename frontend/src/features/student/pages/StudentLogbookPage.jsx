@@ -339,7 +339,7 @@ function weekNaarFormulier(week) {
 }
 
 /* ---------- Week formulier (nieuw + bewerken) ---------- */
-function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aantalWeken }) {
+function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aantalWeken, competentieLijst = LO_COMPETENTIES }) {
   // Bereken per dag of hij al ingevuld is (status="geen_stagedag" of expliciete vlag)
   const [ingediendeDagen, setIngediendeDagen] = useState(
     logbook.dagen.map((d) => !!(d.status === "geen_stagedag"))
@@ -533,7 +533,7 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
             <div className="form_group">
               <label className="form_label">Aan welke competenties werkte je vandaag?</label>
               <div className="lo-chips">
-                {LO_COMPETENTIES.map((lo) => {
+                {competentieLijst.map((lo) => {
                   const geselecteerd = (dag?.competenties ?? []).includes(lo.code);
                   return (
                     <button
@@ -668,6 +668,8 @@ export default function StudentLogbookPage() {
   const [voorstelStatus, setVoorstelStatus] = useState(null);
   const [contractGetekend, setContractGetekend] = useState(false);
   const [loadingGate, setLoadingGate] = useState(true);
+  // Competentiechips komen uit het actieve competentieprofiel (configureerbaar), met de vaste lijst als fallback.
+  const [competentieLijst, setCompetentieLijst] = useState(LO_COMPETENTIES);
 
   // null = nieuwe week invullen, week-object = bestaande week bewerken
   const [editWeek, setEditWeek] = useState(null);
@@ -726,6 +728,13 @@ export default function StudentLogbookPage() {
         if (!cachedContract) cacheSet("student_contract", c);
         if (c?.student_getekend_op) setContractGetekend(true);
       }
+
+      // Competenties uit het actieve profiel laden voor de logboekchips.
+      try {
+        const compRes = await apiRequest("GET", "/competencies");
+        const comps = compRes?.data?.competenties || [];
+        if (comps.length > 0) setCompetentieLijst(comps.map((c) => ({ code: c.code, naam: c.naam })));
+      } catch { /* valt terug op de vaste lijst */ }
 
       setLoadingGate(false);
 
@@ -1000,6 +1009,7 @@ export default function StudentLogbookPage() {
             saving={saving}
             isBewerken={true}
             aantalWeken={aantalWeken}
+            competentieLijst={competentieLijst}
           />
         </>
       )}
@@ -1078,6 +1088,7 @@ export default function StudentLogbookPage() {
               saving={saving}
               isBewerken={false}
               aantalWeken={aantalWeken}
+              competentieLijst={competentieLijst}
             />
           )}
         </>

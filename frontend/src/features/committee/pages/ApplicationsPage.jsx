@@ -34,6 +34,7 @@ function statusLabel(status) {
     aanpassingen_gevraagd: "Aanpassingen vereist",
     heringediend:          "Heringediend",
     goedgekeurd:           "Goedgekeurd",
+    goedgekeurd_met_uitzondering: "Goedgekeurd (uitzondering)",
     afgekeurd:             "Afgekeurd",
     ingetrokken:           "Ingetrokken",
   }[status] || status;
@@ -41,6 +42,7 @@ function statusLabel(status) {
 
 function statusKlasse(status) {
   if (status === "goedgekeurd")            return "s_ok";
+  if (status === "goedgekeurd_met_uitzondering") return "s_ok";
   if (status === "afgekeurd")              return "s_rood";
   if (status === "aanpassingen_gevraagd")  return "s_amber";
   if (status === "ingediend")              return "s_info";
@@ -214,21 +216,21 @@ function VoorstelKaart({ aanvraag, versie }) {
 /* ══════════════════════════════════════════
    CRITERIA KAART
 ══════════════════════════════════════════ */
-function CriteriaKaart({ aanvraag, criteria, onChange, readonly }) {
+function CriteriaKaart({ aanvraag, criteria, onChange, readonly, defs = CRITERIA_DEFS }) {
   const hints    = computeHints(aanvraag);
-  const aangevinkt = CRITERIA_DEFS.filter((c) => criteria[c.id]).length;
+  const aangevinkt = defs.filter((c) => criteria[c.id]).length;
 
   return (
     <div className="card">
       <div className="card_title">
         <i className="ti ti-list-check" />
-        Checklist ({aangevinkt}/{CRITERIA_DEFS.length})
+        Checklist ({aangevinkt}/{defs.length})
       </div>
       <p style={{ fontSize: 11.5, color: "var(--sub)", margin: "-4px 0 10px" }}>
         Verplichte criteria — vink elk criterium af. Goedkeuren kan pas als alles in orde is, of met een expliciet gemotiveerde uitzondering.
       </p>
-      {CRITERIA_DEFS.map((c, i) => {
-        const hint = hints[i];
+      {defs.map((c, i) => {
+        const hint = hints[i] || { cls: "ok", txt: "" };
         const ok   = hint.cls === "ok";
         return (
           <label key={c.id} className={`comm-crit${ok ? "" : " nok"}`} style={{ cursor: readonly ? "default" : "pointer" }}>
@@ -349,7 +351,7 @@ const ONDERDEEL_OPTIES = [
   "Algemeen",
 ];
 
-function BeslisModal({ type, aanvraag, criteria, onSluit, onBeslissing }) {
+function BeslisModal({ type, aanvraag, criteria, onSluit, onBeslissing, defs = CRITERIA_DEFS }) {
   const [feedback, setFeedback]   = useState("");
   const [onderdeel, setOnderdeel] = useState("Algemeen");
   const [motivering, setMotivering] = useState("");
@@ -358,7 +360,7 @@ function BeslisModal({ type, aanvraag, criteria, onSluit, onBeslissing }) {
   const [bezig, setBezig]         = useState(false);
   const [fout, setFout]           = useState("");
 
-  const allesCriteria = CRITERIA_DEFS.every((c) => criteria[c.id]);
+  const allesCriteria = defs.every((c) => criteria[c.id]);
 
   async function verstuur() {
     if (type === "aanpassingen" && !feedback.trim()) { setFout("Feedback is verplicht."); return; }
@@ -374,7 +376,7 @@ function BeslisModal({ type, aanvraag, criteria, onSluit, onBeslissing }) {
     try {
       // Bij goedkeuren eerst de criteria-checklist opslaan — de backend leest die bij de beslissing.
       if (type === "goedkeuren") {
-        const items = CRITERIA_DEFS.map((c) => ({
+        const items = defs.map((c) => ({
           criterium: c.label,
           isVerplicht: true,
           isInOrde: !!criteria[c.id],
@@ -589,6 +591,8 @@ function VergelijkModal({ aanvraagId, feedbackVorige, onSluit }) {
 ══════════════════════════════════════════ */
 function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
   const [criteria, setCriteria]     = useState({});
+  // Beoordelingscriteria komen uit de admin-instellingen (configureerbaar), met de vaste lijst als fallback.
+  const [criteriaDefs, setCriteriaDefs] = useState(CRITERIA_DEFS);
   const [beslissModal, setBeslis]   = useState(null); // 'aanpassingen'|'afkeuren'|'goedkeuren'
   const [vergelijkOpen, setVergelijk] = useState(false);
   const [versies, setVersies]       = useState([]);
@@ -616,6 +620,16 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
     }
   }, [aanvraag.id, status, heeftMeerdereVersies]);
 
+  // Actieve criteria uit de admin-instellingen laden (configureerbaar); valt terug op de vaste lijst.
+  useEffect(() => {
+    api.get("/committee/checklist-criteria")
+      .then((r) => {
+        const rows = r.data?.data?.criteria || [];
+        if (rows.length > 0) setCriteriaDefs(rows.map((c) => ({ id: c.id, label: c.tekst })));
+      })
+      .catch(() => {});
+  }, []);
+
   // Echte historiek + eerder opgeslagen criteriaresultaten laden.
   useEffect(() => {
     const HKEY = `committee_historiek_${aanvraag.id}`;
@@ -636,7 +650,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
           const items = r.data?.data?.items || [];
           const seed = {};
           items.forEach((it) => {
-            const def = CRITERIA_DEFS.find((c) => c.label === it.criterium);
+            const def = criteriaDefs.find((c) => c.label === it.criterium);
             if (def) seed[def.id] = !!it.is_in_orde;
           });
           if (Object.keys(seed).length > 0) { cacheSet(CKEY, seed); setCriteria(seed); }
@@ -665,6 +679,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
           type={beslissModal}
           aanvraag={aanvraag}
           criteria={criteria}
+          defs={criteriaDefs}
           onSluit={() => setBeslis(null)}
           onBeslissing={onBeslissing}
         />
@@ -793,7 +808,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
                 />
               </div>
               <div className="comm-gap-16">
-                <CriteriaKaart aanvraag={aanvraag} criteria={criteria} onChange={toggleCrit} readonly={false} />
+                <CriteriaKaart aanvraag={aanvraag} criteria={criteria} onChange={toggleCrit} readonly={false} defs={criteriaDefs} />
                 <HistoriekKaart items={historiek} />
               </div>
             </div>
@@ -812,7 +827,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
               />
             </div>
             <div className="comm-gap-16">
-              <CriteriaKaart aanvraag={aanvraag} criteria={criteria} onChange={toggleCrit} readonly={false} />
+              <CriteriaKaart aanvraag={aanvraag} criteria={criteria} onChange={toggleCrit} readonly={false} defs={criteriaDefs} />
             </div>
           </div>
         )}
@@ -821,7 +836,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
         {(isGoed || isAfgekeurd || isIngetrokken) && (
           <>
             <VoorstelKaart aanvraag={aanvraag} />
-            <CriteriaKaart aanvraag={aanvraag} criteria={criteria} onChange={() => {}} readonly />
+            <CriteriaKaart aanvraag={aanvraag} criteria={criteria} onChange={() => {}} readonly defs={criteriaDefs} />
             <HistoriekKaart items={historiek} />
           </>
         )}

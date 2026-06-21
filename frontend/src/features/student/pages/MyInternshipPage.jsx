@@ -309,7 +309,7 @@ export default function MyInternshipPage() {
         const gefilterd = soorten.filter((s) => {
           const t = (s.type ?? "").toLowerCase();
           const n = (s.naam ?? "").toLowerCase();
-          return !VERBERG_DOC.has(t) && !VERBERG_DOC.has(n);
+          return !VERBERG_DOC.has(t) && !VERBERG_DOC.has(n) && s.is_verplicht !== 0;
         });
         const alleGoed = gefilterd.length > 0 && gefilterd.every((s) => {
           const actief = docs
