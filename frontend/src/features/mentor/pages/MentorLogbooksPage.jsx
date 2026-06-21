@@ -32,6 +32,17 @@ function dat(value) {
   return new Date(value).toLocaleDateString("nl-BE");
 }
 
+// Zelfde berekening als bij de docent: welke weken (1..aantal_weken) hebben nog geen rij in de DB.
+function getOntbrekendeWeken(weken, aantalWeken) {
+  const ingevuld = new Set(weken.map((w) => w.week_nummer));
+  const totaal = Number(aantalWeken) || (weken.length > 0 ? Math.max(...weken.map((w) => w.week_nummer)) : 0);
+  const ontbrekend = [];
+  for (let n = 1; n <= totaal; n++) {
+    if (!ingevuld.has(n)) ontbrekend.push(n);
+  }
+  return ontbrekend;
+}
+
 export default function MentorLogbooksPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
@@ -180,6 +191,8 @@ export default function MentorLogbooksPage() {
   }
 
   // ─── DETAIL ───
+  const ontbrekendeWeken = getOntbrekendeWeken(weeks, detailStudent?.aantal_weken);
+
   return (
     <div className="page-inner">
         <div style={{ marginBottom: 12 }}>
@@ -192,9 +205,32 @@ export default function MentorLogbooksPage() {
 
         {loadingDetail && <div className="card"><p style={{ color: "var(--sub)", fontSize: 13 }}>Logboeken laden…</p></div>}
         {error && <div className="card"><span className="status s_rood">{error}</span></div>}
-        {!loadingDetail && !error && weeks.length === 0 && (
-          <div className="zone-act leeg"><i className="ti ti-info-circle" style={{ color: "var(--sub)" }} /><span>Nog geen ingediende weken voor deze student.</span></div>
+        {!loadingDetail && !error && weeks.length === 0 && ontbrekendeWeken.length === 0 && (
+          <div className="zone-act leeg"><i className="ti ti-info-circle" style={{ color: "var(--sub)" }} /><span>De stage is nog niet gestart — het logboek opent op de eerste stagedag.</span></div>
         )}
+
+        {!loadingDetail && ontbrekendeWeken.length > 0 && (
+          <div className="card" style={{
+            borderColor: "var(--red)", background: "#fff8f8", marginBottom: 12,
+            display: "flex", alignItems: "center", gap: 10, padding: "12px 16px",
+          }}>
+            <i className="ti ti-alert-triangle" style={{ color: "var(--red)", fontSize: 16 }} />
+            <div style={{ fontSize: 13, fontWeight: 600 }}>
+              {ontbrekendeWeken.length === 1
+                ? `Week ${ontbrekendeWeken[0]} niet ingediend`
+                : `${ontbrekendeWeken.length} weken niet ingediend (${ontbrekendeWeken.join(", ")})`}
+            </div>
+          </div>
+        )}
+
+        {!loadingDetail && ontbrekendeWeken.map((n) => (
+          <div key={`ontbreekt_${n}`} className="card" style={{ borderColor: "var(--red)", marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
+              <span style={{ fontSize: 13.5, fontWeight: 600 }}>Week {n}</span>
+              <span className="status s_rood"><i className="ti ti-alert-triangle" />Niet ingediend door student</span>
+            </div>
+          </div>
+        ))}
 
         {!loadingDetail && weeks.map((week) => {
           const wb = weekBadge(week.status);

@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
-import "../docent.css";
+import "./DocentProposalsPage.css";
+import { IconX, IconRefresh, IconEye } from "@tabler/icons-react";
+import { cacheGet, cacheSet } from "../docentCache";
 
 function getStatusClass(status) {
-  if (status === "goedgekeurd" || status === "goedgekeurd_met_uitzondering") return "s-ok";
-  if (status === "ingediend" || status === "heringediend") return "s-info";
-  if (status === "aanpassingen_gevraagd") return "s-amber";
-  if (status === "afgekeurd") return "s-rood";
-  return "s-grijs";
+  if (status === "goedgekeurd" || status === "goedgekeurd_met_uitzondering") return "s_ok";
+  if (status === "ingediend" || status === "heringediend") return "s_info";
+  if (status === "aanpassingen_gevraagd") return "s_amber";
+  if (status === "afgekeurd") return "s_rood";
+  return "s_grijs";
 }
 
 function getStatusLabel(status) {
@@ -34,13 +36,18 @@ export default function DocentProposalsPage() {
   const [detail, setDetail] = useState(null);        // { huidige, versies, beslissingen }
   const [detailLoading, setDetailLoading] = useState(false);
 
-  async function loadVoorstellen() {
+  async function loadVoorstellen(force = false) {
     try {
-      setLoading(true);
       setError("");
-      const res = await api.get("/docent/proposals", {
-      });
-      setVoorstellen(res.data.data || []);
+      if (!force) {
+        const cached = cacheGet("docent_proposals");
+        if (cached) { setVoorstellen(cached); setLoading(false); return; }
+      }
+      setLoading(true);
+      const res = await api.get("/docent/proposals");
+      const data = res.data.data || [];
+      cacheSet("docent_proposals", data);
+      setVoorstellen(data);
     } catch (err) {
       setError(err.response?.data?.message || "Voorstellen ophalen mislukt");
     } finally {
@@ -70,68 +77,73 @@ export default function DocentProposalsPage() {
   const h = detail?.huidige || null;
 
   return (
-    <div className="doc">
     <div className="page-inner">
       <div className="page-header">
         <div>
           <h1>Stagevoorstellen</h1>
           <p>Voorstellen van jouw studenten — alleen-lezen (de stagecommissie beslist).</p>
         </div>
-        <button className="btn sm" onClick={loadVoorstellen}>Vernieuwen</button>
+        <button className="btn primary" onClick={() => loadVoorstellen(true)}><IconRefresh size={14} stroke={1.8} /> Vernieuwen</button>
       </div>
 
       {loading && <div className="card"><p className="muted">Voorstellen laden...</p></div>}
-      {error && <div className="card"><span className="status s-rood">{error}</span></div>}
+      {error && <div className="card"><span className="status s_rood">{error}</span></div>}
       {!loading && !error && voorstellen.length === 0 && (
         <div className="card"><p className="muted">Geen voorstellen gevonden.</p></div>
       )}
 
       {!loading && !error && voorstellen.length > 0 && (
-        <div className="card">
-          <div className="card-title">Voorstellen ({voorstellen.length})</div>
-          <table className="tbl">
+        <div className="card doc_students_card">
+          <table className="doc_students_tbl">
             <thead>
               <tr>
                 <th>Student</th>
                 <th>Bedrijf</th>
                 <th>Stagefunctie</th>
                 <th>Status</th>
-                <th className="right">Detail</th>
+                <th style={{ textAlign: "right" }}>Detail</th>
               </tr>
             </thead>
             <tbody>
-              {voorstellen.map((v) => (
-                <tr key={v.versie_id}>
-                  <td>
-                    <strong>{v.student_naam || "-"}</strong>
-                    <br />
-                    <span className="muted">{v.studentennummer || ""}</span>
-                  </td>
-                  <td>{v.bedrijf_naam || "-"}</td>
-                  <td>{v.stagefunctie || "-"}</td>
-                  <td>
-                    <span className={"status " + getStatusClass(v.voorstel_status)}>
-                      {getStatusLabel(v.voorstel_status)}
-                    </span>
-                  </td>
-                  <td className="right">
-                    <button className="btn sm" onClick={() => openDetail(v)}>Bekijken</button>
-                  </td>
-                </tr>
-              ))}
+              {voorstellen.map((v) => {
+                const initialen = (v.student_naam || "?").split(" ").filter(Boolean).map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+                return (
+                  <tr key={v.versie_id}>
+                    <td>
+                      <div className="doc_student_cell">
+                        <div className="doc_avatar">{initialen}</div>
+                        <div className="doc_student_info">
+                          <div className="doc_naam">{v.student_naam || "-"}</div>
+                          {v.studentennummer && <div className="doc_bedrijf">{v.studentennummer}</div>}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="doc_sub">{v.bedrijf_naam || "-"}</td>
+                    <td className="doc_sub">{v.stagefunctie || "-"}</td>
+                    <td>
+                      <span className={"status " + getStatusClass(v.voorstel_status)}>
+                        {getStatusLabel(v.voorstel_status)}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <button className="btn sm" onClick={() => openDetail(v)}><IconEye size={14} stroke={1.8} /> Bekijken</button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
 
       {detail && h && (
-        <div className="modal-overlay" onClick={() => setDetail(null)}>
-          <div className="modal" style={{ maxWidth: 620 }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-head">
-              <span className="mh-t">Voorsteldetail (read-only)</span>
-              <button className="btn sm mh-x" onClick={() => setDetail(null)}><i className="ti ti-x" /></button>
+        <div className="modal_overlay" onClick={() => setDetail(null)}>
+          <div className="modal_box" style={{ maxWidth: 620 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal_header">
+              <span className="modal_title">Voorsteldetail (read-only)</span>
+              <button className="icon_btn" onClick={() => setDetail(null)}><IconX size={16} stroke={1.8} /></button>
             </div>
-            <div className="modal-body">
+            <div className="modal_body" style={{ gap: 0, overflowY: "auto", maxHeight: "70vh" }}>
               <div className="kv"><span className="k">Student</span><span className="v">{h.student_naam}</span></div>
               <div className="kv"><span className="k">Bedrijf</span><span className="v">{h.bedrijf_naam || "-"}{h.bedrijfsafdeling ? ` · ${h.bedrijfsafdeling}` : ""}</span></div>
               <div className="kv"><span className="k">Mentor</span><span className="v">{h.mentor_naam || "-"}{h.mentor_functie ? ` (${h.mentor_functie})` : ""}</span></div>
@@ -181,7 +193,6 @@ export default function DocentProposalsPage() {
           </div>
         </div>
       )}
-    </div>
     </div>
   );
 }

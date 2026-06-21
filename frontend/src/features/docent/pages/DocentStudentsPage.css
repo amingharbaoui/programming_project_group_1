@@ -1,0 +1,167 @@
+/* Header: titel links, Vernieuwen rechts */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Geen hover-effect op tabelrijen */
+.tbl tbody tr:hover td,
+.doc_students_tbl tbody tr:hover td {
+  background: transparent;
+}
+
+/* Tabel — zelfde structuur als admin UsersPage */
+.doc_students_card {
+  margin-bottom: 0;
+  padding: 18px 18px 8px;
+}
+
+.doc_students_tbl {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.doc_students_tbl th,
+.doc_students_tbl td {
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.doc_students_tbl th {
+  padding-top: 14px;
+  padding-bottom: 14px;
+  font-size: 11px;
+  letter-spacing: 0.6px;
+  color: var(--faint);
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.doc_students_tbl td {
+  padding-top: 18px;
+  padding-bottom: 18px;
+  vertical-align: middle;
+}
+
+.doc_students_tbl tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Avatar + naam cel */
+.doc_student_cell {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.doc_avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--red-light);
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.doc_student_info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.doc_naam {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--dark);
+  line-height: 1.35;
+}
+
+.doc_bedrijf {
+  font-size: 12px;
+  color: var(--sub);
+}
+
+/* Subtekst kolommen */
+.doc_sub {
+  font-size: 12.5px;
+  color: var(--sub);
+  white-space: nowrap;
+}
+
+/* Actie cel */
+.doc_actie_cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+}
+
+.doc_actie_type {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* Voortgang */
+.doc_prog_row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.doc_prog_pct {
+  font-size: 11px;
+  color: var(--sub);
+  min-width: 30px;
+}
+
+/* Filterbar */
+.doc_filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.doc_zoek {
+  flex: 1;
+  min-width: 220px;
+  max-width: 360px;
+  border: 0.5px solid var(--border);
+  border-radius: 7px;
+  padding: 7px 12px;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--dark);
+  background: var(--white);
+  outline: none;
+  transition: border-color 0.12s;
+}
+
+.doc_zoek:focus {
+  border-color: var(--red);
+}
+
+.doc_select {
+  border: 0.5px solid var(--border);
+  border-radius: 7px;
+  padding: 7px 10px;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--gray);
+  background: var(--white);
+  outline: none;
+  cursor: pointer;
+}

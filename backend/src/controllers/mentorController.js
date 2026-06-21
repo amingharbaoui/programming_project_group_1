@@ -22,6 +22,7 @@ async function getMentorStudents(req, res) {
         sd.status       AS dossier_status,
         sd.startdatum,
         sd.einddatum,
+        sd.aantal_weken,
         (
           SELECT lw.status
           FROM logboek_weken lw
