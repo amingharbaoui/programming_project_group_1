@@ -3,11 +3,30 @@
  * Transactioneel: bij een fout wordt alles teruggedraaid (de DB blijft nooit half geseed).
  * Wachtwoorden worden gehasht (pbkdf2, zelfde schema als userController) zodat echte login werkt.
  *
- * Gebruik:  node scripts/seed-demo.js
+ * Gebruik:  ALLOW_DESTRUCTIVE_SEED=true node scripts/seed-demo.js
  * Demo-wachtwoord voor ELKE gebruiker:  Demo!2026
+ *
+ * VEILIGHEID: dit script WIST ALLE data. Het weigert te draaien zonder de expliciete env-flag
+ * ALLOW_DESTRUCTIVE_SEED=true, en toont eerst welke database (host/naam) geraakt wordt. Zo kan een
+ * teamlid de gedeelde testdatabase niet per ongeluk wissen terwijl iemand anders aan het demonstreren is.
  */
 const crypto = require("crypto");
 const db = require("../src/config/db");
+
+// Harde stop tegen per ongeluk wissen van een gedeelde database.
+function guardDestructiveSeed() {
+  const host = process.env.DB_HOST || "(onbekend)";
+  const port = process.env.DB_PORT || 3306;
+  const naam = process.env.DB_NAME || "(onbekend)";
+  console.log(`\n  seed-demo.js wil ALLE data wissen en herseeden in:`);
+  console.log(`     database "${naam}" op ${host}:${port}\n`);
+  if (process.env.ALLOW_DESTRUCTIVE_SEED !== "true") {
+    console.error("  GEWEIGERD: dit wist de hele database. Draai bewust met:");
+    console.error("     ALLOW_DESTRUCTIVE_SEED=true node scripts/seed-demo.js");
+    console.error("  Doe dit NOOIT tegen een gedeelde DB terwijl iemand test of demonstreert.\n");
+    process.exit(1);
+  }
+}
 
 const DEMO_WACHTWOORD = "Demo!2026";
 function hash(pw) {
@@ -286,4 +305,5 @@ async function main() {
   }
 }
 
+guardDestructiveSeed();
 main();
