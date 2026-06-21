@@ -155,9 +155,28 @@ function BegeleidingKaart({ data, wacht, style }) {
 const VERBERG_DOC = new Set(["reflectiebijlage", "eindoverzicht", "stageovereenkomst"]);
 const DOC_ACTIE_STATUS = new Set(["ontbreekt", "afgekeurd"]);
 
-function TaakKaart({ status, contractStudentGekend, volledigGetekend, docsOk, navigate, startdatum }) {
+function TaakKaart({ status, contractStudentGekend, volledigGetekend, docsOk, navigate, startdatum, dossierStatus }) {
   if (status !== "goedgekeurd") {
     return null;
+  }
+
+  // Eindfase wordt bepaald door de dossierstatus — de voorstelstatus blijft op 'goedgekeurd' staan.
+  if (["resultaat_vrijgegeven", "afgerond", "voltooid"].includes(dossierStatus)) {
+    return (
+      <div className="taak-kaart">
+        <div className="card_title">
+          <i className="ti ti-list-check"></i>
+          Wat moet je nu doen
+        </div>
+        <div className="taak-rij">
+          <div className="taak-icon groen"><i className="ti ti-circle-check"></i></div>
+          <div className="taak-info">Je stage is afgerond. Bekijk je evaluatie en eindresultaat.</div>
+          <button className="btn primary sm" onClick={() => navigate("/student/evaluation")}>
+            Evaluatie <IconArrowRight size={13} />
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const contractOk = !!contractStudentGekend;
@@ -356,6 +375,7 @@ export default function MyInternshipPage() {
   }
 
   const currentStatus = internship?.status || (location.state?.ingediend ? "ingediend" : null);
+  const dossierStatus = internship?.dossier_status ?? internship?.dossierStatus ?? null;
   const heeftVoorstel = !!internship || location.state?.ingediend;
   const isConcept     = currentStatus === "concept";
   const isAfgesloten  = ["afgekeurd", "ingetrokken"].includes(currentStatus);
@@ -530,7 +550,7 @@ export default function MyInternshipPage() {
       {isGoedgekeurd && (
         <>
           <ProgressBar status={currentStatus} contractGetekend={volledigGetekend} startdatum={internship?.startdatum} />
-          <TaakKaart status={currentStatus} contractStudentGekend={contractStudentGekend} volledigGetekend={volledigGetekend} docsOk={docsOk} navigate={navigate} startdatum={internship?.startdatum} />
+          <TaakKaart status={currentStatus} contractStudentGekend={contractStudentGekend} volledigGetekend={volledigGetekend} docsOk={docsOk} navigate={navigate} startdatum={internship?.startdatum} dossierStatus={dossierStatus} />
           <div className="grid_2" style={{ marginTop: 16, alignItems: "stretch" }}>
             <DossierKaart
               titel={`Je stagedossier — goedgekeurd${data?.stagefunctie ? ` · ${data.stagefunctie}` : ""}`}

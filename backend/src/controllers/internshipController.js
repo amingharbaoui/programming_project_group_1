@@ -654,8 +654,10 @@ async function getMyInternship(req, res) {
         v.mentor_functie,
         v.stagefunctie,
         v.opdrachtomschrijving,
-        v.startdatum,
-        v.einddatum,
+        -- Eén bron van waarheid voor de stageperiode: zodra er een dossier is, gelden de dossierdatums
+        -- (waarop ook de routeguard/het contract zich baseren). Vóór goedkeuring de voorsteldatums.
+        COALESCE(d.startdatum, v.startdatum) AS startdatum,
+        COALESCE(d.einddatum, v.einddatum) AS einddatum,
         v.aantal_weken,
         v.uren_per_week,
         v.totaal_uren,

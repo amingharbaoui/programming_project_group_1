@@ -149,8 +149,13 @@ function Matrix({ competenties, studentScores, mentorScores, docentScores, kanIn
 function CompModal({ competentie, huidigScore, huidigMot, onSave, onSluit }) {
   const [score, setScore] = useState(huidigScore ?? null);
   const [motivering, setMotivering] = useState(huidigMot ?? "");
+  const [fout, setFout] = useState("");
 
   function handleSave() {
+    // Motivering staat als verplicht (*) — dwing dat ook echt af, samen met een score.
+    if (!score) { setFout("Kies eerst een score."); return; }
+    if (!motivering.trim()) { setFout("Motivering is verplicht — verwijs naar concrete voorbeelden uit je logboek."); return; }
+    setFout("");
     onSave(competentie.id, score, motivering);
     onSluit();
   }
@@ -201,6 +206,8 @@ function CompModal({ competentie, huidigScore, huidigMot, onSave, onSluit }) {
           onChange={(e) => setMotivering(e.target.value)}
         />
       </div>
+
+      {fout && <p className="status s_rood" style={{ marginTop: 4 }}>{fout}</p>}
     </Modal>
   );
 }
@@ -217,6 +224,7 @@ export default function StudentEvaluationPage() {
   const [bezig, setBezig]         = useState(false);
   const [melding, setMelding]     = useState(null);
   const [openComp, setOpenComp]   = useState(null); // competentie object
+  const [activeType, setActiveType] = useState(null); // null = automatische keuze (tussentijds/finaal)
 
   async function laadData() {
     setLoading(true);
@@ -227,7 +235,7 @@ export default function StudentEvaluationPage() {
       const data = cached ?? (await apiRequest("GET", `/evaluations/${user.id}`)).data;
       if (!cached && data) cacheSet(KEY, data);
       setData(data);
-      const actief = getActieveEval(data?.evaluaties);
+      const actief = huidigeEval();
       if (actief) {
         const init = {};
         (actief.scores || []).filter((s) => s.rol === "student").forEach((s) => {
@@ -247,6 +255,23 @@ export default function StudentEvaluationPage() {
   function getActieveEval(evaluaties) {
     if (!evaluaties) return null;
     return evaluaties.find((e) => e.status === "open") || evaluaties[evaluaties.length - 1] || null;
+  }
+
+  // De evaluatie die nu getoond/bewerkt wordt: de gekozen tab, anders de automatische keuze.
+  function huidigeEval() {
+    const evs = data?.evaluaties;
+    return (activeType && evs?.find((e) => e.type === activeType)) || getActieveEval(evs);
+  }
+
+  // Wisselen tussen tussentijdse en finale evaluatie: scores opnieuw inladen voor die evaluatie.
+  function kiesTab(type) {
+    setActiveType(type);
+    const ev = data?.evaluaties?.find((e) => e.type === type);
+    const init = {};
+    (ev?.scores || []).filter((s) => s.rol === "student").forEach((s) => {
+      init[s.competentie_id] = { score: s.score, motivering: s.motivering };
+    });
+    setScores(init);
   }
 
   async function handleDownloadEindoverzicht() {
@@ -276,7 +301,7 @@ export default function StudentEvaluationPage() {
   async function handleSaveScore(compId, score, motivering) {
     setScores((prev) => ({ ...prev, [compId]: { score, motivering } }));
     // Auto-opslaan in achtergrond
-    const actief = getActieveEval(data?.evaluaties);
+    const actief = huidigeEval();
     if (!actief) return;
     try {
       const allScores = { ...scores, [compId]: { score, motivering } };
@@ -289,20 +314,28 @@ export default function StudentEvaluationPage() {
         })),
       };
       await apiRequest("POST", `/evaluations/${actief.id}/scores`, payload);
-    } catch {
-      /* stil falen, score is al lokaal opgeslagen */
+    } catch (err) {
+      // Autosave-fout zichtbaar maken i.p.v. stil inslikken — anders denkt de student dat het bewaard is.
+      setMelding({ type: "fout", tekst: err.response?.data?.message || "Automatisch opslaan mislukt — probeer opnieuw of dien later in." });
     }
   }
 
   async function handleIndienen() {
-    const actief = getActieveEval(data?.evaluaties);
+    const actief = huidigeEval();
     if (!actief) return;
+    // Indienen vereist per competentie zowel een score als een motivering (zoals de UI met * aangeeft).
+    const comps = data?.competenties || [];
+    const onvolledig = comps.find((c) => !scores[c.id]?.score || !String(scores[c.id]?.motivering || "").trim());
+    if (onvolledig) {
+      setMelding({ type: "fout", tekst: "Vul voor elke competentie een score én een motivering in voor je indient." });
+      return;
+    }
     setBezig(true);
     setMelding(null);
     try {
       const payload = {
         ingediend: true,
-        scores: (data?.competenties || []).map((c) => ({
+        scores: comps.map((c) => ({
           competentie_id: c.id,
           score: scores[c.id]?.score ?? null,
           motivering: scores[c.id]?.motivering ?? "",
@@ -344,7 +377,7 @@ export default function StudentEvaluationPage() {
   const { evaluaties, competenties } = data;
   const tussentijds = evaluaties.find((e) => e.type === "tussentijds") || null;
   const finale      = evaluaties.find((e) => e.type === "finaal")      || null;
-  const actief      = getActieveEval(evaluaties);
+  const actief      = huidigeEval();
 
   const isIngediend   = !!actief?.student_ingediend_op;
   const isVrijgegeven = actief?.status === "vrijgegeven";
@@ -377,6 +410,23 @@ export default function StudentEvaluationPage() {
       </div>
 
       <EvalTrack tussentijds={tussentijds} finale={finale} />
+
+      {tussentijds && finale && (
+        <div className="actions" style={{ margin: "0 0 12px", gap: 8 }}>
+          <button
+            className={`btn sm${actief?.type === "tussentijds" ? " primary" : ""}`}
+            onClick={() => kiesTab("tussentijds")}
+          >
+            Tussentijdse evaluatie
+          </button>
+          <button
+            className={`btn sm${actief?.type === "finaal" ? " primary" : ""}`}
+            onClick={() => kiesTab("finaal")}
+          >
+            Finale evaluatie
+          </button>
+        </div>
+      )}
 
       {melding && (
         <div className={`melding melding-${melding.type === "ok" ? "ok" : "fout"}`}>
