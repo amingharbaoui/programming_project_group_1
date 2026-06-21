@@ -171,7 +171,7 @@ export default function MentorLogbooksPage() {
           {studenten.length > 0 && (
             <div className="card" style={{ padding: "6px 14px" }}>
               <table className="tbl">
-                <thead><tr><th>Student</th><th>Stand</th><th>Status</th><th></th></tr></thead>
+                <thead><tr><th>Student</th><th>Bedrijf</th><th>Status</th><th></th></tr></thead>
                 <tbody>
                   {studenten.map((s) => {
                     const lb = weekBadge(s.logboek_status);
