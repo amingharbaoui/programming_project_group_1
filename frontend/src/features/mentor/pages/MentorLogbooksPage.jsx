@@ -19,6 +19,15 @@ function weekBadge(status) {
   return { cls: "s_info", icon: "ti-pencil", txt: "In opbouw" };
 }
 
+// Fase-bewuste status voor het overzicht: een student buiten de logboekfase mag geen "In opbouw" tonen.
+function logboekBadge(s) {
+  const ds = s.dossier_status;
+  if (["afgerond", "voltooid", "resultaat_vrijgegeven"].includes(ds)) return { cls: "s_grijs", icon: "ti-flag-check", txt: "Afgerond" };
+  if (!["stage_loopt", "actief", "geregistreerd"].includes(ds)) return { cls: "s_grijs", icon: "ti-clock", txt: "Nog niet gestart" };
+  if (!s.logboek_status) return { cls: "s_grijs", icon: "ti-minus", txt: "Nog geen logboek" };
+  return weekBadge(s.logboek_status);
+}
+
 function dagIndex(datum) {
   return (new Date(datum).getDay() + 6) % 7; // ma=0 … zo=6
 }
@@ -174,7 +183,7 @@ export default function MentorLogbooksPage() {
                 <thead><tr><th>Student</th><th>Bedrijf</th><th>Status</th><th></th></tr></thead>
                 <tbody>
                   {studenten.map((s) => {
-                    const lb = weekBadge(s.logboek_status);
+                    const lb = logboekBadge(s);
                     return (
                       <tr key={s.dossier_id ?? s.id}>
                         <td>

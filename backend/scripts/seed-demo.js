@@ -231,13 +231,16 @@ async function main() {
     await doc(dStart, 3, "goedgekeurd", new Date());
 
     // 16 — STAGE LOOPT: logboek + open tussentijdse evaluatie
-    const dLoopt = await dossier(16, vLoopt, 2, "stage_loopt", "2026-02-09");
+    // Lopende stage die op de demodatum nog niet voorbij is (eind 31/8) zodat de student mid-stage staat
+    // i.p.v. 100%. Hieronder wordt aantal_weken op de periode afgestemd (anders klopt de voortgang niet).
+    const dLoopt = await dossier(16, vLoopt, 2, "stage_loopt", "2026-02-09", "2026-08-31");
+    await q("UPDATE stagedossiers SET aantal_weken = 26, totaal_uren = 988 WHERE id = ?", [dLoopt]);
     await ovk(dLoopt, "geregistreerd", { student: new Date(), bedrijf: new Date(), opleiding: new Date() });
     await doc(dLoopt, 1, "geregistreerd", new Date());
     await doc(dLoopt, 2, "goedgekeurd", new Date());
     await doc(dLoopt, 3, "goedgekeurd", new Date());
     await q(`INSERT INTO planning_momenten (stagedossier_id, type, status, gepland_op, locatie, voorgesteld_door_id, aangemaakt_op, aangepast_op)
-             VALUES (?, 'bedrijfsbezoek', 'voorgesteld', '2026-04-20 10:00:00', 'CodeLab Brussels', 2, NOW(), NOW())`, [dLoopt]);
+             VALUES (?, 'bedrijfsbezoek', 'voorgesteld', '2026-06-25 10:00:00', 'CodeLab Brussels', 2, NOW(), NOW())`, [dLoopt]);
     await q(`INSERT INTO evaluaties (id, stagedossier_id, type, status, aangemaakt_op, aangepast_op) VALUES
       (1, ?, 'tussentijds', 'open', NOW(), NOW()),
       (2, ?, 'finaal', 'niet_open', NOW(), NOW())`, [dLoopt, dLoopt]);

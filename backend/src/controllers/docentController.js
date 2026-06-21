@@ -40,7 +40,8 @@ async function getDocentStudents(req, res) {
           WHERE e.stagedossier_id = sd.id AND e.status IN ('klaar_voor_docent','klaar_voor_vrijgave')
           ORDER BY e.deadline_docent IS NULL, e.deadline_docent ASC LIMIT 1) AS actie_deadline,
         (SELECT COUNT(*) FROM planning_momenten pm
-          WHERE pm.stagedossier_id = sd.id AND pm.type = 'bedrijfsbezoek') AS aantal_bezoeken
+          WHERE pm.stagedossier_id = sd.id AND pm.type = 'bedrijfsbezoek'
+            AND pm.status NOT IN ('geannuleerd', 'alternatief_gevraagd')) AS aantal_bezoeken
       FROM stagedossiers sd
       JOIN studenten   st ON st.gebruiker_id = sd.student_id
       JOIN gebruikers   g ON g.id             = st.gebruiker_id
