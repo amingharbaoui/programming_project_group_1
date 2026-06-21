@@ -291,6 +291,15 @@ async function createNewVersion(req, res) {
   try {
     await conn.beginTransaction();
 
+    // Veiligheid: een actief profiel mag nooit destructief gereset worden (zelfde regel als wijzigen/
+    // verwijderen/toevoegen). Voor een nieuwe versie hoort 'dupliceren', niet dit profiel leegmaken.
+    const [prof] = await conn.query("SELECT status FROM competentie_profielen WHERE id = ? LIMIT 1", [profielId]);
+    if (prof.length === 0) { await conn.rollback(); return fail(res, 404, "Profiel niet gevonden"); }
+    if (prof[0].status === "actief") {
+      await conn.rollback();
+      return fail(res, 409, "Een actief competentieprofiel is read-only; dupliceer het om een nieuwe versie te maken");
+    }
+
     // Veiligheid: nooit een profiel resetten waarvan al evaluatiescores bestaan — dupliceer dan i.p.v. wissen.
     const [scoreCount] = await conn.query(
       `SELECT COUNT(*) AS aantal FROM competentie_scores cs
