@@ -6,23 +6,37 @@ import "./DocentLogbooksPage.css";
 import { IconAlertTriangle, IconBell, IconCheck, IconX, IconRefresh, IconChevronDown } from "@tabler/icons-react";
 import { cacheGet, cacheSet, cacheDelete } from "../docentCache";
 
+// Alle mogelijke statussen van logboek_weken:
+// niet_gestart · in_opbouw · ingediend · ontbreekt · afgecheckt_door_mentor
+// teruggestuurd_door_mentor · klaar_voor_docent · teruggestuurd_door_docent
+// goedgekeurd_door_docent · afgesloten
 function getStatusClass(status) {
-  if (status === "goedgekeurd_door_docent") return "s_ok";
-  if (status === "afgecheckt_door_mentor") return "s_info";
-  if (status === "ingediend") return "s_info";
+  if (status === "goedgekeurd_door_docent" || status === "afgesloten") return "s_ok";
+  if (status === "klaar_voor_docent") return "s_amber";
+  if (status === "afgecheckt_door_mentor" || status === "ingediend") return "s_info";
   if (status?.includes("teruggestuurd")) return "s_rood";
-  return "s_grijs";
+  if (status === "ontbreekt") return "s_rood";
+  return "s_grijs"; // niet_gestart, in_opbouw, onbekend
 }
 
 function getStatusLabel(status) {
-  if (status === "goedgekeurd_door_docent") return "Goedgekeurd door docent";
-  if (status === "afgecheckt_door_mentor") return "Afgecheckt door mentor";
-  if (status === "ingediend") return "Ingediend door student";
-  if (status === "teruggestuurd_door_docent") return "Teruggestuurd door docent";
-  if (status === "teruggestuurd_door_mentor") return "Teruggestuurd door mentor";
-  if (status === "in_opbouw") return "In opbouw";
-  return status || "-";
+  const labels = {
+    niet_gestart:             "Nog niet gestart",
+    in_opbouw:                "In opbouw bij student",
+    ingediend:                "Ingediend door student",
+    ontbreekt:                "Niet ingediend",
+    afgecheckt_door_mentor:   "Nagekeken door mentor",
+    teruggestuurd_door_mentor:"Teruggestuurd door mentor",
+    klaar_voor_docent:        "Klaar om na te lezen",
+    teruggestuurd_door_docent:"Teruggestuurd door jou",
+    goedgekeurd_door_docent:  "Goedgekeurd door jou",
+    afgesloten:               "Afgesloten",
+  };
+  return labels[status] || status || "-";
 }
+
+// Weken waar de docent actie op kan nemen (feedback + goedkeuren/terugsturen)
+const KAN_REVIEWEN = ["afgecheckt_door_mentor", "klaar_voor_docent"];
 
 function formatDate(value) {
   if (!value) return "-";
@@ -356,34 +370,36 @@ export default function DocentLogbooksPage() {
               </table>
             )}
 
-            {!["goedgekeurd_door_docent"].includes(week.status) && (
+            {KAN_REVIEWEN.includes(week.status) && (
               <>
-                <div className="form_group" style={{ marginTop: "14px" }}>
-                  <label className="form_label">Feedback docent</label>
+                <div className="form_group" style={{ marginTop: "12px" }}>
+                  <label className="form_label">Feedback (optioneel)</label>
                   <textarea
-                    className="form_textarea"
-                    placeholder="Geef feedback als docent..."
+                    className="form_input"
+                    rows={2}
                     value={feedbackByWeek[week.id] || ""}
                     onChange={(e) =>
-                      setFeedbackByWeek({ ...feedbackByWeek, [week.id]: e.target.value })
+                      setFeedbackByWeek((prev) => ({ ...prev, [week.id]: e.target.value }))
                     }
+                    placeholder="Voeg eventuele feedback toe voor de student..."
+                    style={{ resize: "vertical" }}
                   />
                 </div>
-
                 <div className="actions" style={{ marginTop: "8px" }}>
-                  <button
-                    className="btn"
-                    disabled={actionLoadingId === week.id}
-                    onClick={() => reviewWeek(week.id, true)}
-                  >
-                    Aanpassing vragen
-                  </button>
                   <button
                     className="btn primary"
                     disabled={actionLoadingId === week.id}
                     onClick={() => reviewWeek(week.id, false)}
                   >
-                    {actionLoadingId === week.id ? "Verwerken..." : "Nagekeken"}
+                    <IconCheck size={14} stroke={2} />
+                    {actionLoadingId === week.id ? "Bezig..." : "Goedkeuren"}
+                  </button>
+                  <button
+                    className="btn"
+                    disabled={actionLoadingId === week.id}
+                    onClick={() => reviewWeek(week.id, true)}
+                  >
+                    Terugsturen
                   </button>
                 </div>
               </>
@@ -391,20 +407,25 @@ export default function DocentLogbooksPage() {
           </div>
         );
       })}
+
       {/* Herinnering modal */}
       {remindModal.open && (
-        <div className="modal_overlay" onClick={() => setRemindModal({ ...remindModal, open: false })}>
-          <div className="modal_box" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal_overlay" onClick={() => setRemindModal({ open: false, succes: true, tekst: "" })}>
+          <div className="modal_box" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal_header">
-              <span className="modal_title">{remindModal.succes ? "Herinnering verstuurd" : "Actie vereist"}</span>
-              <button className="icon_btn" onClick={() => setRemindModal({ ...remindModal, open: false })}>
+              <span className="modal_title">
+                {remindModal.succes ? "Herinnering verstuurd" : "Actie vereist"}
+              </span>
+              <button className="icon_btn" onClick={() => setRemindModal({ open: false, succes: true, tekst: "" })}>
                 <IconX size={16} stroke={1.8} />
               </button>
             </div>
             <div className="modal_body">
               <p style={{ margin: 0, fontSize: 13, color: "var(--sub)" }}>{remindModal.tekst}</p>
               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-                <button className="btn primary" onClick={() => setRemindModal({ ...remindModal, open: false })}>OK</button>
+                <button className="btn primary" onClick={() => setRemindModal({ open: false, succes: true, tekst: "" })}>
+                  OK
+                </button>
               </div>
             </div>
           </div>
@@ -413,4 +434,3 @@ export default function DocentLogbooksPage() {
     </div>
   );
 }
-

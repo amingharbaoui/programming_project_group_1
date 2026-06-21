@@ -10,27 +10,31 @@ function formatDateTime(val) {
   return new Date(val).toLocaleString("nl-BE", { dateStyle: "short", timeStyle: "short" });
 }
 
+// Alle mogelijke statussen van planning_momenten:
+// voorgesteld · bevestigd · alternatief_gevraagd · gepland · gegeven · geweest · geannuleerd
 function getStatusClass(status) {
-  if (status === "bevestigd") return "s_ok";
+  if (status === "bevestigd" || status === "gepland") return "s_ok";
   if (status === "voorgesteld") return "s_amber";
-  if (status === "gegeven" || status === "geweest" || status === "afgerond") return "s_info";
   if (status === "alternatief_gevraagd") return "s_amber";
+  if (status === "gegeven" || status === "geweest") return "s_info";
   if (status === "geannuleerd") return "s_rood";
   return "s_grijs";
 }
 
 function getStatusLabel(status) {
-  if (status === "bevestigd") return "Bevestigd";
-  if (status === "voorgesteld") return "Wacht op bevestiging";
-  if (status === "alternatief_gevraagd") return "Alternatief voorgesteld";
-  if (status === "gegeven") return "Gegeven";
-  if (status === "geweest") return "Geweest";
-  if (status === "afgerond") return "Afgerond";
-  if (status === "geannuleerd") return "Geannuleerd";
-  return status || "-";
+  const labels = {
+    voorgesteld:          "Wacht op bevestiging mentor",
+    bevestigd:            "Bevestigd door mentor",
+    alternatief_gevraagd: "Mentor stelt ander moment voor",
+    gepland:              "Gepland",
+    gegeven:              "Gegeven",
+    geweest:              "Geweest",
+    geannuleerd:          "Geannuleerd",
+  };
+  return labels[status] || status || "-";
 }
 
-const AFGEHANDELD = ["gegeven", "geweest", "afgerond", "geannuleerd"];
+const AFGEHANDELD = ["gegeven", "geweest", "geannuleerd"];
 
 const TYPE_OPTIES = [
   { key: "alle", label: "Alle types" },

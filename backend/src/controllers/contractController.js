@@ -189,7 +189,7 @@ async function registerOvereenkomst(req, res) {
     const [docs] = await conn.query(
       `SELECT COUNT(*) AS openstaand
        FROM documenten doc JOIN document_soorten ds ON ds.id = doc.document_soort_id
-       WHERE doc.stagedossier_id = ? AND ds.is_verplicht = 1 AND doc.status NOT IN ('goedgekeurd', 'geregistreerd')`,
+       WHERE doc.stagedossier_id = ? AND ds.is_verplicht = 1 AND ds.type != 'stageovereenkomst' AND doc.status NOT IN ('goedgekeurd', 'geregistreerd')`,
       [dossierId]
     );
     if (docs[0].openstaand > 0) {

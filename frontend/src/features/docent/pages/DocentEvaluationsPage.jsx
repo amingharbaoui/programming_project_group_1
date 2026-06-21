@@ -6,26 +6,32 @@ import "./DocentEvaluationsPage.css";
 import { IconCircleCheck, IconEye, IconX } from "@tabler/icons-react";
 import { cacheGet, cacheSet, cacheDelete } from "../docentCache";
 
+// Alle mogelijke statussen van evaluaties:
+// niet_open · open · student_ingediend · mentor_ingediend · klaar_voor_docent
+// geregistreerd · klaar_voor_vrijgave · vrijgegeven
 function getEvalStatusClass(status) {
-  if (status === "open") return "s_amber";
-  if (status === "student_ingediend") return "s_info";
-  if (status === "mentor_ingediend") return "s_amber";
-  if (status === "geregistreerd") return "s_ok";
+  if (status === "vrijgegeven" || status === "geregistreerd") return "s_ok";
   if (status === "klaar_voor_vrijgave") return "s_ok";
-  if (status === "vrijgegeven") return "s_ok";
+  if (status === "klaar_voor_docent") return "s_amber"; // actie vereist van docent
+  if (status === "mentor_ingediend") return "s_info";
+  if (status === "student_ingediend") return "s_info";
+  if (status === "open") return "s_grijs";
   if (status === "niet_open") return "s_grijs";
   return "s_grijs";
 }
 
 function getEvalStatusLabel(status) {
-  if (status === "open") return "Open";
-  if (status === "student_ingediend") return "Student ingediend";
-  if (status === "mentor_ingediend") return "Mentor ingediend";
-  if (status === "geregistreerd") return "Geregistreerd";
-  if (status === "klaar_voor_vrijgave") return "Klaar voor vrijgave";
-  if (status === "vrijgegeven") return "Vrijgegeven";
-  if (status === "niet_open") return "Niet open";
-  return status || "-";
+  const labels = {
+    niet_open:          "Nog niet beschikbaar",
+    open:               "Geopend",
+    student_ingediend:  "Student ingediend",
+    mentor_ingediend:   "Mentor ingediend",
+    klaar_voor_docent:  "Klaar om in te vullen",
+    geregistreerd:      "Geregistreerd",
+    klaar_voor_vrijgave:"Klaar om vrij te geven",
+    vrijgegeven:        "Vrijgegeven",
+  };
+  return labels[status] || status || "-";
 }
 
 // Korte fase-omschrijving van het dossier voor de evaluatielijst.
@@ -490,6 +496,8 @@ export default function DocentEvaluationsPage() {
   const [evalData, setEvalData]           = useState(null);
   const [loadingEval, setLoadingEval]     = useState(false);
   const [activeType, setActiveType]       = useState("tussentijds");
+  const [zoek, setZoek]                   = useState("");
+  const [filterStatus, setFilterStatus]   = useState("alle");
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
@@ -553,6 +561,16 @@ export default function DocentEvaluationsPage() {
 
   const geselecteerdeStudent = studenten.find((s) => s.id === geselecteerdId);
 
+  const gefilterd = studenten.filter((s) => {
+    if (zoek) {
+      const q = zoek.toLowerCase();
+      if (!`${s.voornaam} ${s.achternaam}`.toLowerCase().includes(q) &&
+          !(s.bedrijf || "").toLowerCase().includes(q)) return false;
+    }
+    if (filterStatus === "actie") return s.actie_type === "evaluatie";
+    return true;
+  });
+
   return (
     <div className="page-inner">
       <div className="page-header">
@@ -562,17 +580,39 @@ export default function DocentEvaluationsPage() {
         </div>
       </div>
 
+      <div className="doc_filters" style={{ marginBottom: 16 }}>
+        <input
+          className="doc_zoek"
+          placeholder="Zoek op student of bedrijf..."
+          value={zoek}
+          onChange={(e) => setZoek(e.target.value)}
+        />
+        <select
+          className="doc_select"
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+        >
+          <option value="alle">Alle studenten</option>
+          <option value="actie">Actie nodig</option>
+        </select>
+        {(zoek || filterStatus !== "alle") && (
+          <button className="btn sm primary" onClick={() => { setZoek(""); setFilterStatus("alle"); }}>
+            Wis filters
+          </button>
+        )}
+      </div>
+
       {loading && (
         <div className="card">
           <p className="muted">Studenten laden...</p>
         </div>
       )}
 
-      {!loading && studenten.length === 0 && (
+      {!loading && gefilterd.length === 0 && (
         <div className="card"><p className="muted">Geen studenten gevonden.</p></div>
       )}
 
-      {!loading && studenten.length > 0 && (
+      {!loading && gefilterd.length > 0 && (
         <div className="card doc_students_card" style={{ marginBottom: "16px" }}>
           <table className="doc_students_tbl">
             <thead>
@@ -586,7 +626,7 @@ export default function DocentEvaluationsPage() {
               </tr>
             </thead>
             <tbody>
-              {studenten.map((s) => {
+              {gefilterd.map((s) => {
                 const initialen = [s.voornaam, s.achternaam].filter(Boolean).map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?";
                 return (
                   <tr key={s.dossier_id}>
@@ -600,16 +640,20 @@ export default function DocentEvaluationsPage() {
                       </div>
                     </td>
                     <td className="doc_sub">{s.bedrijf || "-"}</td>
-                    <td className="doc_sub">
-                      {s.mentor_voornaam ? `${s.mentor_voornaam} ${s.mentor_achternaam}` : "-"}
+                              <td className="doc_sub">
+                      {s.mentor_voornaam ? `${s.mentor_voornaam} ${s.mentor_achternaam || ""}`.trim() : "-"}
                     </td>
                     <td className="doc_sub">{faseLabelKort(s.dossier_status)}</td>
                     <td>
                       {(() => { const b = evalActieBadge(s); return <span className={`status ${b.cls}`}>{b.txt}</span>; })()}
                     </td>
                     <td style={{ textAlign: "right" }}>
-                      <button className="btn sm" onClick={() => handleBekijken(s)}>
-                        <IconEye size={14} stroke={1.8} /> {geselecteerdId === s.id ? "Sluiten" : "Bekijken"}
+                      <button
+                        className={`btn sm${geselecteerdId === s.id ? " primary" : ""}`}
+                        onClick={() => handleBekijken(s)}
+                      >
+                        <IconEye size={14} stroke={1.8} />
+                        {geselecteerdId === s.id ? "Sluiten" : "Bekijken"}
                       </button>
                     </td>
                   </tr>
@@ -620,24 +664,25 @@ export default function DocentEvaluationsPage() {
         </div>
       )}
 
-      {/* Detail sectie */}
-      {geselecteerdId && (
-        <div>
-          <div className="doc_eval_detail_header">
-            <h2 className="doc_eval_detail_title">
-              {geselecteerdeStudent
-                ? `${geselecteerdeStudent.voornaam} ${geselecteerdeStudent.achternaam}`
-                : ""}
-            </h2>
-            <div className="doc_eval_tabs">
+      {/* Eval detail */}
+      {geselecteerdeStudent && (
+        <>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 15 }}>
+                {geselecteerdeStudent.voornaam} {geselecteerdeStudent.achternaam}
+              </div>
+              <div style={{ fontSize: 12.5, color: "var(--sub)" }}>{geselecteerdeStudent.bedrijf || "-"}</div>
+            </div>
+            <div className="actions">
               <button
-                className={`doc_eval_tab${activeType === "tussentijds" ? " actief" : ""}`}
+                className={`btn sm${activeType === "tussentijds" ? " primary" : ""}`}
                 onClick={() => setActiveType("tussentijds")}
               >
                 Tussentijds
               </button>
               <button
-                className={`doc_eval_tab${activeType === "finaal" ? " actief" : ""}`}
+                className={`btn sm${activeType === "finaal" ? " primary" : ""}`}
                 onClick={() => setActiveType("finaal")}
               >
                 Finaal
@@ -646,22 +691,20 @@ export default function DocentEvaluationsPage() {
           </div>
 
           {loadingEval && (
-            <div className="card">
-              <p className="muted">Evaluatie laden...</p>
-            </div>
+            <div className="card"><p className="muted">Evaluatie laden...</p></div>
           )}
 
           {!loadingEval && evalData && (
             <EvalDetail
               evalData={evalData}
               activeType={activeType}
-              userId={user.id}
+              userId={geselecteerdId}
               onRefresh={() => { cacheDelete(`docent_eval_${geselecteerdId}`); cacheDelete("docent_students"); loadEval(geselecteerdId, true); }}
-              stagedossierId={geselecteerdeStudent?.dossier_id}
+              stagedossierId={evalData.stagedossierId ?? geselecteerdeStudent?.dossier_id}
               dossierStatus={geselecteerdeStudent?.dossier_status}
             />
           )}
-        </div>
+        </>
       )}
     </div>
   );

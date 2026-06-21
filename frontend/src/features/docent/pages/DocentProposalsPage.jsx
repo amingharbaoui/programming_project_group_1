@@ -5,22 +5,28 @@ import "./DocentProposalsPage.css";
 import { IconX, IconRefresh, IconEye } from "@tabler/icons-react";
 import { cacheGet, cacheSet } from "../docentCache";
 
+// Alle mogelijke statussen van stagevoorstellen:
+// concept · ingediend · aanpassingen_gevraagd · heringediend · goedgekeurd · afgekeurd · ingetrokken
 function getStatusClass(status) {
   if (status === "goedgekeurd" || status === "goedgekeurd_met_uitzondering") return "s_ok";
   if (status === "ingediend" || status === "heringediend") return "s_info";
   if (status === "aanpassingen_gevraagd") return "s_amber";
-  if (status === "afgekeurd") return "s_rood";
-  return "s_grijs";
+  if (status === "afgekeurd" || status === "ingetrokken") return "s_rood";
+  return "s_grijs"; // concept
 }
 
 function getStatusLabel(status) {
-  if (status === "goedgekeurd") return "Goedgekeurd";
-  if (status === "goedgekeurd_met_uitzondering") return "Goedgekeurd (uitzondering)";
-  if (status === "ingediend") return "Ingediend";
-  if (status === "heringediend") return "Heringediend";
-  if (status === "aanpassingen_gevraagd") return "Aanpassingen gevraagd";
-  if (status === "afgekeurd") return "Afgekeurd";
-  return status || "-";
+  const labels = {
+    concept:                    "Concept",
+    ingediend:                  "Ingediend",
+    aanpassingen_gevraagd:      "Aanpassingen gevraagd",
+    heringediend:               "Heringediend",
+    goedgekeurd:                "Goedgekeurd",
+    goedgekeurd_met_uitzondering:"Goedgekeurd (uitzondering)",
+    afgekeurd:                  "Afgekeurd",
+    ingetrokken:                "Ingetrokken door student",
+  };
+  return labels[status] || status || "-";
 }
 
 function formatDate(v) {
@@ -33,8 +39,10 @@ export default function DocentProposalsPage() {
   const [voorstellen, setVoorstellen] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [detail, setDetail] = useState(null);        // { huidige, versies, beslissingen }
+  const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [zoek, setZoek] = useState("");
+  const [filterStatus, setFilterStatus] = useState("alle");
 
   async function loadVoorstellen(force = false) {
     try {
@@ -76,6 +84,25 @@ export default function DocentProposalsPage() {
 
   const h = detail?.huidige || null;
 
+  const STATUS_OPTIES = [
+    { key: "alle", label: "Alle statussen" },
+    { key: "ingediend", label: "Ingediend" },
+    { key: "heringediend", label: "Heringediend" },
+    { key: "aanpassingen_gevraagd", label: "Aanpassingen gevraagd" },
+    { key: "goedgekeurd", label: "Goedgekeurd" },
+    { key: "afgekeurd", label: "Afgekeurd" },
+  ];
+
+  const gefilterd = voorstellen.filter((v) => {
+    if (zoek) {
+      const q = zoek.toLowerCase();
+      if (!(v.student_naam || "").toLowerCase().includes(q) &&
+          !(v.bedrijf_naam || "").toLowerCase().includes(q)) return false;
+    }
+    if (filterStatus !== "alle" && v.voorstel_status !== filterStatus) return false;
+    return true;
+  });
+
   return (
     <div className="page-inner">
       <div className="page-header">
@@ -86,13 +113,36 @@ export default function DocentProposalsPage() {
         <button className="btn primary" onClick={() => loadVoorstellen(true)}><IconRefresh size={14} stroke={1.8} /> Vernieuwen</button>
       </div>
 
+      <div className="doc_filters" style={{ marginBottom: 16 }}>
+        <input
+          className="doc_zoek"
+          placeholder="Zoek op student of bedrijf..."
+          value={zoek}
+          onChange={(e) => setZoek(e.target.value)}
+        />
+        <select
+          className="doc_select"
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+        >
+          {STATUS_OPTIES.map((o) => (
+            <option key={o.key} value={o.key}>{o.label}</option>
+          ))}
+        </select>
+        {(zoek || filterStatus !== "alle") && (
+          <button className="btn sm primary" onClick={() => { setZoek(""); setFilterStatus("alle"); }}>
+            Wis filters
+          </button>
+        )}
+      </div>
+
       {loading && <div className="card"><p className="muted">Voorstellen laden...</p></div>}
       {error && <div className="card"><span className="status s_rood">{error}</span></div>}
-      {!loading && !error && voorstellen.length === 0 && (
+      {!loading && !error && gefilterd.length === 0 && (
         <div className="card"><p className="muted">Geen voorstellen gevonden.</p></div>
       )}
 
-      {!loading && !error && voorstellen.length > 0 && (
+      {!loading && !error && gefilterd.length > 0 && (
         <div className="card doc_students_card">
           <table className="doc_students_tbl">
             <thead>
@@ -105,7 +155,7 @@ export default function DocentProposalsPage() {
               </tr>
             </thead>
             <tbody>
-              {voorstellen.map((v) => {
+              {gefilterd.map((v) => {
                 const initialen = (v.student_naam || "?").split(" ").filter(Boolean).map((n) => n[0]).join("").toUpperCase().slice(0, 2);
                 return (
                   <tr key={v.versie_id}>
@@ -140,10 +190,10 @@ export default function DocentProposalsPage() {
         <div className="modal_overlay" onClick={() => setDetail(null)}>
           <div className="modal_box" style={{ maxWidth: 620 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal_header">
-              <span className="modal_title">Voorsteldetail (read-only)</span>
+              <span className="modal_title">Voorsteldetail</span>
               <button className="icon_btn" onClick={() => setDetail(null)}><IconX size={16} stroke={1.8} /></button>
             </div>
-            <div className="modal_body" style={{ gap: 0, overflowY: "auto", maxHeight: "70vh" }}>
+            <div className="modal_body" style={{ overflowY: "auto", maxHeight: "75vh" }}>
               <div className="kv"><span className="k">Student</span><span className="v">{h.student_naam}</span></div>
               <div className="kv"><span className="k">Bedrijf</span><span className="v">{h.bedrijf_naam || "-"}{h.bedrijfsafdeling ? ` · ${h.bedrijfsafdeling}` : ""}</span></div>
               <div className="kv"><span className="k">Mentor</span><span className="v">{h.mentor_naam || "-"}{h.mentor_functie ? ` (${h.mentor_functie})` : ""}</span></div>
