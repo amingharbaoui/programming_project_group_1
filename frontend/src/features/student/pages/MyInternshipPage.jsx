@@ -286,6 +286,8 @@ export default function MyInternshipPage() {
   const [volledigGetekend, setVolledigGetekend] = useState(false);
   const [docsOk, setDocsOk] = useState(false);
   const [historiek, setHistoriek] = useState([]);
+  // Konden contract/documenten niet geladen worden, dan is de taakkaart op default-false onbetrouwbaar (341).
+  const [flowDataFout, setFlowDataFout] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -314,7 +316,7 @@ export default function MyInternshipPage() {
         if (!cached && c) cacheSet("student_contract", c);
         setContractStudentGekend(!!c?.student_getekend_op);
         setVolledigGetekend(!!(c?.student_getekend_op && c?.bedrijf_getekend_op));
-      } catch {}
+      } catch { setFlowDataFout(true); }
       // Documenten
       try {
         const cachedDocs    = cacheGet("student_documents");
@@ -338,7 +340,7 @@ export default function MyInternshipPage() {
           return actief && ["goedgekeurd", "geregistreerd"].includes(actief.status);
         });
         setDocsOk(alleGoed);
-      } catch {}
+      } catch { setFlowDataFout(true); }
     }
     fetchData();
   }, []);
@@ -552,6 +554,11 @@ export default function MyInternshipPage() {
       {/* ── GOEDGEKEURD / TERUGGESTUURD / VALIDATIE ── */}
       {isGoedgekeurd && (
         <>
+          {flowDataFout && (
+            <div className="card" style={{ marginBottom: 12 }}>
+              <span className="status s_rood"><i className="ti ti-alert-circle" /> Je contract- of documentstatus kon niet geladen worden. Herlaad de pagina — de volgende taak hieronder klopt mogelijk niet.</span>
+            </div>
+          )}
           <ProgressBar status={currentStatus} contractGetekend={volledigGetekend} startdatum={internship?.startdatum} />
           <TaakKaart status={currentStatus} contractStudentGekend={contractStudentGekend} volledigGetekend={volledigGetekend} docsOk={docsOk} navigate={navigate} startdatum={internship?.startdatum} dossierStatus={dossierStatus} />
           <div className="grid_2" style={{ marginTop: 16, alignItems: "stretch" }}>

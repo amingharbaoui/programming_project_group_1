@@ -65,10 +65,16 @@ function StudentFaseGuard({ path, children }) {
 
       const access = await fetchStudentAccess();
       if (!actief) return;
+      if (access.laadFout) {
+        // Voorstelstatus kon niet geladen worden → toon een laadfout i.p.v. een (mogelijk verkeerde) lock.
+        setState({ loading: false, toegestaan: false, laadFout: true, lock: { titel: "Laden mislukt", uitleg: "" } });
+        return;
+      }
       const toegestaan = isStudentRouteOpen(access, path);
       setState({
         loading: false,
         toegestaan,
+        laadFout: false,
         lock: getStudentRouteLock(access, path),
       });
     }
@@ -82,6 +88,21 @@ function StudentFaseGuard({ path, children }) {
       <div className="page-inner">
         <div className="page-header"><h1>Laden...</h1></div>
         <div className="card"><p style={{ fontSize: 13, color: "var(--sub)" }}>Toegang controleren...</p></div>
+      </div>
+    );
+  }
+
+  if (state.laadFout) {
+    return (
+      <div className="page-inner">
+        <div className="page-header"><h1>Laden mislukt</h1></div>
+        <div className="card">
+          <div className="card_title" style={{ color: "var(--red)" }}>
+            <i className="ti ti-alert-circle"></i>
+            Je stagegegevens konden niet geladen worden
+          </div>
+          <p style={{ fontSize: 13, color: "var(--sub)" }}>Herlaad de pagina; we konden je stagefase niet betrouwbaar bepalen.</p>
+        </div>
       </div>
     );
   }

@@ -218,7 +218,11 @@ export async function fetchStudentAccess() {
 
   const voorstel = internshipRes.status === "fulfilled" ? internshipRes.value?.data : null;
   const contract = contractRes.status === "fulfilled" ? contractRes.value?.data : null;
-  return berekenStudentAccess(voorstel, contract);
+  const access = berekenStudentAccess(voorstel, contract);
+  // Faalt de voorstel-call (netwerk/500), dan is de berekende fase onbetrouwbaar: signaleer dat met een
+  // laadFout-vlag i.p.v. de student onterecht in "geen toegang" te zetten (auditpunt 339).
+  if (internshipRes.status === "rejected") return { ...access, laadFout: true };
+  return access;
 }
 
 export function isStudentRouteOpen(access, path) {
