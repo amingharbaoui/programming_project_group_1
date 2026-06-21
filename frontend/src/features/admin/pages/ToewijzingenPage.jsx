@@ -47,6 +47,9 @@ export default function ToewijzingenPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [modalError, setModalError] = useState("");
 
+  const [zoek, setZoek] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [successModal, setSuccessModal] = useState(false);
   const [toast, setToast] = useState(null);
   const showToast = useCallback((msg, type = "ok") => {
     setToast({ msg, type });
@@ -98,10 +101,10 @@ export default function ToewijzingenPage() {
       await api.patch(`/admin/dossiers/${modal.dossier.id}/assign`, {
         stagebegeleiderId: Number(geselecteerdeDocent),
       });
-      showToast("Stagebegeleider gekoppeld.");
       cacheDelete("admin_dossiers");
       setModal(null);
       load();
+      setSuccessModal(true);
     } catch (err) {
       showToast(err.response?.data?.message || "Koppelen mislukt", "error");
     } finally {
@@ -110,8 +113,19 @@ export default function ToewijzingenPage() {
   }
 
   const heeftBegeleider = (d) => !!(d.docent_voornaam || d.docent_achternaam || d.stagebegeleider_id);
-  const zonder = dossiers.filter((d) => !heeftBegeleider(d));
-  const met    = dossiers.filter((d) =>  heeftBegeleider(d));
+
+  const matchZoekFilter = (d) => {
+    const z = zoek.toLowerCase();
+    if (!z) return true;
+    const naam = volledigeNaam(d.student_voornaam, d.student_achternaam).toLowerCase();
+    const bedrijf = (d.bedrijf_naam || "").toLowerCase();
+    return naam.includes(z) || bedrijf.includes(z);
+  };
+
+  const matchStatusFilter = (d) => !filterStatus || d.status === filterStatus;
+
+  const zonder = dossiers.filter((d) => !heeftBegeleider(d) && matchZoekFilter(d) && matchStatusFilter(d));
+  const met    = dossiers.filter((d) =>  heeftBegeleider(d) && matchZoekFilter(d) && matchStatusFilter(d));
 
   return (
     <div className="page">
@@ -123,6 +137,36 @@ export default function ToewijzingenPage() {
           )}
         </h1>
         <p>Koppel een docent als stagebegeleider aan elke student. De docent krijgt daarna toegang tot het dossier.</p>
+      </div>
+
+      <div className="dos_filters">
+        <input
+          className="dos_zoek"
+          placeholder="Zoek op student of stagebedrijf..."
+          value={zoek}
+          onChange={(e) => setZoek(e.target.value)}
+        />
+        <select
+          className="dos_select"
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+        >
+          <option value="">Alle statussen</option>
+          <option value="wacht_op_student">Wacht op student</option>
+          <option value="wacht_op_bedrijf">Wacht op bedrijf</option>
+          <option value="in_controle_bij_administratie">In controle</option>
+          <option value="document_afgekeurd">Document afgekeurd</option>
+          <option value="geregistreerd">Geregistreerd</option>
+          <option value="stage_loopt">Stage loopt</option>
+          <option value="resultaat_vrijgegeven">Resultaat vrijgegeven</option>
+          <option value="afgerond">Afgerond</option>
+        </select>
+        {(filterStatus || zoek) && (
+          <button className="btn sm primary" onClick={() => { setFilterStatus(""); setZoek(""); }}>
+            <IconX size={16} stroke={1.8} />
+            Wis filters
+          </button>
+        )}
       </div>
 
       {loading && <div className="card tw_state">Toewijzingen laden...</div>}
@@ -167,10 +211,14 @@ export default function ToewijzingenPage() {
                   <td><div className="tw_cell_muted">{d.dossiernummer || "-"}</div></td>
                   <td><span className={`status ${statusCls(d.status)}`}>{STATUS_LABELS[d.status] || d.status}</span></td>
                   <td style={{ textAlign: "right" }}>
-                    <button className="btn sm primary" onClick={() => openModal(d)}>
-                      <IconLink size={16} stroke={1.8} />
-                      Koppelen
-                    </button>
+                    {["resultaat_vrijgegeven", "afgerond"].includes(d.status) ? (
+                      <span className="status s_grijs">Afgerond — read-only</span>
+                    ) : (
+                      <button className="btn sm primary" onClick={() => openModal(d)}>
+                        <IconLink size={16} stroke={1.8} />
+                        Koppelen
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -181,10 +229,7 @@ export default function ToewijzingenPage() {
 
       {!loading && !error && met.length > 0 && (
         <div className="card tw_card">
-          <div className="tw_section_title">
-            <IconCircleCheck size={16} stroke={1.8} />
-            Stagebegeleider toegewezen
-          </div>
+
           <table className="tbl tw_tbl">
             <thead>
               <tr>
@@ -218,10 +263,14 @@ export default function ToewijzingenPage() {
                   <td><div className="tw_cell_muted">{d.dossiernummer || "-"}</div></td>
                   <td><span className={`status ${statusCls(d.status)}`}>{STATUS_LABELS[d.status] || d.status}</span></td>
                   <td style={{ textAlign: "right" }}>
-                    <button className="btn sm" onClick={() => openModal(d)}>
-                      <IconPencil size={16} stroke={1.8} />
-                      Wijzigen
-                    </button>
+                    {["resultaat_vrijgegeven", "afgerond"].includes(d.status) ? (
+                      <span className="status s_grijs">Afgerond — read-only</span>
+                    ) : (
+                      <button className="btn sm" onClick={() => openModal(d)}>
+                        <IconPencil size={16} stroke={1.8} />
+                        Wijzigen
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -281,6 +330,27 @@ export default function ToewijzingenPage() {
                 <IconLink size={16} stroke={1.8} />
                 {actionLoading ? "Bezig..." : heeftBegeleider(modal.dossier) ? "Opslaan" : "Koppelen"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {successModal && (
+        <div className="modal_overlay" onClick={() => setSuccessModal(false)}>
+          <div className="modal_box modal_box_sm" onClick={(e) => e.stopPropagation()}>
+            <div className="modal_header">
+              <span>Stagebegeleider gekoppeld</span>
+              <button className="icon_close" onClick={() => setSuccessModal(false)}>
+                <IconX size={16} stroke={1.8} />
+              </button>
+            </div>
+            <div className="modal_body">
+              <p style={{ margin: 0, fontSize: 14, color: "var(--dark)" }}>
+                De stagebegeleider is succesvol gekoppeld aan het dossier.
+              </p>
+            </div>
+            <div className="modal_footer">
+              <button className="btn primary" onClick={() => setSuccessModal(false)}>OK</button>
             </div>
           </div>
         </div>

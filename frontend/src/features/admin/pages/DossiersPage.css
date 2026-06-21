@@ -158,7 +158,8 @@
 }
 
 .dos_row_actie td:first-child {
-  border-left: 2.5px solid var(--amber);
+  border-left: 3px solid var(--red);
+  padding-left: 13px;
 }
 
 .dos_state_cell {

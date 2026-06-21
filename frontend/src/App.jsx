@@ -2,7 +2,6 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import AppLayout from "./components/layout/AppLayout";
-import MentorLayout from "./features/mentor/MentorLayout";
 import LoginPage from "./components/layout/LoginPage.jsx";
 import {
   fetchStudentAccess,
@@ -16,6 +15,7 @@ import StudentLogbookPage from "./features/student/pages/StudentLogbookPage";
 import StudentEvaluationPage from "./features/student/pages/StudentEvaluationPage";
 import StudentContractPage from "./features/student/pages/StudentContractPage";
 import StudentDocumentsPage from "./features/student/pages/StudentDocumentsPage";
+import StudentPlanningPage from "./features/student/pages/StudentPlanningPage";
 
 import ApplicationsPage from "./features/committee/pages/ApplicationsPage";
 
@@ -65,10 +65,16 @@ function StudentFaseGuard({ path, children }) {
 
       const access = await fetchStudentAccess();
       if (!actief) return;
+      if (access.laadFout) {
+        // Voorstelstatus kon niet geladen worden → toon een laadfout i.p.v. een (mogelijk verkeerde) lock.
+        setState({ loading: false, toegestaan: false, laadFout: true, lock: { titel: "Laden mislukt", uitleg: "" } });
+        return;
+      }
       const toegestaan = isStudentRouteOpen(access, path);
       setState({
         loading: false,
         toegestaan,
+        laadFout: false,
         lock: getStudentRouteLock(access, path),
       });
     }
@@ -82,6 +88,21 @@ function StudentFaseGuard({ path, children }) {
       <div className="page-inner">
         <div className="page-header"><h1>Laden...</h1></div>
         <div className="card"><p style={{ fontSize: 13, color: "var(--sub)" }}>Toegang controleren...</p></div>
+      </div>
+    );
+  }
+
+  if (state.laadFout) {
+    return (
+      <div className="page-inner">
+        <div className="page-header"><h1>Laden mislukt</h1></div>
+        <div className="card">
+          <div className="card_title" style={{ color: "var(--red)" }}>
+            <i className="ti ti-alert-circle"></i>
+            Je stagegegevens konden niet geladen worden
+          </div>
+          <p style={{ fontSize: 13, color: "var(--sub)" }}>Herlaad de pagina; we konden je stagefase niet betrouwbaar bepalen.</p>
+        </div>
       </div>
     );
   }
@@ -123,6 +144,7 @@ export default function App() {
             <Route path="/student/evaluation" element={<StudentFaseGuard path="/student/evaluation"><StudentEvaluationPage /></StudentFaseGuard>} />
             <Route path="/student/contract" element={<StudentFaseGuard path="/student/contract"><StudentContractPage /></StudentFaseGuard>} />
             <Route path="/student/documents" element={<StudentFaseGuard path="/student/documents"><StudentDocumentsPage /></StudentFaseGuard>} />
+            <Route path="/student/planning" element={<StudentFaseGuard path="/student/planning"><StudentPlanningPage /></StudentFaseGuard>} />
 
             <Route path="/committee" element={<Navigate to="/committee/applications" replace />} />
             <Route path="/committee/applications" element={<ApplicationsPage />} />
@@ -142,7 +164,7 @@ export default function App() {
             <Route path="/docent/planning" element={<DocentPlanningPage />} />
           </Route>
 
-          <Route element={<MentorLayout />}>
+          <Route element={<AppLayout />}>
             <Route path="/mentor/students" element={<MentorStudentsPage />} />
             <Route path="/mentor/dossier" element={<MentorDossierPage />} />
             <Route path="/mentor/logbooks" element={<MentorLogbooksPage />} />

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import "./DossierDetailPage.css";
 import "../../../index.css";
-import api from "../../../services/api";
+import api, { fileUrl } from "../../../services/api";
+import { cacheDelete } from "../adminCache";
 import {
   IconArrowLeft,
   IconFolder,
@@ -22,15 +23,16 @@ import {
   IconWalk,
   IconUsers,
   IconAlertTriangle,
+  IconFileOff,
 } from "@tabler/icons-react";
 
 /* ─── Real DB status values (schema.sql line 312) ─── */
 const STATUS_CONFIG = {
-  wacht_op_student:              { cls: "s_gray",  label: "Wacht op student" },
-  wacht_op_bedrijf:              { cls: "s_gray",  label: "Wacht op stagebedrijf" },
+  wacht_op_student:              { cls: "s_amber", label: "Wacht op student" },
+  wacht_op_bedrijf:              { cls: "s_amber", label: "Wacht op stagebedrijf" },
   in_controle_bij_administratie: { cls: "s_amber", label: "In controle" },
   document_afgekeurd:            { cls: "s_red",   label: "Wacht op nieuwe versie" },
-  geregistreerd:                 { cls: "s_ok",    label: "Startklaar" },
+  geregistreerd:                 { cls: "s_ok",    label: "Geregistreerd" },
   stage_loopt:                   { cls: "s_info",  label: "Stage loopt" },
   resultaat_vrijgegeven:         { cls: "s_amber", label: "Eindoverzicht te genereren" },
   afgerond:                      { cls: "s_ok",    label: "Afgerond" },
@@ -38,6 +40,12 @@ const STATUS_CONFIG = {
 
 const CONTRACT_STATES  = ["wacht_op_student", "wacht_op_bedrijf", "in_controle_bij_administratie", "document_afgekeurd", "geregistreerd"];
 const AFSLUITING_STATES = ["resultaat_vrijgegeven", "afgerond"];
+
+function fileExt(naam) {
+  if (!naam) return "";
+  const dot = naam.lastIndexOf(".");
+  return dot !== -1 ? naam.slice(dot).toLowerCase() : "";
+}
 
 function fmtDate(iso) {
   if (!iso) return null;
@@ -162,6 +170,29 @@ export default function DossierDetailPage() {
 
   /* document-level approve/reject */
   const [docModal, setDocModal] = useState(null); // null | { id, naam }
+
+  /* PDF preview */
+  const [preview, setPreview] = useState(null); // null | { naam, url, src, isBlob }
+  const [iframeErr, setIframeErr] = useState(false);
+  function sluitPreview() {
+    setPreview((p) => { if (p?.isBlob && p.src) URL.revokeObjectURL(p.src); return null; });
+    setIframeErr(false);
+  }
+  async function openPreview(url, naam) {
+    if (!url) return;
+    // Geüploade bestanden lopen via de token-route; API-PDF's (bv. de gegenereerde contractfallback)
+    // hebben een Authorization-header nodig en kan een iframe niet sturen → als blob ophalen.
+    if (url.startsWith("/uploads/")) {
+      setPreview({ naam, url, src: fileUrl(url), isBlob: false });
+      return;
+    }
+    try {
+      const res = await api.get(url, { responseType: "blob" });
+      setPreview({ naam, url, src: URL.createObjectURL(res.data), isBlob: true });
+    } catch {
+      showToast("Voorbeeld kon niet geladen worden", "error");
+    }
+  }
   const [docReden, setDocReden] = useState("");
   const [docRedenError, setDocRedenError] = useState("");
 
@@ -176,6 +207,8 @@ export default function DossierDetailPage() {
       setError("");
       const res = await api.get(`/admin/dossiers/${id}`);
       setDossier(res.data.data);
+      // De overzichtslijst-cache invalideren zodat statuswijzigingen daar niet stale blijven.
+      cacheDelete("admin_dossiers");
     } catch (err) {
       setError(err.response?.data?.message || "Dossier ophalen mislukt");
     } finally {
@@ -222,7 +255,7 @@ export default function DossierDetailPage() {
   async function doRegistreer() {
     setActionLoading(true);
     try {
-      await api.patch(`/admin/dossiers/${id}/startklaar`);
+      await api.patch(`/admin/dossiers/${id}/overeenkomst/registreer`);
       showToast("Stageovereenkomst geregistreerd — dossier compleet en startklaar.");
       setModal(null);
       load();
@@ -379,7 +412,6 @@ export default function DossierDetailPage() {
           <span className="k">Stagebegeleider</span>
           <span className="v">
             {docent || "—"}
-            {docent && <span className="dd_muted"> · definitief gekoppeld</span>}
             {dossier.docent_email && <span className="dd_muted"> · {dossier.docent_email}</span>}
           </span>
         </div>
@@ -417,11 +449,9 @@ export default function DossierDetailPage() {
         </div>
         <div className="kv">
           <span className="k">Verzekering</span>
-          <span className="v" style={{ color: isGeregistreerd ? "var(--green)" : "inherit" }}>
+          <span className="v" style={{ color: dossier.verzekering_in_orde ? "var(--green)" : "inherit" }}>
             {dossier.verzekering_in_orde
               ? "In orde"
-              : isGeregistreerd
-              ? "In orde — geregistreerd"
               : "Nog niet in orde — wacht op registratie"}
           </span>
         </div>
@@ -497,7 +527,7 @@ export default function DossierDetailPage() {
             <div className="dd_doc_naam">stageovereenkomst_{student.toLowerCase().replace(/\s+/g, "_")}.pdf</div>
             <div className="dd_doc_meta">{dossier.bedrijf_naam}</div>
           </div>
-          <button className="btn sm">
+          <button className="btn sm" onClick={() => openPreview(ovk?.bestand_url || `/admin/dossiers/${id}/contract-pdf`, `stageovereenkomst_${student.toLowerCase().replace(/\s+/g, "_")}.pdf`)} disabled={!ovk}>
             <IconEye size={13} stroke={2} />
             Bekijken
           </button>
@@ -505,13 +535,9 @@ export default function DossierDetailPage() {
 
         {isGeregistreerd ? (
           <div className="dd_ovk_footer dd_ovk_footer_ok">
-            <IconCheck size={13} stroke={2.5} /> Geregistreerd — de verzekering is in orde.
+            <IconCheck size={13} stroke={2.5} /> De verzekering is in orde.
           </div>
-        ) : (
-          <div className="dd_ovk_footer">
-            De administratie controleert en registreert de stageovereenkomst zodra alle handtekeningen binnen zijn.
-          </div>
-        )}
+        ) : null}
       </div>
     );
   }
@@ -546,7 +572,9 @@ export default function DossierDetailPage() {
         <div className="dd_doc_list">
           {docs.map((doc) => {
             const cfg = docStatusMap[doc.status] || { cls: "s_gray", label: doc.status };
-            const canAct = doc.bestand_naam && ["ingediend", "in_controle"].includes(doc.status);
+            // In de eindfase is documentcontrole read-only (backend blokkeert het ook).
+            const dossierReadOnly = ["resultaat_vrijgegeven", "afgerond"].includes(dossier.status);
+            const canAct = !dossierReadOnly && doc.bestand_naam && ["ingediend", "in_controle"].includes(doc.status);
             return (
               <div key={doc.id} className="dd_doc_ctrl_row">
                 <IconFileText size={15} stroke={1.8} className="dd_doc_ctrl_icon" />
@@ -557,16 +585,16 @@ export default function DossierDetailPage() {
                       {doc.is_verplicht ? " · verplicht" : " · optioneel"}
                     </span>
                   </div>
-                  {doc.bestand_naam && (
-                    <div className="dd_doc_ctrl_meta">{doc.bestand_naam}</div>
+                  {doc.bestand_naam && doc.status !== "ontbreekt" && (
+                    <div className="dd_doc_ctrl_meta">{doc.naam}{fileExt(doc.bestand_naam)}</div>
                   )}
                   {doc.afkeurreden && (
                     <div className="dd_doc_ctrl_reden">{doc.afkeurreden}</div>
                   )}
                 </div>
                 <span className={`status ${cfg.cls}`}>{cfg.label}</span>
-                {doc.bestand_naam && (
-                  <button className="btn sm">
+                {doc.bestand_naam && doc.status !== "ontbreekt" && (
+                  <button className="btn sm" onClick={() => openPreview(doc.bestand_url, doc.bestand_naam)}>
                     <IconEye size={13} stroke={2} />
                     Bekijken
                   </button>
@@ -595,9 +623,6 @@ export default function DossierDetailPage() {
               </div>
             );
           })}
-        </div>
-        <div className="dd_card_footer_muted">
-          Het dossier is pas compleet als de stageovereenkomst geregistreerd is en alle verplichte documenten goedgekeurd zijn.
         </div>
       </div>
     );
@@ -635,6 +660,10 @@ export default function DossierDetailPage() {
 
   /* ─── Beslissing card ─── */
   function BeslisKaart() {
+    // Registreren mag pas wanneer alle verplichte documenten goedgekeurd/geregistreerd zijn (zoals de backend afdwingt).
+    const verplichteDocs = (dossier.documenten || []).filter((d) => d.is_verplicht && d.type !== "stageovereenkomst" && d.type !== "eindoverzicht");
+    const nietKlaar = verplichteDocs.filter((d) => !["goedgekeurd", "geregistreerd"].includes(d.status));
+    const docsKlaar = nietKlaar.length === 0;
     return (
       <div className="card dd_card dd_card_featured">
         <div className="dd_card_title">
@@ -644,6 +673,11 @@ export default function DossierDetailPage() {
         <p className="dd_beslis_desc">
           Alle handtekeningen zijn binnen. Controleer de documenten en registreer de stageovereenkomst — pas daarna is de verzekering in orde.
         </p>
+        {!docsKlaar && (
+          <p className="dd_card_muted" style={{ color: "var(--amber, #b45309)" }}>
+            Nog niet alle verplichte documenten zijn goedgekeurd ({nietKlaar.length} open). Keur de documenten eerst goed.
+          </p>
+        )}
         <div className="dd_beslis_actions">
           <button
             className="btn"
@@ -653,7 +687,7 @@ export default function DossierDetailPage() {
             <IconX size={14} stroke={2.5} />
             Afkeuren
           </button>
-          <button className="btn primary" onClick={() => setModal("registreren")}>
+          <button className="btn primary" disabled={!docsKlaar} onClick={() => docsKlaar && setModal("registreren")}>
             <IconCheck size={14} stroke={2.5} />
             Goedkeuren &amp; registreren
           </button>
@@ -681,19 +715,21 @@ export default function DossierDetailPage() {
           <span className="k">Inhoud</span>
           <span className="v">Competentiescores · eindpresentatie · eindcijfer · logboekstatus · stageperiode · documentstatus</span>
         </div>
-        <p className="dd_card_footer_muted">
-          Het eindresultaat werd bepaald en vrijgegeven door de docent — de administratie genereert enkel het eindoverzicht.
-        </p>
-        {afgerond && (
-          <div className="dd_doc_row" style={{ marginTop: 8 }}>
-            <div className="dd_doc_icon"><IconFileTypePdf size={16} stroke={1.5} /></div>
-            <div className="dd_doc_info">
-              <div className="dd_doc_naam">eindoverzicht_{student.toLowerCase().replace(/\s+/g, "_")}.pdf</div>
-              <div className="dd_doc_meta">Zichtbaar voor student en stagebegeleider</div>
+        {afgerond && (() => {
+          const eindDoc = (dossier.documenten || []).find((d) => d.type === "eindoverzicht");
+          return (
+            <div className="dd_doc_row" style={{ marginTop: 8 }}>
+              <div className="dd_doc_icon"><IconFileTypePdf size={16} stroke={1.5} /></div>
+              <div className="dd_doc_info">
+                <div className="dd_doc_naam">eindoverzicht_{student.toLowerCase().replace(/\s+/g, "_")}.pdf</div>
+                <div className="dd_doc_meta">Zichtbaar voor student en stagebegeleider</div>
+              </div>
+              <button className="btn sm" onClick={() => openPreview(eindDoc?.bestand_url, `eindoverzicht_${student.toLowerCase().replace(/\s+/g, "_")}.pdf`)} disabled={!eindDoc?.bestand_url}>
+                <IconEye size={13} stroke={2} />Bekijken
+              </button>
             </div>
-            <button className="btn sm"><IconEye size={13} stroke={2} />Bekijken</button>
-          </div>
-        )}
+          );
+        })()}
         {!afgerond && (
           <div className="dd_card_actions">
             <button className="btn primary" onClick={() => setModal("eindoverzicht")}>
@@ -987,6 +1023,45 @@ export default function DossierDetailPage() {
                 <IconX size={14} stroke={2.5} />
                 {actionLoading ? "Bezig..." : "Afkeuren"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Preview */}
+      {preview && (
+        <div className="modal_overlay" onClick={sluitPreview}>
+          <div className="modal_box" style={{ maxWidth: 860, width: "92vw" }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal_header">
+              <span className="modal_title">{preview.naam}</span>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <a href={preview.src} target="_blank" rel="noreferrer" className="btn sm">
+                  <IconFileExport size={13} stroke={2} /> Openen in nieuw venster
+                </a>
+                <button className="icon_close" onClick={sluitPreview}><IconX size={16} stroke={2} /></button>
+              </div>
+            </div>
+            <div className="modal_body" style={{ padding: 0 }}>
+              {/\.(png|jpe?g|gif|webp)(\?|$)/i.test(preview.url) ? (
+                <img src={preview.src} alt={preview.naam} style={{ maxWidth: "100%", display: "block", borderRadius: "0 0 14px 14px" }} />
+              ) : iframeErr ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, height: "70vh", color: "var(--faint)" }}>
+                  <IconFileOff size={40} stroke={1.4} />
+                  <span style={{ fontSize: 13, fontWeight: 500 }}>Document niet beschikbaar</span>
+                </div>
+              ) : (
+                <iframe
+                  src={preview.src}
+                  title={preview.naam}
+                  style={{ width: "100%", height: "70vh", border: "none", borderRadius: "0 0 14px 14px", display: "block" }}
+                  onLoad={(e) => {
+                    try {
+                      const text = e.target.contentDocument?.body?.innerText || "";
+                      if (text.includes('"success":false')) setIframeErr(true);
+                    } catch {}
+                  }}
+                />
+              )}
             </div>
           </div>
         </div>

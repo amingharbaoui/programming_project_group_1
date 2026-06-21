@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
-import "../mentor.css";
+import "./MentorEvaluationPage.css";
+import { cacheGet, cacheSet, cacheDelete } from "../mentorCache";
 
 const SCORE_LBL = ["", "Onvoldoende", "Matig", "Voldoende", "Goed", "Uitstekend"];
 const KLAAR = ["mentor_ingediend", "klaar_voor_docent", "geregistreerd", "klaar_voor_vrijgave", "vrijgegeven"];
@@ -34,31 +35,55 @@ export default function MentorEvaluationPage() {
   const [scores, setScores] = useState({ tussentijds: {}, finaal: {} });
   const [motiv, setMotiv] = useState({ tussentijds: {}, finaal: {} });
   const [modalCompId, setModalCompId] = useState(null);
+  const [verslagOpen, setVerslagOpen] = useState(false);
   const [bezig, setBezig] = useState(false);
   const [melding, setMelding] = useState({ tekst: "", type: "" });
 
   useEffect(() => {
     async function init() {
+      const cached = cacheGet("mentor_students");
+      if (cached) { setStudenten(cached); return; }
       try {
         const res = await api.get("/mentor/students");
-        setStudenten(res.data.data || []);
+        const data = res.data.data || [];
+        cacheSet("mentor_students", data);
+        setStudenten(data);
       } catch (err) {
         setError(err.response?.data?.message || "Stagiairs ophalen mislukt");
       }
     }
     init();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!detailId) return;
     async function load() {
+      const cached = cacheGet(`mentor_evaluation_${detailId}`);
+      if (cached) {
+        setEvalData(cached);
+        const ns = { tussentijds: {}, finaal: {} };
+        const nm = { tussentijds: {}, finaal: {} };
+        for (const ev of cached.evaluaties || []) {
+          const key = ev.type === "finaal" ? "finaal" : "tussentijds";
+          for (const s of (ev.scores || []).filter((x) => x.rol === "mentor")) {
+            ns[key][s.competentie_id] = s.score;
+            nm[key][s.competentie_id] = s.motivering || "";
+          }
+          // Algemene praktijkfeedback terugladen, anders overschrijft een volgende opslag ze met leeg.
+          nm[key].algemeen = ev.mentor_algemene_feedback || "";
+        }
+        setScores(ns);
+        setMotiv(nm);
+        setLoadingEval(false);
+        return;
+      }
       try {
         setLoadingEval(true);
         setError("");
         setMelding({ tekst: "", type: "" });
         const res = await api.get(`/evaluations/${detailId}`);
         const data = res.data.data;
+        cacheSet(`mentor_evaluation_${detailId}`, data);
         setEvalData(data);
         const ns = { tussentijds: {}, finaal: {} };
         const nm = { tussentijds: {}, finaal: {} };
@@ -68,6 +93,8 @@ export default function MentorEvaluationPage() {
             ns[key][s.competentie_id] = s.score;
             nm[key][s.competentie_id] = s.motivering || "";
           }
+          // Algemene praktijkfeedback terugladen, anders overschrijft een volgende opslag ze met leeg.
+          nm[key].algemeen = ev.mentor_algemene_feedback || "";
         }
         setScores(ns);
         setMotiv(nm);
@@ -78,7 +105,6 @@ export default function MentorEvaluationPage() {
       }
     }
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detailId]);
 
   const detailStudent = studenten.find((s) => s.id === detailId);
@@ -104,7 +130,7 @@ export default function MentorEvaluationPage() {
     if (ingediend) {
       const missing = competenties.filter((c) => !scores[activeTab][c.id]);
       if (missing.length > 0) {
-        setMelding({ tekst: "Geef voor elke competentie een score in.", type: "s-amber" });
+        setMelding({ tekst: "Geef voor elke competentie een score in.", type: "s_amber" });
         return;
       }
     }
@@ -116,52 +142,88 @@ export default function MentorEvaluationPage() {
     try {
       setBezig(true);
       setMelding({ tekst: "", type: "" });
-      await api.post(`/evaluations/${huidigeEval.id}/scores`, { scores: scoresArr, ingediend });
-      setMelding({ tekst: ingediend ? "Mentorinput ingediend!" : "Opgeslagen als concept.", type: "s-ok" });
+      await api.post(`/evaluations/${huidigeEval.id}/scores`, { scores: scoresArr, ingediend, algemeneFeedback: motiv[activeTab]?.algemeen || "" });
+      setMelding({ tekst: ingediend ? "Mentorinput ingediend!" : "Opgeslagen als concept.", type: "s_ok" });
+      cacheDelete(`mentor_evaluation_${detailId}`);
       const res = await api.get(`/evaluations/${detailId}`);
-      setEvalData(res.data.data);
+      const fresh = res.data.data;
+      cacheSet(`mentor_evaluation_${detailId}`, fresh);
+      setEvalData(fresh);
     } catch (err) {
-      setMelding({ tekst: err.response?.data?.message || "Opslaan mislukt", type: "s-rood" });
+      setMelding({ tekst: err.response?.data?.message || "Opslaan mislukt", type: "s_rood" });
     } finally {
       setBezig(false);
     }
   }
 
+  function evalRegelM(s) {
+    const ds = s.dossier_status;
+    if (["wacht_op_student","wacht_op_bedrijf","in_controle_bij_administratie","geregistreerd"].includes(ds))
+      return { type: "—", wachtOp: "Zelfevaluatie van de student" };
+    if (["actief","stage_loopt"].includes(ds))
+      return { type: "Tussentijds", wachtOp: "Zelfevaluatie van de student" };
+    if (["afgerond","voltooid"].includes(ds))
+      return { type: "Finale", wachtOp: "Eindpresentatie + docent" };
+    if (ds === "resultaat_vrijgegeven")
+      return { type: "Finale", wachtOp: "—" };
+    return { type: "—", wachtOp: "—" };
+  }
+  function evalStatusBadge(s) {
+    const ds = s.dossier_status;
+    if (["wacht_op_student","wacht_op_bedrijf","in_controle_bij_administratie","geregistreerd","actief","stage_loopt"].includes(ds))
+      return { cls: "s_grijs", icon: "ti-lock", txt: "Nog niet open" };
+    if (["afgerond","voltooid"].includes(ds))
+      return { cls: "s_ok", icon: "ti-check", txt: "Input ingediend" };
+    if (ds === "resultaat_vrijgegeven")
+      return { cls: "s_ok", icon: "ti-award", txt: "Afgerond" };
+    return { cls: "s_grijs", icon: "", txt: "—" };
+  }
+
   // ─── TABEL ───
   if (!detailId) {
     return (
-      <div className="mtr">
-        <div className="page-inner">
+      <div className="page-inner">
           <div className="page-header">
             <h1>Evaluaties</h1>
-            <p>Competentieprofiel: Toegepaste Informatica 2025–2026 — de student motiveert, jij scoort als advies</p>
+            <p>Competentieprofiel: Toegepaste Informatica 2025–2026 · versie 1.0 — de student motiveert, jij scoort als advies</p>
           </div>
-          {error && <div className="card"><span className="status s-rood">{error}</span></div>}
+          {error && <div className="card"><span className="status s_rood">{error}</span></div>}
           {!error && studenten.length === 0 && <div className="card"><p style={{ color: "var(--sub)", fontSize: 13 }}>Geen stagiairs gevonden.</p></div>}
           {studenten.length > 0 && (
             <div className="card" style={{ padding: "6px 14px" }}>
               <table className="tbl">
-                <thead><tr><th>Student</th><th>Bedrijf</th><th></th></tr></thead>
+                <thead><tr><th>Student</th><th>Type</th><th>Wacht op</th><th>Status</th><th></th></tr></thead>
                 <tbody>
-                  {studenten.map((s) => (
-                    <tr key={s.dossier_id ?? s.id}>
-                      <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                          <div className="prof-av" style={{ width: 30, height: 30, fontSize: 11 }}>{initialen(s)}</div>
-                          <div style={{ fontSize: 13.5, fontWeight: 600, cursor: "pointer" }} onClick={() => setDetailId(s.id)}>{s.voornaam} {s.achternaam}</div>
-                        </div>
-                      </td>
-                      <td style={{ fontSize: 12.5, color: "var(--sub)" }}>{s.bedrijf || "-"}</td>
-                      <td style={{ textAlign: "right" }}>
-                        <button className="btn sm" onClick={() => setDetailId(s.id)}><i className="ti ti-eye" />Open</button>
-                      </td>
-                    </tr>
-                  ))}
+                  {studenten.map((s) => {
+                    const inf = evalRegelM(s);
+                    const eb = evalStatusBadge(s);
+                    return (
+                      <tr key={s.dossier_id ?? s.id}>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                            <div className="prof-av" style={{ width: 30, height: 30, fontSize: 11 }}>{initialen(s)}</div>
+                            <div style={{ fontSize: 13.5, fontWeight: 600, cursor: "pointer" }} onClick={() => setDetailId(s.id)}>
+                              {s.voornaam} {s.achternaam}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ fontSize: 12.5, color: "var(--sub)" }}>{inf.type}</td>
+                        <td style={{ fontSize: 12.5, color: "var(--sub)" }}>{inf.wachtOp}</td>
+                        <td>
+                          <span className={`status ${eb.cls}`}>
+                            {eb.icon && <i className={`ti ${eb.icon}`} />}{eb.txt}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <button className="btn sm" onClick={() => setDetailId(s.id)}><i className="ti ti-eye" />Open</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           )}
-        </div>
       </div>
     );
   }
@@ -174,14 +236,13 @@ export default function MentorEvaluationPage() {
   const modalStudent = modalComp ? studentScore(modalComp.id) : null;
 
   return (
-    <div className="mtr">
-      <div className="page-inner">
+    <div className="page-inner">
         <div style={{ marginBottom: 12 }}>
           <button className="btn" onClick={() => setDetailId(null)}><i className="ti ti-arrow-left" />Alle evaluaties</button>
         </div>
         <div className="page-header">
           <h1>{detailStudent ? `${detailStudent.voornaam} ${detailStudent.achternaam}` : "Evaluatie"}</h1>
-          <p>Competentieprofiel: Toegepaste Informatica 2025–2026 · versie 1.0</p>
+          <p>Actief competentieprofiel</p>
         </div>
 
         {/* stepper */}
@@ -207,17 +268,33 @@ export default function MentorEvaluationPage() {
           </div>
         </div>
 
-        {/* Resultaatkaart — enkel zichtbaar nadat de docent het eindresultaat heeft vrijgegeven (story 34) */}
+        {/* Resultaatkaart — enkel zichtbaar nadat de docent het eindresultaat heeft vrijgegeven */}
         {finaalEval?.status === "vrijgegeven" && (
           <div className="card" style={{ marginTop: 14, borderLeft: "3px solid var(--green, #16a34a)" }}>
-            <div className="card_title"><i className="ti ti-trophy" /> Eindresultaat vrijgegeven</div>
-            <div className="kv"><span className="k">Eindcijfer</span><span className="v"><b>{finaalEval.eindcijfer != null ? `${Number(finaalEval.eindcijfer).toFixed(1)}/20` : "-"}</b></span></div>
+            <div className="card_title" style={{ color: "var(--green, #16a34a)" }}>
+              <i className="ti ti-award" />Stage afgerond
+              <span className="status s_ok" style={{ marginLeft: "auto" }}><i className="ti ti-star" />Resultaat vrijgegeven</span>
+            </div>
+            <div className="kv">
+              <span className="k">Eindcijfer</span>
+              <span className="v"><b style={{ fontSize: 16 }}>{finaalEval.eindcijfer != null ? `${Number(finaalEval.eindcijfer).toFixed(1)}/20` : "—"}</b></span>
+            </div>
             {finaalEval.competentie_score != null && (
-              <div className="kv"><span className="k">Competentiescore</span><span className="v">{Number(finaalEval.competentie_score).toFixed(1)}/5</span></div>
+              <div className="kv">
+                <span className="k">Competentiescore</span>
+                <span className="v">{Number(finaalEval.competentie_score).toFixed(1)}/5</span>
+              </div>
             )}
             {finaalEval.verslag && (
-              <div className="kv"><span className="k">Eindfeedback</span><span className="v">{finaalEval.verslag}</span></div>
+              <div className="kv">
+                <span className="k">Eindfeedback van de docent</span>
+                <span className="v" style={{ lineHeight: 1.6, fontStyle: "italic", color: "var(--sub)" }}>"{finaalEval.verslag}"</span>
+              </div>
             )}
+            <div className="kv">
+              <span className="k">Open acties</span>
+              <span className="v"><span className="status s_ok"><i className="ti ti-check" />Geen — stage volledig afgerond</span></span>
+            </div>
           </div>
         )}
 
@@ -234,6 +311,17 @@ export default function MentorEvaluationPage() {
               <div className="zone-act leeg"><i className="ti ti-lock" style={{ color: "var(--sub)" }} /><span>Deze evaluatie is nog niet beschikbaar — je krijgt een melding zodra de student zijn zelfevaluatie indient.</span></div>
             ) : (
               <>
+                {/* Sectietitel */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14, marginBottom: 4 }}>
+                  <span style={{ fontWeight: 700, fontSize: 14.5 }}>
+                    {activeTab === "tussentijds" ? "Evaluatie 1 · Tussentijdse mentorinput" : "Evaluatie 2 · Finale mentorinput"}
+                  </span>
+                  {KLAAR.includes(huidigeEval.status) ? (
+                    <span className="status s_ok"><i className="ti ti-check" />Ingediend</span>
+                  ) : (
+                    <span className="status s_amber"><i className="ti ti-pencil" />Jouw input gevraagd</span>
+                  )}
+                </div>
                 <div className="mtx mtx2">
                   <div className="mtx-row mtx-head">
                     <span />
@@ -258,9 +346,9 @@ export default function MentorEvaluationPage() {
                 </div>
 
                 <div className="card" style={{ marginTop: 12 }}>
-                  <div className="card-title"><i className="ti ti-message" style={{ color: "var(--red)" }} />Algemene praktijkfeedback</div>
+                  <div className="card_title"><i className="ti ti-message" style={{ color: "var(--red)" }} />Algemene praktijkfeedback</div>
                   <textarea
-                    className="form-input"
+                    className="form_input"
                     style={{ minHeight: 60, fontSize: 12.5 }}
                     placeholder="Hoe draait je stagiair mee op de werkvloer?"
                     value={motiv[activeTab].algemeen || ""}
@@ -274,7 +362,13 @@ export default function MentorEvaluationPage() {
                 {kanInvullen ? (
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
                     <button className="btn" disabled={bezig} onClick={() => dienIn(false)}>Opslaan als concept</button>
-                    <button className="btn primary" disabled={bezig} onClick={() => dienIn(true)}><i className="ti ti-send" />Mentorinput indienen</button>
+                    <button className="btn primary" disabled={bezig} onClick={() => dienIn(true)}><i className="ti ti-send" />{activeTab === "finaal" ? "Finale mentorinput indienen" : "Mentorinput indienen"}</button>
+                  </div>
+                ) : activeTab === "tussentijds" && huidigeEval?.status === "geregistreerd" ? (
+                  <div className="zone-act leeg" style={{ marginTop: 12 }}>
+                    <i className="ti ti-circle-check" />
+                    <span>Je tussentijdse mentorinput is ingediend en werd verwerkt: de docent registreerde de tussentijdse bespreking. {detailStudent?.voornaam || "De student"} kan het verslag bekijken; jouw input staat hierboven read-only.</span>
+                    <button className="btn sm" style={{ marginLeft: "auto" }} onClick={() => setVerslagOpen(true)}><i className="ti ti-file-text" />Verslag bekijken</button>
                   </div>
                 ) : (
                   <p style={{ marginTop: 12, fontSize: 13, color: "var(--sub)" }}>Je mentorinput is ingediend en staat read-only.</p>
@@ -283,7 +377,29 @@ export default function MentorEvaluationPage() {
             )}
           </>
         )}
-      </div>
+
+      {/* verslag-modal — net als toonVerslag() in de HTML-prototype */}
+      {verslagOpen && (
+        <div className="modal-overlay" onClick={() => setVerslagOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <div className="mh-icon"><i className="ti ti-file-text" /></div>
+              <div>
+                <div className="mh-t">Verslag tussentijdse bespreking</div>
+                <div className="mh-s">Geregistreerd door de docent</div>
+              </div>
+              <button className="icon-btn mh-x btn sm" onClick={() => setVerslagOpen(false)}><i className="ti ti-x" /></button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: 13, lineHeight: 1.7 }}>{tussentijdsEval?.verslag || "Geen verslag ingevuld door de docent."}</p>
+              <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 10 }}>Dit verslag is ook zichtbaar voor de student.</div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn primary" onClick={() => setVerslagOpen(false)}>Sluiten</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* score-modal */}
       {modalComp && (
@@ -306,7 +422,7 @@ export default function MentorEvaluationPage() {
 
               {kanInvullen ? (
                 <>
-                  <div className="form-label" style={{ margin: "12px 0 6px" }}>Jouw advies-score<span className="req">*</span></div>
+                  <div className="form_label" style={{ margin: "12px 0 6px" }}>Jouw advies-score<span className="req">*</span></div>
                   <div className="scale" style={{ marginBottom: 6 }}>
                     {[1, 2, 3, 4, 5].map((n) => (
                       <button key={n} className={`scale-btn ${scores[activeTab][modalComp.id] === n ? "selected" : ""}`} onClick={() => zetScore(modalComp.id, n)}>{n}</button>
@@ -314,9 +430,9 @@ export default function MentorEvaluationPage() {
                     <span className="scale-lbl">{scores[activeTab][modalComp.id] ? SCORE_LBL[scores[activeTab][modalComp.id]] : ""}</span>
                   </div>
                   <div style={{ fontSize: 11, color: "var(--faint)" }}>1 onvoldoende · 3 voldoende · 5 uitstekend</div>
-                  <div className="form-group" style={{ marginTop: 12 }}>
-                    <label className="form-label">Praktijkfeedback (optioneel)</label>
-                    <textarea className="form-input" style={{ minHeight: 48, fontSize: 12.5 }} value={motiv[activeTab][modalComp.id] || ""} onChange={(e) => zetMotiv(modalComp.id, e.target.value)} />
+                  <div className="form_group" style={{ marginTop: 12 }}>
+                    <label className="form_label">Praktijkfeedback (optioneel)</label>
+                    <textarea className="form_input" style={{ minHeight: 48, fontSize: 12.5 }} value={motiv[activeTab][modalComp.id] || ""} onChange={(e) => zetMotiv(modalComp.id, e.target.value)} />
                   </div>
                 </>
               ) : (
@@ -327,7 +443,8 @@ export default function MentorEvaluationPage() {
               )}
             </div>
             <div className="modal-foot">
-              <button className="btn primary" onClick={() => setModalCompId(null)}><i className="ti ti-check" />{kanInvullen ? "Bewaar" : "Sluiten"}</button>
+              {/* "Bewaar" slaat de score nu echt op (als concept) i.p.v. enkel de modal te sluiten (auditpunt 413). */}
+              <button className="btn primary" disabled={bezig} onClick={async () => { if (kanInvullen) await dienIn(false); setModalCompId(null); }}><i className="ti ti-check" />{kanInvullen ? "Bewaar" : "Sluiten"}</button>
             </div>
           </div>
         </div>

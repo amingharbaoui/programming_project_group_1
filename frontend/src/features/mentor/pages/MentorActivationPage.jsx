@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import "../../../components/layout/LoginPage.css";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import api from "../../../services/api";
+import logoWide from "../../../assets/stageify-logo/stageify_logo_wide.png";
 
 export default function MentorActivationPage() {
   const [searchParams] = useSearchParams();
@@ -63,7 +64,7 @@ export default function MentorActivationPage() {
         <div className="login_header">
           <img
             className="login_logo"
-            src="../../../../src/assets/stageify-logo/stageify_logo_wide.png"
+            src={logoWide}
             alt="Stagify logo"
           />
           <p className="login_subtitle">Account activeren &middot; stagementor</p>

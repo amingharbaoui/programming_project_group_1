@@ -1,10 +1,10 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
-const path = require("path");
-const fs = require("fs");
 const db = require("./config/db");
 const { verifyToken } = require("./utils/token");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 const healthRoutes = require("./routes/healthRoutes");
 const authRoutes = require("./routes/authRoutes");
@@ -29,25 +29,50 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Toegestane origins zijn env-gedreven (komma-gescheiden), met de lokale frontend als default.
+const ALLOWED_ORIGINS = (process.env.CORS_ORIGIN || "http://localhost:5173")
+  .split(",").map((o) => o.trim()).filter(Boolean);
 app.use(cors({
-  origin: "http://localhost:5173",
+  origin: ALLOWED_ORIGINS,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization", "x-user-id"]
 }));
 app.use(express.json({ limit: "1mb" }));
-const UPLOADS_DIR = path.join(__dirname, "../uploads");
-app.use("/uploads", (req, res, next) => {
-  // Auth vereist: token via Authorization-header of ?t= query (een preview/iframe kan geen header sturen).
-  const headerToken = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  if (!verifyToken(headerToken || req.query.t)) {
-    return res.status(401).json({ success: false, message: "Authenticatie vereist" });
-  }
+app.use("/uploads", (req, res) => {
+  // Rechtstreeks serveren vanuit /uploads sloeg de eigenaarschapscontrole over (elk geldig token
+  // kon elk rootbestand openen). Alles loopt nu via /api/documents/bestand/..., dezelfde route die
+  // de frontend gebruikt — met dossier-eigenaarschapscontrole. We verwijzen door zodat oude links
+  // (mails, eerder gedeelde URLs) blijven werken én alsnog de toegangscontrole krijgen.
   const rel = req.path.replace(/^\/+/, "");
-  if (!rel || rel.includes("..") || rel.includes("/")) return next();
-  const filePath = path.join(UPLOADS_DIR, rel);
-  if (!fs.existsSync(filePath)) return next();
-  res.sendFile(filePath);
+  if (!rel || rel.includes("..")) {
+    return res.status(404).json({ success: false, message: "Niet gevonden" });
+  }
+  const suffix = req.query.t ? `?t=${encodeURIComponent(req.query.t)}` : "";
+  return res.redirect(307, `/api/documents/bestand/${rel}${suffix}`);
 });
+
+// Security headers op de API-responses. Bewust ná de upload-handler zodat geserveerde
+// bestanden (PDF/afbeeldingen in de frontend-iframe) niet door frame-/CORP-regels geblokkeerd worden.
+app.use(helmet({
+  contentSecurityPolicy: false, // JSON-API; CSP hoort op de frontend-HTML
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
+
+// Rate-limiting (env-gedreven, genereuze dev-defaults — zet strenger in productie).
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_MAX || 2000),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.AUTH_RATE_LIMIT_MAX || 100),
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use("/api", apiLimiter);
+app.use("/api/auth/login", authLimiter);
 
 app.use("/api/health", healthRoutes);
 app.use("/api/auth", authRoutes);
@@ -88,6 +113,13 @@ app.use((err, req, res, next) => {
 
 const server = app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
+  // Toon duidelijk welke database live is (auditpunt 384): zo ziet iedereen meteen of hij op de
+  // gedeelde DB zit en voorkomen we per ongeluk testen tegen de verkeerde database.
+  console.log(`Database: "${process.env.DB_NAME || "(niet gezet!)"}" op ${process.env.DB_HOST || "(niet gezet!)"}:${process.env.DB_PORT || 3306}`);
+  const ontbrekend = ["DB_HOST", "DB_USER", "DB_NAME"].filter((k) => !process.env[k]);
+  if (ontbrekend.length) {
+    console.warn(`[WAARSCHUWING] Ontbrekende DB-omgevingsvariabelen: ${ontbrekend.join(", ")} — zet ze in backend/.env.`);
+  }
 });
 
 // Vangnet: laat één onafgevangen fout de server NIET platleggen (anders staat alles plat).

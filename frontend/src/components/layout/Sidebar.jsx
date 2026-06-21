@@ -34,7 +34,9 @@ function heeftDocumentActieNodig(soorten = [], documenten = []) {
   const verplichteUploadSoorten = soorten.filter((soort) => {
     const type = normaliseerDocumentType(soort.type);
     const naam = normaliseerDocumentType(soort.naam);
-    return type !== "stageovereenkomst" &&
+    // Enkel écht verplichte soorten meetellen — een optioneel documenttype mag geen rode waarschuwing geven.
+    return Number(soort.is_verplicht) !== 0 &&
+      type !== "stageovereenkomst" &&
       !VERBORGEN_DOCUMENT_TYPES.has(type) &&
       !VERBORGEN_DOCUMENT_TYPES.has(naam);
   });
@@ -88,10 +90,11 @@ export default function Sidebar({ collapsed }) {
         warn.delete(STUDENT_KEY_PATHS[access.dot]);
       }
 
-      if (access.open.includes("documenten")) {
+      // In de eindfase (afgerond/resultaat vrijgegeven) is een document geen openstaande taak meer.
+      if (access.open.includes("documenten") && access.key !== "afgerond") {
         const [docsRes, soortenRes] = await Promise.allSettled([
-          apiRequest("GET", "/documents/my"),
-          apiRequest("GET", "/documents/soorten"),
+          apiRequest("GET", "/documents/my", null, { skipAuthRedirect: true }),
+          apiRequest("GET", "/documents/soorten", null, { skipAuthRedirect: true }),
         ]);
 
         if (
@@ -107,7 +110,7 @@ export default function Sidebar({ collapsed }) {
       let showLogboekDot = !!(access.dot === "logboek");
       if (showLogboekDot) {
         try {
-          const logRes = await apiRequest("GET", `/logbooks/${user.id}`);
+          const logRes = await apiRequest("GET", `/logbooks/${user.id}`, null, { skipAuthRedirect: true });
           const weken = Array.isArray(logRes.data) ? logRes.data : [];
           // Bereken huidige weeknummer op basis van startdatum
           const startdatum = access.startdatum ? new Date(access.startdatum) : null;
@@ -115,8 +118,11 @@ export default function Sidebar({ collapsed }) {
             const vandaag = new Date();
             const verschil = Math.floor((vandaag - startdatum) / (1000 * 60 * 60 * 24));
             const huidigeWeek = Math.max(1, Math.ceil((verschil + 1) / 7));
+            // Een 'in_opbouw' week is enkel conceptdata, geen officiële indiening: dan blijft de dot staan
+            // zodat de student dezelfde waarschuwing krijgt als docent/mentor/reminders (auditpunt 422).
+            const OFFICIEEL_INGEDIEND = new Set(["ingediend", "afgecheckt_door_mentor", "klaar_voor_docent", "goedgekeurd_door_docent", "afgesloten"]);
             const alIngediend = weken.some(
-              (w) => Number(w.week_nummer) === huidigeWeek && w.status !== "ontbreekt"
+              (w) => Number(w.week_nummer) === huidigeWeek && OFFICIEEL_INGEDIEND.has(w.status)
             );
             if (alIngediend) showLogboekDot = false;
           }

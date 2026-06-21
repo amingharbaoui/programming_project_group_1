@@ -8,6 +8,9 @@ export const STUDENT_PATH_KEYS = {
   "/student/documents": "documenten",
   "/student/logbook": "logboek",
   "/student/evaluation": "evaluatie",
+  // Planning is een eigen sleutel: een bedrijfsbezoek/eindpresentatie kan al gepland worden zodra de
+  // stage geregistreerd (startklaar) is — los van het logboek, dat pas vanaf de startdatum opent.
+  "/student/planning": "planning",
 };
 
 export const STUDENT_FASES = {
@@ -85,14 +88,14 @@ export const STUDENT_FASES = {
     faseIdx: 4,
     fase: "Stage",
     actie: "Alles is in orde. Je logboek opent vanaf je startdatum.",
-    open: ["stage", "overeenkomst", "evaluatie", "documenten"],
+    open: ["stage", "overeenkomst", "documenten", "planning"],
     warn: [],
   },
   gestart: {
     faseIdx: 4,
     fase: "Stage loopt",
     actie: "Vul je logboek van vandaag in.",
-    open: ["stage", "overeenkomst", "logboek", "evaluatie", "documenten"],
+    open: ["stage", "overeenkomst", "logboek", "evaluatie", "documenten", "planning"],
     warn: [],
     dot: "logboek",
   },
@@ -100,7 +103,7 @@ export const STUDENT_FASES = {
     faseIdx: 4,
     fase: "Stage loopt",
     actie: "Logboek van vandaag nog niet ingevuld.",
-    open: ["stage", "overeenkomst", "logboek", "evaluatie", "documenten"],
+    open: ["stage", "overeenkomst", "logboek", "evaluatie", "documenten", "planning"],
     warn: [],
     dot: "logboek",
   },
@@ -108,14 +111,14 @@ export const STUDENT_FASES = {
     faseIdx: 5,
     fase: "Evaluatie",
     actie: "Bereid je eindpresentatie voor.",
-    open: ["stage", "overeenkomst", "logboek", "evaluatie", "documenten"],
+    open: ["stage", "overeenkomst", "logboek", "evaluatie", "documenten", "planning"],
     warn: [],
   },
   afgerond: {
     faseIdx: 5,
     fase: "Afgerond",
     actie: "Je eindresultaat staat klaar bij Evaluatie.",
-    open: ["stage", "overeenkomst", "logboek", "evaluatie", "documenten"],
+    open: ["stage", "overeenkomst", "logboek", "evaluatie", "documenten", "planning"],
     warn: [],
     dot: "evaluatie",
   },
@@ -123,6 +126,9 @@ export const STUDENT_FASES = {
 
 function normaliseerVoorstelStatus(status) {
   if (status === "aanpassingen_gevraagd") return "aanpassingen";
+  // Goedgekeurd met uitzondering is functioneel goedgekeurd: de backend maakt al een dossier aan, dus
+  // de student hoort dezelfde flow te krijgen (contract/documenten/...) i.p.v. een lege pagina (340).
+  if (status === "goedgekeurd_met_uitzondering") return "goedgekeurd";
   return status || "geen";
 }
 
@@ -190,7 +196,8 @@ export function berekenStudentAccess(voorstel, contract) {
     return { key: "startklaar", startdatum, ...STUDENT_FASES.startklaar };
   }
 
-  if (dossierStatus === "afgerond" || contract?.status === "afgerond") {
+  // Na vrijgave van het resultaat zit de student in de eindfase (evaluatie/eindoverzicht), niet meer "Stage loopt".
+  if (dossierStatus === "afgerond" || dossierStatus === "resultaat_vrijgegeven" || contract?.status === "afgerond") {
     return { key: "afgerond", startdatum, ...STUDENT_FASES.afgerond };
   }
   if (dossierStatus === "presentatie") {
@@ -205,13 +212,17 @@ export function berekenStudentAccess(voorstel, contract) {
 
 export async function fetchStudentAccess() {
   const [internshipRes, contractRes] = await Promise.allSettled([
-    apiRequest("GET", "/internships/my"),
-    apiRequest("GET", "/contracts/my"),
+    apiRequest("GET", "/internships/my", null, { skipAuthRedirect: true }),
+    apiRequest("GET", "/contracts/my", null, { skipAuthRedirect: true }),
   ]);
 
   const voorstel = internshipRes.status === "fulfilled" ? internshipRes.value?.data : null;
   const contract = contractRes.status === "fulfilled" ? contractRes.value?.data : null;
-  return berekenStudentAccess(voorstel, contract);
+  const access = berekenStudentAccess(voorstel, contract);
+  // Faalt de voorstel-call (netwerk/500), dan is de berekende fase onbetrouwbaar: signaleer dat met een
+  // laadFout-vlag i.p.v. de student onterecht in "geen toegang" te zetten (auditpunt 339).
+  if (internshipRes.status === "rejected") return { ...access, laadFout: true };
+  return access;
 }
 
 export function isStudentRouteOpen(access, path) {
@@ -223,6 +234,15 @@ export function isStudentRouteOpen(access, path) {
 export function getStudentRouteLock(access, path) {
   const key = STUDENT_PATH_KEYS[path];
   const startLabel = formatDatumKort(access.startdatum);
+
+  if (path === "/student/planning") {
+    return {
+      titel: access.key === "startklaar" && startLabel ? `Opent op ${startLabel}` : "Planning nog niet beschikbaar",
+      uitleg: access.key === "startklaar"
+        ? "Je planning opent vanaf de startdatum van je stage."
+        : "Je planning opent zodra je stagedossier in orde is en je stage gestart is.",
+    };
+  }
 
   if (key === "overeenkomst") {
     return {

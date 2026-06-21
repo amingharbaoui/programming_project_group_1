@@ -112,18 +112,24 @@ function DossierKaart({ titel, data, formatDatum }) {
             <div className="kv"><span className="k">Uren/week</span><span className="v">{data?.uren_per_week ? `${data.uren_per_week}u` : "—"}</span></div>
           </div>
         </div>
-        <div className="card">
+        <div className="card" style={{ marginTop: 16 }}>
           <div className="card_title"><IconFileDescription size={16} />Opdracht</div>
           <p style={{ fontSize: 13.5, lineHeight: 1.65, color: "var(--sub)", margin: 0 }}>{data?.opdrachtomschrijving || "—"}</p>
         </div>
+        {data?.praktische_afspraken && data?.praktische_afspraken_gedeeld_op && (
+          <div className="card" style={{ marginTop: 16 }}>
+            <div className="card_title"><IconFileDescription size={16} />Praktische afspraken</div>
+            <p style={{ fontSize: 13.5, lineHeight: 1.65, color: "var(--sub)", margin: 0, whiteSpace: "pre-line" }}>{data.praktische_afspraken}</p>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function BegeleidingKaart({ data, wacht }) {
+function BegeleidingKaart({ data, wacht, style }) {
   return (
-    <div className="card">
+    <div className="card" style={style}>
       <div className="card_title"><IconUsers size={16} />Begeleiding</div>
       {data?.mentor_naam && (
         <div className="prof">
@@ -136,10 +142,14 @@ function BegeleidingKaart({ data, wacht }) {
         </div>
       )}
       <div className="prof">
-        <div className="prof-av grijs"><i className="ti ti-user-question" style={{ fontSize: 16 }}></i></div>
+        {data?.stagebegeleider_naam
+          ? <div className="prof-av">{data.stagebegeleider_naam.split(" ").map(w => w[0]).slice(0,2).join("").toUpperCase()}</div>
+          : <div className="prof-av grijs"><i className="ti ti-user-question" style={{ fontSize: 16 }}></i></div>
+        }
         <div>
-          <div className="p-naam">Stagebegeleider wordt toegewezen</div>
+          <div className="p-naam">{data?.stagebegeleider_naam ?? "Stagebegeleider wordt toegewezen"}</div>
           <div className="p-rol">{wacht ? "Definitief na goedkeuring" : "Erasmushogeschool Brussel"}</div>
+          {data?.stagebegeleider_email && <div className="p-mail">{data.stagebegeleider_email}</div>}
         </div>
       </div>
     </div>
@@ -149,9 +159,28 @@ function BegeleidingKaart({ data, wacht }) {
 const VERBERG_DOC = new Set(["reflectiebijlage", "eindoverzicht", "stageovereenkomst"]);
 const DOC_ACTIE_STATUS = new Set(["ontbreekt", "afgekeurd"]);
 
-function TaakKaart({ status, contractStudentGekend, volledigGetekend, docsOk, navigate, startdatum }) {
+function TaakKaart({ status, contractStudentGekend, volledigGetekend, docsOk, navigate, startdatum, dossierStatus }) {
   if (status !== "goedgekeurd") {
     return null;
+  }
+
+  // Eindfase wordt bepaald door de dossierstatus — de voorstelstatus blijft op 'goedgekeurd' staan.
+  if (["resultaat_vrijgegeven", "afgerond", "voltooid"].includes(dossierStatus)) {
+    return (
+      <div className="taak-kaart">
+        <div className="card_title">
+          <i className="ti ti-list-check"></i>
+          Wat moet je nu doen
+        </div>
+        <div className="taak-rij">
+          <div className="taak-icon groen"><i className="ti ti-circle-check"></i></div>
+          <div className="taak-info">Je stage is afgerond. Bekijk je evaluatie en eindresultaat.</div>
+          <button className="btn primary sm" onClick={() => navigate("/student/evaluation")}>
+            Evaluatie <IconArrowRight size={13} />
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const contractOk = !!contractStudentGekend;
@@ -261,6 +290,8 @@ export default function MyInternshipPage() {
   const [volledigGetekend, setVolledigGetekend] = useState(false);
   const [docsOk, setDocsOk] = useState(false);
   const [historiek, setHistoriek] = useState([]);
+  // Konden contract/documenten niet geladen worden, dan is de taakkaart op default-false onbetrouwbaar (341).
+  const [flowDataFout, setFlowDataFout] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -289,7 +320,7 @@ export default function MyInternshipPage() {
         if (!cached && c) cacheSet("student_contract", c);
         setContractStudentGekend(!!c?.student_getekend_op);
         setVolledigGetekend(!!(c?.student_getekend_op && c?.bedrijf_getekend_op));
-      } catch {}
+      } catch { setFlowDataFout(true); }
       // Documenten
       try {
         const cachedDocs    = cacheGet("student_documents");
@@ -303,16 +334,17 @@ export default function MyInternshipPage() {
         const gefilterd = soorten.filter((s) => {
           const t = (s.type ?? "").toLowerCase();
           const n = (s.naam ?? "").toLowerCase();
-          return !VERBERG_DOC.has(t) && !VERBERG_DOC.has(n);
+          return !VERBERG_DOC.has(t) && !VERBERG_DOC.has(n) && s.is_verplicht !== 0;
         });
         const alleGoed = gefilterd.length > 0 && gefilterd.every((s) => {
           const actief = docs
             .filter((d) => d.document_soort_id === s.id)
             .sort((a, b) => (b.versie_nummer ?? 0) - (a.versie_nummer ?? 0))[0];
-          return actief && !DOC_ACTIE_STATUS.has(actief.status);
+          // Pas 'in orde' wanneer de administratie het document écht goedgekeurd/geregistreerd heeft.
+          return actief && ["goedgekeurd", "geregistreerd"].includes(actief.status);
         });
         setDocsOk(alleGoed);
-      } catch {}
+      } catch { setFlowDataFout(true); }
     }
     fetchData();
   }, []);
@@ -348,7 +380,11 @@ export default function MyInternshipPage() {
     );
   }
 
-  const currentStatus = internship?.status || (location.state?.ingediend ? "ingediend" : null);
+  const rawStatus = internship?.status || (location.state?.ingediend ? "ingediend" : null);
+  // Goedgekeurd met uitzondering volgt exact dezelfde studentflow als goedgekeurd; anders matcht geen
+  // hoofdblok en krijgt de student een lege pagina na die beslissing (auditpunt 340).
+  const currentStatus = rawStatus === "goedgekeurd_met_uitzondering" ? "goedgekeurd" : rawStatus;
+  const dossierStatus = internship?.dossier_status ?? internship?.dossierStatus ?? null;
   const heeftVoorstel = !!internship || location.state?.ingediend;
   const isConcept     = currentStatus === "concept";
   const isAfgesloten  = ["afgekeurd", "ingetrokken"].includes(currentStatus);
@@ -370,7 +406,7 @@ export default function MyInternshipPage() {
 
       <div className="page-header">
         <h1>{pageTitle}</h1>
-        <p>Academiejaar 2025-2026</p>
+        <p>Academiejaar {data?.academiejaar || "—"}</p>
       </div>
 
       {/* ── GEEN VOORSTEL ── */}
@@ -455,18 +491,16 @@ export default function MyInternshipPage() {
               <div className="b-text">Je stagevoorstel wordt behandeld door de stagecommissie. Je krijgt een melding zodra er een beslissing is.</div>
             </div>
           </div>
-          <div style={{ borderTop: "1px solid var(--border)", marginTop: 6, paddingTop: 14 }}>
-            <div className="grid_2">
-              <div>
-                <DossierKaart titel="Je voorstel zoals ingediend — nog niet goedgekeurd" data={data} formatDatum={formatDatum} />
-                {kanIntrekken && (
-                  <button className="btn" style={{ marginTop: 10 }} onClick={() => setIntrekModal(true)}>
-                    <IconArrowBackUp size={14} /> Voorstel intrekken
-                  </button>
-                )}
-              </div>
-              <BegeleidingKaart data={data} wacht={true} />
+          <div className="grid_2" style={{ marginTop: 16, alignItems: "stretch" }}>
+            <div>
+              <DossierKaart titel="Je voorstel zoals ingediend — nog niet goedgekeurd" data={data} formatDatum={formatDatum} />
+              {kanIntrekken && (
+                <button className="btn" style={{ marginTop: 10 }} onClick={() => setIntrekModal(true)}>
+                  <IconArrowBackUp size={14} /> Voorstel intrekken
+                </button>
+              )}
             </div>
+            <BegeleidingKaart data={data} wacht={true} style={{ alignSelf: "start" }} />
           </div>
         </>
       )}
@@ -485,16 +519,14 @@ export default function MyInternshipPage() {
           <div style={{ marginBottom: 16 }}>
             <Historiek items={historiek} />
           </div>
-          <div style={{ borderTop: "1px solid var(--border)", marginTop: 6, paddingTop: 14 }}>
-            <div className="grid_2">
-              <div>
-                <DossierKaart titel="Je voorstel zoals ingediend" data={data} formatDatum={formatDatum} />
-                <button className="btn" style={{ marginTop: 10 }} onClick={() => setIntrekModal(true)}>
-                  <IconArrowBackUp size={14} /> Voorstel intrekken
-                </button>
-              </div>
-              <BegeleidingKaart data={data} wacht={true} />
+          <div className="grid_2" style={{ marginTop: 16, alignItems: "stretch" }}>
+            <div>
+              <DossierKaart titel="Je voorstel zoals ingediend" data={data} formatDatum={formatDatum} />
+              <button className="btn" style={{ marginTop: 10 }} onClick={() => setIntrekModal(true)}>
+                <IconArrowBackUp size={14} /> Voorstel intrekken
+              </button>
             </div>
+            <BegeleidingKaart data={data} wacht={true} style={{ alignSelf: "start" }} />
           </div>
         </>
       )}
@@ -503,7 +535,7 @@ export default function MyInternshipPage() {
       {isAanpassingen && (
         <>
           <ProgressBar status={currentStatus} contractGetekend={false} />
-          <div className="card" style={{ marginBottom: 16, border: "1.5px solid #0a0a0a", boxShadow: "0 4px 14px rgba(0,0,0,.10)" }}>
+          <div className="card" style={{ marginBottom: 16 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 11, flexWrap: "wrap" }}>
               <div className="taak-icon amber" style={{ width: 34, height: 34, fontSize: 17, borderRadius: 8, flexShrink: 0 }}>
                 <i className="ti ti-message-circle"></i>
@@ -517,7 +549,7 @@ export default function MyInternshipPage() {
               </button>
             </div>
           </div>
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 16, display: "grid", gridTemplateColumns: "minmax(0,3fr) minmax(0,2fr)", gap: 16, alignItems: "stretch" }}>
             <Historiek items={historiek} />
           </div>
         </>
@@ -526,17 +558,20 @@ export default function MyInternshipPage() {
       {/* ── GOEDGEKEURD / TERUGGESTUURD / VALIDATIE ── */}
       {isGoedgekeurd && (
         <>
-          <ProgressBar status={currentStatus} contractGetekend={volledigGetekend} startdatum={internship?.startdatum} />
-          <TaakKaart status={currentStatus} contractStudentGekend={contractStudentGekend} volledigGetekend={volledigGetekend} docsOk={docsOk} navigate={navigate} startdatum={internship?.startdatum} />
-          <div style={{ borderTop: "1px solid var(--border)", marginTop: 16, paddingTop: 14 }}>
-            <div className="grid_2">
-              <DossierKaart
-                titel={`Je stagedossier — goedgekeurd${data?.stagefunctie ? ` · ${data.stagefunctie}` : ""}`}
-                data={data}
-                formatDatum={formatDatum}
-              />
-              <BegeleidingKaart data={data} wacht={false} />
+          {flowDataFout && (
+            <div className="card" style={{ marginBottom: 12 }}>
+              <span className="status s_rood"><i className="ti ti-alert-circle" /> Je contract- of documentstatus kon niet geladen worden. Herlaad de pagina — de volgende taak hieronder klopt mogelijk niet.</span>
             </div>
+          )}
+          <ProgressBar status={currentStatus} contractGetekend={volledigGetekend} startdatum={internship?.startdatum} />
+          <TaakKaart status={currentStatus} contractStudentGekend={contractStudentGekend} volledigGetekend={volledigGetekend} docsOk={docsOk} navigate={navigate} startdatum={internship?.startdatum} dossierStatus={dossierStatus} />
+          <div className="grid_2" style={{ marginTop: 16, alignItems: "stretch" }}>
+            <DossierKaart
+              titel={`Je stagedossier — goedgekeurd${data?.stagefunctie ? ` · ${data.stagefunctie}` : ""}`}
+              data={data}
+              formatDatum={formatDatum}
+            />
+            <BegeleidingKaart data={data} wacht={false} style={{ alignSelf: "start" }} />
           </div>
         </>
       )}

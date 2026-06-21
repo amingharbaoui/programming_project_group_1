@@ -1,33 +1,58 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import "./DocentLogbooksPage.css";
+import { IconAlertTriangle, IconBell, IconCheck, IconX, IconRefresh, IconArrowLeft } from "@tabler/icons-react";
+import { cacheGet, cacheSet, cacheDelete } from "../docentCache";
 
+// Alle mogelijke statussen van logboek_weken:
+// niet_gestart · in_opbouw · ingediend · ontbreekt · afgecheckt_door_mentor
+// teruggestuurd_door_mentor · klaar_voor_docent · teruggestuurd_door_docent
+// goedgekeurd_door_docent · afgesloten
 function getStatusClass(status) {
-  if (status === "goedgekeurd_door_docent") return "s_ok";
-  if (status === "afgecheckt_door_mentor") return "s_info";
-  if (status === "ingediend") return "s_info";
+  if (status === "goedgekeurd_door_docent" || status === "afgesloten") return "s_ok";
+  if (status === "klaar_voor_docent") return "s_amber";
+  if (status === "afgecheckt_door_mentor" || status === "ingediend") return "s_info";
   if (status?.includes("teruggestuurd")) return "s_rood";
-  return "s_grijs";
+  if (status === "ontbreekt") return "s_rood";
+  return "s_grijs"; // niet_gestart, in_opbouw, onbekend
 }
 
 function getStatusLabel(status) {
-  if (status === "goedgekeurd_door_docent") return "Goedgekeurd door docent";
-  if (status === "afgecheckt_door_mentor") return "Afgecheckt door mentor";
-  if (status === "ingediend") return "Ingediend door student";
-  if (status === "teruggestuurd_door_docent") return "Teruggestuurd door docent";
-  if (status === "teruggestuurd_door_mentor") return "Teruggestuurd door mentor";
-  if (status === "in_opbouw") return "In opbouw";
-  return status || "-";
+  const labels = {
+    niet_gestart:             "Nog niet gestart",
+    in_opbouw:                "In opbouw bij student",
+    ingediend:                "Ingediend door student",
+    ontbreekt:                "Niet ingediend",
+    afgecheckt_door_mentor:   "Nagekeken door mentor",
+    teruggestuurd_door_mentor:"Teruggestuurd door mentor",
+    klaar_voor_docent:        "Klaar om na te lezen",
+    teruggestuurd_door_docent:"Teruggestuurd door jou",
+    goedgekeurd_door_docent:  "Goedgekeurd door jou",
+    afgesloten:               "Afgesloten",
+  };
+  return labels[status] || status || "-";
 }
+
+// Weken waar de docent actie op kan nemen (feedback + goedkeuren/terugsturen)
+const KAN_REVIEWEN = ["afgecheckt_door_mentor", "klaar_voor_docent"];
 
 function formatDate(value) {
   if (!value) return "-";
   return new Date(value).toLocaleDateString("nl-BE");
 }
 
+function formatDagNaam(datum) {
+  if (!datum) return "Dag";
+  const t = new Date(datum).toLocaleDateString("nl-BE", { weekday: "long", day: "numeric", month: "long" });
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 export default function DocentLogbooksPage() {
   const { user } = useAuth();
 
+  const [searchParams] = useSearchParams();
   const [studenten, setStudenten] = useState([]);
   const [studentId, setStudentId] = useState(null);
   const [weeks, setWeeks] = useState([]);
@@ -37,18 +62,25 @@ export default function DocentLogbooksPage() {
   const [feedbackByWeek, setFeedbackByWeek] = useState({});
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [remindLoading, setRemindLoading] = useState(false);
-  const [remindMelding, setRemindMelding] = useState({ weekNr: null, tekst: "", type: "" });
+  const [remindModal, setRemindModal] = useState({ open: false, succes: true, tekst: "" });
 
   // Laad studenten van API
   useEffect(() => {
     async function loadStudenten() {
       try {
-        const res = await api.get("/docent/students", {
-        });
-        const data = res.data.data || [];
+        let data = cacheGet("docent_students");
+        if (!data) {
+          const res = await api.get("/docent/students");
+          data = res.data.data || [];
+          cacheSet("docent_students", data);
+        }
         setStudenten(data);
-        if (data.length > 0) {
-          const sid = data[0].student_id || data[0].id;
+        // Alleen meteen een student openen als die expliciet via ?student= meegegeven is (bv. vanuit
+        // het studentenoverzicht); anders het overzicht tonen (master-detail, zoals het prototype).
+        const param = Number(searchParams.get("student"));
+        const gekozen = param ? data.find((s) => (s.student_id || s.id) === param) : null;
+        if (gekozen) {
+          const sid = gekozen.student_id || gekozen.id;
           setStudentId(sid);
           loadLogbooks(sid);
         } else {
@@ -61,14 +93,19 @@ export default function DocentLogbooksPage() {
     loadStudenten();
   }, []);
 
-  async function loadLogbooks(sid) {
+  async function loadLogbooks(sid, force = false) {
     try {
       setLoading(true);
       setError("");
       setWeeks([]);
-      const response = await api.get(`/docent/logbooks/${sid}`, {
-      });
-      setWeeks(response.data.data || []);
+      if (!force) {
+        const cached = cacheGet(`docent_logbooks_${sid}`);
+        if (cached) { setWeeks(cached); setLoading(false); return; }
+      }
+      const response = await api.get(`/docent/logbooks/${sid}`);
+      const data = response.data.data || [];
+      cacheSet(`docent_logbooks_${sid}`, data);
+      setWeeks(data);
     } catch (err) {
       setError(err.response?.data?.message || err.message || "Logboeken ophalen mislukt");
     } finally {
@@ -80,7 +117,7 @@ export default function DocentLogbooksPage() {
     const newId = Number(e.target.value);
     setStudentId(newId);
     setFeedbackByWeek({});
-    setRemindMelding({ weekNr: null, tekst: "", type: "" });
+    setRemindModal({ open: false, succes: true, tekst: "" });
     loadLogbooks(newId);
   }
 
@@ -90,9 +127,10 @@ export default function DocentLogbooksPage() {
       await api.patch(`/docent/logbooks/${weekId}/review`, {
         feedback: feedbackByWeek[weekId] || "Logboek nagekeken door docent.",
         herindieningNodig,
-      }, {
       });
-      await loadLogbooks(studentId);
+      cacheDelete(`docent_logbooks_${studentId}`);
+      cacheDelete("docent_students");
+      await loadLogbooks(studentId, true);
     } catch (err) {
       alert(err.response?.data?.message || err.message || "Docentcontrole mislukt");
     } finally {
@@ -103,15 +141,19 @@ export default function DocentLogbooksPage() {
   async function handleHerinner(weekNr) {
     try {
       setRemindLoading(true);
-      setRemindMelding({ weekNr: null, tekst: "", type: "" });
-      await api.post(`/docent/logbooks/${studentId}/remind`, { weken: weekNr ? [weekNr] : [] }, {
+      await api.post(`/docent/logbooks/${studentId}/remind`, { weken: weekNr ? [weekNr] : [] });
+      setRemindModal({
+        open: true,
+        succes: true,
+        tekst: weekNr === "algemeen"
+          ? "De student heeft een algemene herinnering ontvangen om de ontbrekende logboekweken in te dienen."
+          : `De student heeft een herinnering ontvangen voor week ${weekNr}.`,
       });
-      setRemindMelding({ weekNr, tekst: "Herinnering verstuurd naar student.", type: "s_ok" });
     } catch (err) {
-      setRemindMelding({
-        weekNr,
-        tekst: err.response?.data?.message || "Herinnering versturen mislukt.",
-        type: "s_rood",
+      setRemindModal({
+        open: true,
+        succes: false,
+        tekst: err.response?.data?.message || "Herinnering versturen mislukt. Probeer opnieuw.",
       });
     } finally {
       setRemindLoading(false);
@@ -122,17 +164,31 @@ export default function DocentLogbooksPage() {
     (s) => (s.student_id || s.id) === studentId
   );
 
-  // Bereken ontbrekende weeknummers: alle weken 1..aantal_weken die nog niet (volledig) bestaan.
+  // Bereken ontbrekende weeknummers: weken 1..aantal_weken die nog niet bestaan EN al voorbij zijn.
+  // Zelfde logica als de backend (getMissingLogbooksForDocent) — geen toekomstige weken of eindfase markeren.
   function getOntbrekendeWeken(weeks) {
+    // Alleen tijdens een startklare/lopende stage zijn er ontbrekende weken; in contract- of eindfase niet.
+    if (!["geregistreerd", "actief", "stage_loopt"].includes(geselecteerdeStudent?.dossier_status)) {
+      return [];
+    }
     const ingevuld = new Set(
       weeks.filter((w) => w.status && w.status !== "ontbreekt").map((w) => w.week_nummer)
     );
     // Totaal verwachte weken: uit de stage (aantal_weken), met fallback op de hoogste ingediende week.
     const totaal = Number(geselecteerdeStudent?.aantal_weken)
       || (weeks.length > 0 ? Math.max(...weeks.map((w) => w.week_nummer)) : 0);
+
+    const startD = geselecteerdeStudent?.startdatum ? new Date(geselecteerdeStudent.startdatum) : null;
+    const vandaag = new Date(); vandaag.setHours(0, 0, 0, 0);
+    const weekVoorbij = (n) => {
+      if (!startD || Number.isNaN(startD.getTime())) return true;
+      const einde = new Date(startD); einde.setDate(einde.getDate() + n * 7);
+      return einde <= vandaag;
+    };
+
     const ontbrekend = [];
     for (let n = 1; n <= totaal; n++) {
-      if (!ingevuld.has(n)) ontbrekend.push(n);
+      if (!ingevuld.has(n) && weekVoorbij(n)) ontbrekend.push(n);
     }
     return ontbrekend;
   }
@@ -146,36 +202,75 @@ export default function DocentLogbooksPage() {
   ].sort((a, b) => b.week_nummer - a.week_nummer);
 
   return (
-    <div className="page_inner">
-      <div className="page_header">
+    <div className="page-inner">
+      <div className="page-header">
         <div>
           <h1>Logboeken</h1>
-          <p>Bekijk logboeken, mentorfeedback en geef docentfeedback.</p>
+          <p>Een week komt hier binnen nadat de mentor hem afgecheckt heeft — jij leest na en keurt goed of stuurt terug.</p>
         </div>
-        <button className="btn sm" onClick={() => studentId && loadLogbooks(studentId)}>
-          Vernieuwen
-        </button>
+        {studentId && (
+          <button className="btn primary" onClick={() => loadLogbooks(studentId, true)}>
+            <IconRefresh size={14} stroke={1.8} /> Vernieuwen
+          </button>
+        )}
       </div>
 
-      {/* Student selector */}
-      {studenten.length > 0 && (
-        <div className="card" style={{ marginBottom: "12px" }}>
-          <div className="card_title">Student kiezen</div>
-          <div className="form_group" style={{ marginBottom: 0 }}>
-            <label className="form_label">Student</label>
-            <select
-              className="form_input"
-              value={studentId || ""}
-              onChange={handleStudentChange}
-            >
-              {studenten.map((s) => (
-                <option key={s.dossier_id} value={s.student_id || s.id}>
-                  {s.voornaam} {s.achternaam}
-                  {s.bedrijf ? ` — ${s.bedrijf}` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
+      {/* Overzicht: zolang er geen student gekozen is, een tabel met alle stagiairs (zoals het prototype). */}
+      {!studentId && studenten.length > 0 && (
+        <div className="card doc_students_card">
+          <table className="doc_students_tbl">
+            <thead>
+              <tr><th>Student</th><th>Bedrijf</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+              {studenten.map((s) => {
+                const sid = s.student_id || s.id;
+                const initialen = [s.voornaam, s.achternaam].filter(Boolean).map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?";
+                const teLezen = s.actie_type === "logboek";
+                const logboekFase = ["geregistreerd", "actief", "stage_loopt"].includes(s.dossier_status);
+                const afgerondFase = ["resultaat_vrijgegeven", "afgerond", "voltooid"].includes(s.dossier_status);
+                return (
+                  <tr key={s.dossier_id}>
+                    <td>
+                      <div className="doc_student_cell">
+                        <div className="doc_avatar">{initialen}</div>
+                        <div className="doc_student_info"><div className="doc_naam">{s.voornaam} {s.achternaam}</div></div>
+                      </div>
+                    </td>
+                    <td className="doc_sub">{s.bedrijf || "-"}</td>
+                    <td>
+                      {afgerondFase
+                        ? <span className="status s_grijs">Afgerond</span>
+                        : !logboekFase
+                        ? <span className="status s_grijs">Nog niet gestart</span>
+                        : teLezen
+                        ? <span className="status s_rood"><IconAlertTriangle size={13} stroke={1.8} /> Na te lezen</span>
+                        : <span className="status s_grijs">Bijgewerkt</span>}
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <button className="btn sm" onClick={() => handleStudentChange({ target: { value: sid } })}>Openen</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {!studentId && studenten.length === 0 && (
+        <div className="card"><p className="muted">Geen stagiairs gevonden.</p></div>
+      )}
+
+      {/* Detail: terugknop naar het overzicht. */}
+      {studentId && (
+        <div style={{ marginBottom: 12 }}>
+          <button className="btn" onClick={() => { setStudentId(null); setWeeks([]); }}>
+            <IconArrowLeft size={14} stroke={1.8} /> Alle logboeken
+          </button>
+          {geselecteerdeStudent && (
+            <span style={{ marginLeft: 10, fontWeight: 600 }}>{geselecteerdeStudent.voornaam} {geselecteerdeStudent.achternaam}</span>
+          )}
         </div>
       )}
 
@@ -191,82 +286,42 @@ export default function DocentLogbooksPage() {
         </div>
       )}
 
-      {!loading && !error && alleWeken.length === 0 && (
-        <div className="empty_state">Geen logboeken gevonden voor deze student.</div>
+      {studentId && !loading && !error && alleWeken.length === 0 && (
+        <div className="card"><p className="muted">Geen logboeken gevonden voor deze student.</p></div>
       )}
 
-      {/* Ontbrekende weken banner */}
+      {/* Ontbrekende weken samenvatting */}
       {!loading && ontbrekendeWeken.length > 0 && (
-        <div className="card" style={{
-          borderColor: "var(--red)",
-          background: "#fff8f8",
-          marginBottom: "12px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: "12px",
-          padding: "12px 16px",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <i className="ti ti-alert-triangle" style={{ color: "var(--red)", fontSize: "16px" }} />
+        <div className="card lb_missing_banner">
+          <div className="lb_missing_left">
+            <IconAlertTriangle size={15} stroke={1.8} className="lb_missing_icon" />
             <div>
-              <div style={{ fontSize: "13px", fontWeight: 600 }}>
+              <span className="lb_missing_title">
                 {ontbrekendeWeken.length === 1
-                  ? `Week ${ontbrekendeWeken[0]} niet ingediend`
-                  : `${ontbrekendeWeken.length} weken niet ingediend (${ontbrekendeWeken.join(", ")})`}
-              </div>
-              {geselecteerdeStudent && (
-                <div style={{ fontSize: "12px", color: "var(--sub)" }}>
-                  {geselecteerdeStudent.voornaam} {geselecteerdeStudent.achternaam} loopt achter op het logboek.
-                </div>
-              )}
+                  ? `Week ${ontbrekendeWeken[0]} ontbreekt`
+                  : `${ontbrekendeWeken.length} weken ontbreken`}
+              </span>
+              <span className="lb_missing_sub">
+                {geselecteerdeStudent ? `${geselecteerdeStudent.voornaam} ${geselecteerdeStudent.achternaam} heeft deze weken nog niet ingediend.` : ""}
+              </span>
             </div>
           </div>
-          <button
-            className="btn sm"
-            onClick={() => handleHerinner("algemeen")}
-            disabled={remindLoading}
-          >
-            <i className="ti ti-bell" /> Herinnering sturen
+          <button className="btn sm" onClick={() => handleHerinner("algemeen")} disabled={remindLoading}>
+            <IconBell size={14} stroke={1.8} /> Herinnering sturen
           </button>
         </div>
       )}
 
-      {remindMelding.tekst && (
-        <div style={{ marginBottom: "10px" }}>
-          <span className={`status ${remindMelding.type}`}>{remindMelding.tekst}</span>
-        </div>
-      )}
 
       {!loading && !error && alleWeken.map((week) => {
         if (week.ontbreekt) {
-          // Ontbrekende week rij
           return (
-            <div
-              key={`ontbreekt_${week.week_nummer}`}
-              className="card"
-              style={{ borderColor: "var(--red)", marginBottom: "8px" }}
-            >
-              <div style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "9px",
-                flexWrap: "wrap",
-              }}>
-                <span style={{ fontSize: "13.5px", fontWeight: 600 }}>Week {week.week_nummer}</span>
-                <span className="status s_rood">
-                  <i className="ti ti-alert-triangle" /> Niet ingediend door student
-                </span>
-                <div style={{ marginLeft: "auto" }}>
-                  <button
-                    className="btn sm"
-                    disabled={remindLoading}
-                    onClick={() => handleHerinner(week.week_nummer)}
-                  >
-                    <i className="ti ti-bell" /> Herinnering sturen
-                  </button>
-                </div>
-              </div>
+            <div key={`ontbreekt_${week.week_nummer}`} className="card lb_week_missing">
+              <span className="lb_week_nr">Week {week.week_nummer}</span>
+              <span className="lb_week_missing_lbl">Niet ingediend</span>
+              <button className="btn sm" disabled={remindLoading} onClick={() => handleHerinner(week.week_nummer)} style={{ marginLeft: "auto" }}>
+                <IconBell size={14} stroke={1.8} /> Herinnering sturen
+              </button>
             </div>
           );
         }
@@ -281,7 +336,7 @@ export default function DocentLogbooksPage() {
               </span>
               {week.blokkade && (
                 <span className="status s_rood" style={{ marginLeft: "4px" }}>
-                  <i className="ti ti-alert-triangle" /> {week.blokkade}
+                  <IconAlertTriangle size={14} stroke={1.8} /> {week.blokkade}
                 </span>
               )}
             </div>
@@ -306,56 +361,101 @@ export default function DocentLogbooksPage() {
             )}
 
             {(week.dagen || []).length > 0 && (
-              <table className="tbl" style={{ marginTop: "12px" }}>
-                <thead>
-                  <tr>
-                    <th>Datum</th>
-                    <th>Taken</th>
-                    <th>Reflectie</th>
-                    <th>Uren</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {week.dagen.map((day) => (
-                    <tr key={day.id}>
-                      <td>{formatDate(day.datum)}</td>
-                      <td>{day.uitgevoerde_taken || "-"}</td>
-                      <td>{day.reflectie || "-"}</td>
-                      <td>{day.aantal_uren || 0}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="lb_dagen" style={{ marginTop: 12 }}>
+                {week.dagen.map((dag) => {
+                  const comps = Array.isArray(dag.competenties)
+                    ? dag.competenties
+                    : (dag.competenties ? JSON.parse(dag.competenties) : []);
+                  const geenStage = dag.status === "geen_stagedag";
+                  return (
+                    <div className="lb_dag" key={dag.id}>
+                      <div className="lb_dag_hoofd">
+                        <span className="lb_dag_naam">
+                          {formatDagNaam(dag.datum)}
+                          {dag.titel && <span className="lb_dag_titel"> — {dag.titel}</span>}
+                        </span>
+                        <div className="lb_dag_rechts">
+                          <span className="lb_dag_uren">{dag.aantal_uren || 0}u</span>
+                          {geenStage && <span className="status s_grijs" style={{ fontSize: 10 }}>Geen stagedag</span>}
+                          {!geenStage && dag.mentor_bevestigd_op && (
+                            <span className="status s_ok" style={{ fontSize: 10 }}>
+                              <IconCheck size={10} stroke={2} /> Mentor bevestigd
+                            </span>
+                          )}
+                          {!geenStage && !dag.mentor_bevestigd_op && (
+                            <span className="status s_grijs" style={{ fontSize: 10 }}>Niet bevestigd</span>
+                          )}
+                        </div>
+                      </div>
+                      {!geenStage && (
+                        <div className="lb_dag_body">
+                          {dag.uitgevoerde_taken && (
+                            <div className="lb_dag_veld">
+                              <span className="lb_veld_k">Taken</span>
+                              <span>{dag.uitgevoerde_taken}</span>
+                            </div>
+                          )}
+                          {dag.reflectie && (
+                            <div className="lb_dag_veld">
+                              <span className="lb_veld_k">Reflectie</span>
+                              <span>{dag.reflectie}</span>
+                            </div>
+                          )}
+                          {dag.problemen && (
+                            <div className="lb_dag_veld">
+                              <span className="lb_veld_k">Problemen</span>
+                              <span>{dag.problemen}</span>
+                            </div>
+                          )}
+                          {comps.length > 0 && (
+                            <div className="lb_dag_chips">
+                              {comps.map((c) => <span key={c} className="lb_dag_chip">{c}</span>)}
+                            </div>
+                          )}
+                          {dag.mentor_opmerking && (
+                            <div className="lb_dag_veld">
+                              <span className="lb_veld_k">Opmerking mentor</span>
+                              <span>{dag.mentor_opmerking}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
 
-            {!["goedgekeurd_door_docent"].includes(week.status) && (
+            {KAN_REVIEWEN.includes(week.status) && (
               <>
-                <div className="form_group" style={{ marginTop: "14px" }}>
-                  <label className="form_label">Feedback docent</label>
+                <div className="form_group" style={{ marginTop: "12px" }}>
+                  <label className="form_label">Feedback (optioneel)</label>
                   <textarea
-                    className="form_textarea"
-                    placeholder="Geef feedback als docent..."
+                    className="form_input"
+                    rows={2}
                     value={feedbackByWeek[week.id] || ""}
                     onChange={(e) =>
-                      setFeedbackByWeek({ ...feedbackByWeek, [week.id]: e.target.value })
+                      setFeedbackByWeek((prev) => ({ ...prev, [week.id]: e.target.value }))
                     }
+                    placeholder="Voeg eventuele feedback toe voor de student..."
+                    style={{ resize: "vertical" }}
                   />
                 </div>
-
                 <div className="actions" style={{ marginTop: "8px" }}>
-                  <button
-                    className="btn"
-                    disabled={actionLoadingId === week.id}
-                    onClick={() => reviewWeek(week.id, true)}
-                  >
-                    Aanpassing vragen
-                  </button>
                   <button
                     className="btn primary"
                     disabled={actionLoadingId === week.id}
                     onClick={() => reviewWeek(week.id, false)}
                   >
-                    {actionLoadingId === week.id ? "Verwerken..." : "Nagekeken"}
+                    <IconCheck size={14} stroke={2} />
+                    {actionLoadingId === week.id ? "Bezig..." : "Goedkeuren"}
+                  </button>
+                  <button
+                    className="btn"
+                    disabled={actionLoadingId === week.id}
+                    onClick={() => reviewWeek(week.id, true)}
+                  >
+                    Terugsturen
                   </button>
                 </div>
               </>
@@ -363,6 +463,30 @@ export default function DocentLogbooksPage() {
           </div>
         );
       })}
+
+      {/* Herinnering modal */}
+      {remindModal.open && (
+        <div className="modal_overlay" onClick={() => setRemindModal({ open: false, succes: true, tekst: "" })}>
+          <div className="modal_box" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal_header">
+              <span className="modal_title">
+                {remindModal.succes ? "Herinnering verstuurd" : "Actie vereist"}
+              </span>
+              <button className="icon_btn" onClick={() => setRemindModal({ open: false, succes: true, tekst: "" })}>
+                <IconX size={16} stroke={1.8} />
+              </button>
+            </div>
+            <div className="modal_body">
+              <p style={{ margin: 0, fontSize: 13, color: "var(--sub)" }}>{remindModal.tekst}</p>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
+                <button className="btn primary" onClick={() => setRemindModal({ open: false, succes: true, tekst: "" })}>
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -88,11 +88,12 @@ export default function StudentContractPage() {
 
   useEffect(() => { laadContract(); }, []);
 
-  async function laadContract() {
+  async function laadContract(force = false) {
     setLoading(true);
     setFout(null);
     try {
-      const cached = cacheGet("student_contract");
+      // Het contract wordt ook door mentor/administratie gewijzigd → met 'force' verse data ophalen.
+      const cached = force ? null : cacheGet("student_contract");
       const data = cached ?? (await apiRequest("GET", "/contracts/my")).data;
       if (!cached && data) cacheSet("student_contract", data);
       setContract(data);
@@ -108,7 +109,7 @@ export default function StudentContractPage() {
     setBezig(true);
     setFout(null);
     try {
-      const res = await apiRequest("POST", "/contracts/sign");
+      const res = await apiRequest("POST", "/contracts/sign", { bevestigd: true });
       cacheDelete("student_contract");
       await laadContract();
       setAkkoord(false);
@@ -164,8 +165,9 @@ export default function StudentContractPage() {
   return (
     <div className="page-inner">
 
-      <div className="page-header">
+      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1>Stageovereenkomst</h1>
+        <button className="btn sm" onClick={() => laadContract(true)} disabled={loading}>Vernieuwen</button>
       </div>
 
       {fout && (
@@ -234,8 +236,8 @@ export default function StudentContractPage() {
 
       {wachtOpBedrijf && (
         <button className="btn contract-reminder" onClick={() => setHerinneringOpen(true)}>
-          <i className="ti ti-bell-ringing"></i>
-          Herinnering sturen naar het bedrijf
+          <i className="ti ti-info-circle"></i>
+          Wat als het bedrijf nog niet tekent?
         </button>
       )}
 

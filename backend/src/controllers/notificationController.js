@@ -63,4 +63,21 @@ async function markAllRead(req, res) {
   }
 }
 
-module.exports = { listMine, markRead, markAllRead };
+// Eén melding verwijderen (alleen eigen meldingen).
+async function deleteOne(req, res) {
+  const userId = getUserId(req);
+  const id = Number(req.params.id);
+  if (!id) return fail(res, 400, "Ongeldig meldings-id");
+  try {
+    const [r] = await db.query(
+      "DELETE FROM systeem_meldingen WHERE id = ? AND ontvanger_id = ?",
+      [id, userId]
+    );
+    if (r.affectedRows === 0) return fail(res, 404, "Melding niet gevonden");
+    return ok(res, { id }, "Melding verwijderd");
+  } catch (error) {
+    return fail(res, 500, "Melding verwijderen mislukt", error.message);
+  }
+}
+
+module.exports = { listMine, markRead, markAllRead, deleteOne };

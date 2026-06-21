@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import "./MentorAfsprakenPage.css";
+import { cacheGet, cacheSet, cacheDelete } from "../mentorCache";
+import { kiesMentorStagiair, onthoudMentorDossier } from "../mentorSelection";
 
 function formatDate(value) {
   if (!value) return null;
@@ -26,6 +30,7 @@ const LEGE_VELDEN = { werkuren: "", thuiswerk: "", eersteDag: "", contactpersoon
 export default function MentorAfsprakenPage() {
   const { user } = useAuth();
 
+  const [searchParams] = useSearchParams();
   const [studenten, setStudenten]               = useState([]);
   const [geselecteerdDossier, setGeselecteerdDossier] = useState(null);
   const [afspraken, setAfspraken]               = useState("");
@@ -38,17 +43,22 @@ export default function MentorAfsprakenPage() {
   const [veldenOpgeslagen, setVeldenOpgeslagen] = useState(null);
   const [veldenEdit, setVeldenEdit]             = useState({ ...LEGE_VELDEN });
 
-  // Laad studenten van de mentor
   useEffect(() => {
     async function loadStudenten() {
+      const cached = cacheGet("mentor_students");
+      if (cached) {
+        setStudenten(cached);
+        if (cached.length > 0) setGeselecteerdDossier(kiesMentorStagiair(cached, searchParams)?.dossier_id);
+        setLoading(false);
+        return;
+      }
       try {
         setLoading(true);
         const res = await api.get("/mentor/students");
         const data = res.data.data || [];
+        cacheSet("mentor_students", data);
         setStudenten(data);
-        if (data.length > 0) {
-          setGeselecteerdDossier(data[0].dossier_id);
-        }
+        if (data.length > 0) setGeselecteerdDossier(kiesMentorStagiair(data, searchParams)?.dossier_id);
       } catch (err) {
         console.error(err);
       } finally {
@@ -58,21 +68,25 @@ export default function MentorAfsprakenPage() {
     loadStudenten();
   }, []);
 
-  // Laad afspraken voor geselecteerd dossier
   useEffect(() => {
     if (!geselecteerdDossier) return;
     async function loadAfspraken() {
+      const cached = cacheGet(`mentor_afspraken_${geselecteerdDossier}`);
+      if (cached) {
+        setAfspraken(cached.tekst || "");
+        setGedeeldOp(cached.gedeeldOp || null);
+        setVeldenOpgeslagen(cached.velden || null);
+        setAfsprakenLoading(false);
+        return;
+      }
       try {
         setAfsprakenLoading(true);
         setMelding({ tekst: "", type: "" });
         setEditMode(false);
-        const res = await api.get(
-          `/mentor/dossier/${geselecteerdDossier}/afspraken`
-        );
+        const res = await api.get(`/mentor/dossier/${geselecteerdDossier}/afspraken`);
         const row = res.data.data;
-        setAfspraken(row?.praktische_afspraken || "");
-        setGedeeldOp(row?.praktische_afspraken_gedeeld_op || null);
-        // Story 29: losse velden uit de opgeslagen JSON halen (indien aanwezig).
+        const tekst = row?.praktische_afspraken || "";
+        const gedeeldOp = row?.praktische_afspraken_gedeeld_op || null;
         let velden = null;
         if (row?.praktische_afspraken_velden) {
           try {
@@ -81,6 +95,9 @@ export default function MentorAfsprakenPage() {
               : row.praktische_afspraken_velden;
           } catch { velden = null; }
         }
+        cacheSet(`mentor_afspraken_${geselecteerdDossier}`, { tekst, gedeeldOp, velden });
+        setAfspraken(tekst);
+        setGedeeldOp(gedeeldOp);
         setVeldenOpgeslagen(velden);
       } catch (err) {
         setAfspraken("");
@@ -109,19 +126,24 @@ export default function MentorAfsprakenPage() {
   }
 
   async function opslaan() {
+    // Niets delen als alle velden leeg zijn: anders krijgt de student een melding zonder inhoud.
+    if (!Object.values(veldenEdit).some((v) => String(v || "").trim() !== "")) {
+      setMelding({ tekst: "Vul minstens één praktische afspraak in voor je ze deelt.", type: "s_rood" });
+      return;
+    }
     try {
       setBezig(true);
       setMelding({ tekst: "", type: "" });
-      await api.patch(
-        `/mentor/dossier/${geselecteerdDossier}/afspraken`,
-        { velden: veldenEdit }
-      );
-      // De PATCH geeft enkel { dossierId } terug; haal de canonieke (opgebouwde) tekst opnieuw op.
+      await api.patch(`/mentor/dossier/${geselecteerdDossier}/afspraken`, { velden: veldenEdit });
+      cacheDelete(`mentor_afspraken_${geselecteerdDossier}`);
       const res = await api.get(`/mentor/dossier/${geselecteerdDossier}/afspraken`);
       const row = res.data?.data;
-      setAfspraken(row?.praktische_afspraken || "");
+      const tekst = row?.praktische_afspraken || "";
+      const gedeeldOp = row?.praktische_afspraken_gedeeld_op || new Date().toISOString();
+      cacheSet(`mentor_afspraken_${geselecteerdDossier}`, { tekst, gedeeldOp, velden: { ...veldenEdit } });
+      setAfspraken(tekst);
       setVeldenOpgeslagen({ ...veldenEdit });
-      setGedeeldOp(row?.praktische_afspraken_gedeeld_op || new Date().toISOString());
+      setGedeeldOp(gedeeldOp);
       setEditMode(false);
       setMelding({ tekst: "Afspraken opgeslagen!", type: "s_ok" });
     } catch (err) {
@@ -137,34 +159,39 @@ export default function MentorAfsprakenPage() {
   const geselecteerdeStudent = studenten.find(
     (s) => s.dossier_id === geselecteerdDossier
   );
+  const dossierStatus = geselecteerdeStudent?.dossier_status || "";
+  // Contract nog niet getekend/geregistreerd → afspraken pagina nog niet relevant
+  const CONTRACT_FASES = ["wacht_op_student", "wacht_op_bedrijf", "in_controle_bij_administratie"];
+  const AFGEROND_FASES = ["afgerond", "voltooid", "resultaat_vrijgegeven"];
+  const contractNogNietKlaar = CONTRACT_FASES.includes(dossierStatus);
+  const dossierAfgerond = AFGEROND_FASES.includes(dossierStatus);
+  // Actiestijl: overeenkomst is geregistreerd maar afspraken nog niet gedeeld
+  const isActieKaart = dossierStatus === "geregistreerd" && !gedeeldOp && !editMode;
 
   return (
-    <div className="page_inner">
-      <div className="page_header">
-        <div>
-          <h1>Praktische afspraken</h1>
-          <p>Bekijk en bewerk de praktische afspraken voor je stagiair.</p>
-        </div>
+    <div className="page-inner">
+      <div className="page-header">
+        <h1>Praktische afspraken</h1>
+        <p>Bekijk en bewerk de praktische afspraken voor je stagiair</p>
       </div>
 
       {/* Student selector */}
-      {!loading && studenten.length > 0 && (
-        <div className="card" style={{ marginBottom: "12px" }}>
-          <div className="card_title">Stagiair kiezen</div>
-          <div className="form_group" style={{ marginBottom: 0 }}>
-            <label className="form_label">Stagiair</label>
-            <select
-              className="form_input"
-              value={geselecteerdDossier || ""}
-              onChange={(e) => setGeselecteerdDossier(Number(e.target.value))}
-            >
-              {studenten.map((s) => (
-                <option key={s.dossier_id} value={s.dossier_id}>
-                  {s.voornaam} {s.achternaam} — {s.bedrijf}
-                </option>
-              ))}
-            </select>
-          </div>
+      {!loading && studenten.length > 1 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div className="card_title">Stagiair</div>
+          <select
+            className="form_input"
+            style={{ marginTop: 0 }}
+            value={geselecteerdDossier || ""}
+            onChange={(e) => { const v = Number(e.target.value); setGeselecteerdDossier(v); onthoudMentorDossier(v); }}
+          >
+            {studenten.map((s) => (
+              <option key={s.dossier_id} value={s.dossier_id}>
+                {s.voornaam} {s.achternaam} — {s.bedrijf}
+                {AFGEROND_FASES.includes(s.dossier_status) ? " (afgerond)" : ""}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -184,50 +211,73 @@ export default function MentorAfsprakenPage() {
         </div>
       )}
 
-      {!afsprakenLoading && geselecteerdDossier && (
+      {/* Nog niet relevant: contract niet geregistreerd */}
+      {!afsprakenLoading && geselecteerdDossier && contractNogNietKlaar && (
         <div className="card">
           <div className="card_title">
+            <i className="ti ti-message-circle" style={{ color: "var(--sub)" }} />
             Praktische afspraken
-            {geselecteerdeStudent && (
-              <span className="muted" style={{ fontWeight: 400, fontSize: "13px" }}>
-                {" "}— {geselecteerdeStudent.voornaam} {geselecteerdeStudent.achternaam}
+            <span className="status s_grijs" style={{ marginLeft: "auto" }}>
+              <i className="ti ti-lock" />Nog niet van toepassing
+            </span>
+          </div>
+          <p style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.6 }}>
+            De stageovereenkomst moet eerst geregistreerd zijn voor je praktische afspraken kan delen.
+          </p>
+        </div>
+      )}
+
+      {!afsprakenLoading && geselecteerdDossier && !contractNogNietKlaar && (
+        <div className="card" style={isActieKaart ? { border: "1.5px solid #0a0a0a", boxShadow: "0 4px 14px rgba(0,0,0,.10)" } : {}}>
+          <div className="card_title">
+            <i className="ti ti-message-circle" style={{ color: "var(--red)" }} />
+            {gedeeldOp ? "Praktische afspraken & berichten" : "Praktische afspraken delen"}
+            {gedeeldOp && !editMode && (
+              <span className="status s_ok" style={{ marginLeft: "auto" }}>
+                <i className="ti ti-check" />Gedeeld op {formatDate(gedeeldOp)}
+              </span>
+            )}
+            {!gedeeldOp && !editMode && (
+              <span className="status s_rood" style={{ marginLeft: "auto" }}>
+                <i className="ti ti-pencil" />Te delen vóór de start
               </span>
             )}
           </div>
 
-          {gedeeldOp && (
-            <p className="muted" style={{ fontSize: "12px", marginBottom: "12px" }}>
-              Laatst gedeeld op {formatDate(gedeeldOp)}
-            </p>
-          )}
-
           {!editMode ? (
             <>
-              <div
-                style={{
-                  background: "var(--bg-secondary, #f5f5f5)",
-                  borderRadius: "8px",
-                  padding: "14px",
-                  minHeight: "80px",
-                  whiteSpace: "pre-wrap",
-                  fontSize: "14px",
-                  lineHeight: "1.6",
-                  color: afspraken ? "inherit" : "var(--text-muted, #aaa)",
-                }}
-              >
-                {afspraken || "Nog geen afspraken ingevoerd."}
-              </div>
+              {veldenOpgeslagen && Object.values(veldenOpgeslagen).some(Boolean) ? (
+                <>
+                  {AFSPRAAK_VELDEN.filter((v) => veldenOpgeslagen[v.key]).map((v) => (
+                    <div className="kv" key={v.key}>
+                      <span className="k">{v.label}</span>
+                      <span className="v">{veldenOpgeslagen[v.key]}</span>
+                    </div>
+                  ))}
+                  {gedeeldOp && (
+                    <p style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 8 }}>
+                      {geselecteerdeStudent?.voornaam || "De student"} ziet deze afspraken in het studentendashboard.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p style={{ fontSize: 13, color: "var(--faint)" }}>Nog geen afspraken ingevoerd.</p>
+              )}
 
               {melding.tekst && (
-                <div style={{ marginTop: "10px" }}>
+                <div style={{ marginTop: 10 }}>
                   <span className={`status ${melding.type}`}>{melding.tekst}</span>
                 </div>
               )}
 
-              <div className="actions" style={{ marginTop: "16px" }}>
-                <button className="btn primary" onClick={startEdit}>
-                  <i className="ti ti-pencil" /> Bewerken
-                </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
+                {dossierAfgerond ? (
+                  <span className="status s_grijs"><i className="ti ti-lock" />Dossier afgerond — read-only</span>
+                ) : (
+                  <button className="btn sm" onClick={startEdit}>
+                    <i className="ti ti-pencil" />Bewerken
+                  </button>
+                )}
               </div>
             </>
           ) : (
@@ -257,21 +307,18 @@ export default function MentorAfsprakenPage() {
               ))}
 
               {melding.tekst && (
-                <div style={{ marginBottom: "10px" }}>
+                <div style={{ marginBottom: 10 }}>
                   <span className={`status ${melding.type}`}>{melding.tekst}</span>
                 </div>
               )}
 
-              <div className="actions">
-                <button
-                  className="btn primary"
-                  onClick={opslaan}
-                  disabled={bezig}
-                >
-                  {bezig ? "Opslaan..." : "Opslaan"}
-                </button>
-                <button className="btn" onClick={annuleer} disabled={bezig}>
-                  Annuleren
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
+                <button className="btn" onClick={annuleer} disabled={bezig}>Annuleren</button>
+                <span style={{ fontSize: 11.5, color: "var(--faint)" }}>
+                  {geselecteerdeStudent?.voornaam || "De student"} ziet deze afspraken in het studentendashboard.
+                </span>
+                <button className="btn primary" style={{ marginLeft: "auto" }} onClick={opslaan} disabled={bezig}>
+                  <i className="ti ti-send" />{bezig ? "Opslaan..." : "Praktische afspraken delen"}
                 </button>
               </div>
             </>

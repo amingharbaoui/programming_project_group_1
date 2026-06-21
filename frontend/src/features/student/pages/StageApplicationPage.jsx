@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiRequest } from "../../../services/api";
-import { cacheGet, cacheSet, cacheDelete } from "../studentCache";
+import { cacheSet, cacheDelete } from "../studentCache";
 import "./StageApplicationPage.css";
 import Modal from "../../../components/ui/Modal";
 import {
@@ -19,6 +19,15 @@ export default function StageApplicationPage() {
   const [huidigStatus, setHuidigStatus] = useState(null);
   // Modal state: null = gesloten, object = { icon, titel, sub, body, onSluit }
   const [modal, setModal] = useState(null);
+  const [stageRegel, setStageRegel] = useState(null);
+  const [checklistItems, setChecklistItems] = useState([]);
+
+  useEffect(() => {
+    apiRequest("GET", "/internships/settings").then(res => {
+      if (res?.data?.stageRegels?.[0]) setStageRegel(res.data.stageRegels[0]);
+      if (res?.data?.checklistItems) setChecklistItems(res.data.checklistItems.filter(i => i.actief));
+    }).catch(() => {});
+  }, []);
 
   const [form, setForm] = useState({
     bedrijfNaam: "",
@@ -39,9 +48,17 @@ export default function StageApplicationPage() {
   useEffect(() => {
     async function laadBestaand() {
       try {
-        const cached = cacheGet("student_internship");
-        const data = cached ?? (await apiRequest("GET", "/internships/my")).data;
+        // Statusbeslissing (herindienen/redirect) altijd op verse data — een gecachte oude status kan
+        // de student onterecht wegsturen na een commissiebeslissing (bv. aanpassingen gevraagd).
+        const data = (await apiRequest("GET", "/internships/my")).data;
         if (!data) return;
+        cacheSet("student_internship", data);
+
+        const heropenbaar = ["concept", "aanpassingen_gevraagd", "afgekeurd", "ingetrokken"];
+        if (!heropenbaar.includes(data.status)) {
+          navigate("/student/internship", { replace: true });
+          return;
+        }
 
         const laadbaar = ["concept", "aanpassingen_gevraagd"];
         if (!laadbaar.includes(data.status)) return;
@@ -63,8 +80,11 @@ export default function StageApplicationPage() {
           opdrachtTitel:         data.stagefunctie        || "",
           opdrachtOmschrijving:  data.opdrachtomschrijving || "",
         });
-      } catch {
-        // geen voorstel gevonden — lege form is ok
+      } catch (err) {
+        // Een leeg voorstel komt als data: null binnen (200, geen error) en is hierboven al afgehandeld.
+        // Een fout hier is een echte laad-/netwerkfout — die mogen we niet verbergen als "geen voorstel",
+        // anders lijkt een bestaande aanvraag verdwenen en begint de student onterecht opnieuw.
+        setError(err.response?.data?.message || "Je bestaande aanvraag kon niet geladen worden. Herlaad de pagina voor je iets wijzigt of indient.");
       }
     }
     laadBestaand();
@@ -278,17 +298,25 @@ export default function StageApplicationPage() {
               <label className="form_label">Uren per week</label>
               <input className="form_input" type="number" min="1" max="60" name="urenPerWeek" value={form.urenPerWeek} onChange={handleChange} placeholder="38" />
             </div>
-            <p className="stagevenster-info">Moet binnen het stagevenster van de opleiding vallen: 9 feb - 26 jun 2026.</p>
+            <p className="stagevenster-info">
+              {stageRegel?.stagevenster_start && stageRegel?.stagevenster_einde
+                ? `Moet binnen het stagevenster van de opleiding vallen: ${new Date(stageRegel.stagevenster_start).toLocaleDateString("nl-BE", { day: "numeric", month: "short", year: "numeric" })} - ${new Date(stageRegel.stagevenster_einde).toLocaleDateString("nl-BE", { day: "numeric", month: "short", year: "numeric" })}.`
+                : "Moet binnen het stagevenster van de opleiding vallen."}
+            </p>
           </div>
 
           <div className="actions">
-            <button type="button" className="btn" onClick={handleSaveDraft} disabled={savingDraft}>
-              <IconDeviceFloppy size={16} />
-              {savingDraft ? "Opslaan..." : "Opslaan als concept"}
-            </button>
+            {/* Bij "aanpassingen gevraagd" weigert de backend een concept-save (er loopt al een voorstel);
+                dan kan de student enkel meteen opnieuw indienen. */}
+            {huidigStatus !== "aanpassingen_gevraagd" && (
+              <button type="button" className="btn" onClick={handleSaveDraft} disabled={savingDraft}>
+                <IconDeviceFloppy size={16} />
+                {savingDraft ? "Opslaan..." : "Opslaan als concept"}
+              </button>
+            )}
             <button type="submit" className="btn primary">
               <IconSend size={16} />
-              Indienen
+              {huidigStatus === "aanpassingen_gevraagd" ? "Opnieuw indienen" : "Indienen"}
             </button>
           </div>
 
@@ -302,24 +330,14 @@ export default function StageApplicationPage() {
           </div>
           <div className="checklist-item">
             <IconCircleCheck size={14} />
-            Minstens 12 weken voltijds (456 uur) binnen het stagevenster
+            Minstens {stageRegel?.minimum_weken ?? 12} weken voltijds ({stageRegel?.minimum_uren ?? 456} uur) binnen het stagevenster
           </div>
-          <div className="checklist-item">
-            <IconCircleCheck size={14} />
-            IT-gerelateerde opdracht met een ontwikkelcomponent
-          </div>
-          <div className="checklist-item">
-            <IconCircleCheck size={14} />
-            Mentor met een technische functie binnen het bedrijf
-          </div>
-          <div className="checklist-item">
-            <IconCircleCheck size={14} />
-            Concrete omschrijving: technologie, taken en team
-          </div>
-          <div className="checklist-item">
-            <IconCircleCheck size={14} />
-            Stage in een professionele bedrijfsomgeving
-          </div>
+          {checklistItems.map((item) => (
+            <div className="checklist-item" key={item.id}>
+              <IconCircleCheck size={14} />
+              {item.tekst}
+            </div>
+          ))}
         </div>
 
       </div>

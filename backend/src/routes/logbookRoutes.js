@@ -4,7 +4,8 @@ const {
   saveLogbookDay,
   updateLogbookEntry,
   getLogbooksByStudent,
-  studentAntwoordFeedback
+  studentAntwoordFeedback,
+  studentReactieDag
 } = require("../controllers/logbookController");
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
 
@@ -17,5 +18,6 @@ router.post("/day", saveLogbookDay);
 router.patch("/entries/:id", updateLogbookEntry);
 router.get("/:studentId", getLogbooksByStudent);
 router.patch("/weeks/:weekId/antwoord", studentAntwoordFeedback);
+router.patch("/days/:dayId/reactie", studentReactieDag);
 
 module.exports = router;

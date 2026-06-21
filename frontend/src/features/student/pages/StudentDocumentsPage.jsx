@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { apiRequest, fileUrl } from "../../../services/api";
+import { cacheDelete } from "../studentCache";
 import "./StudentDocumentsPage.css";
 import Modal from "../../../components/ui/Modal";
 import {
@@ -10,6 +11,8 @@ import {
   IconEye,
   IconFolderOpen,
   IconArrowRight,
+  IconFileOff,
+  IconX,
 } from "@tabler/icons-react";
 
 const STATUS_MAP = {
@@ -52,11 +55,12 @@ function deadlineVoorDocument(soort, documenten, contract) {
 }
 
 /* ── Verplicht document kaart ── */
-function DocumentKaart({ soort, documenten, onUpload, onFout, onBekijken }) {
+function DocumentKaart({ soort, documenten, onUpload, onFout, onBekijken, readOnly }) {
   const [bezig, setBezig] = useState(false);
   const inputRef = useRef(null);
 
   const actief = documenten?.[0] ?? null;
+  const heeftBestand = Boolean(actief?.bestand_url) && actief?.status !== "ontbreekt";
 
   async function handleBestandKiezen(e) {
     const bestand = e.target.files?.[0];
@@ -82,7 +86,7 @@ function DocumentKaart({ soort, documenten, onUpload, onFout, onBekijken }) {
         <IconFile size={16} className="doc-file-icon" />
         <div>
           <div className="doc-naam">{soort.naam}</div>
-          {actief && (
+          {heeftBestand && (
             <div className="doc-meta">
               {formatDatum(actief.opgeladen_op)}
             </div>
@@ -98,16 +102,18 @@ function DocumentKaart({ soort, documenten, onUpload, onFout, onBekijken }) {
       <div className="doc-rij-rechts">
         <StatusBadge status={actief?.status ?? "ontbreekt"} />
 
-        {actief?.bestand_url && (
+        {heeftBestand && (
           <button className="btn sm" onClick={() => onBekijken(actief.bestand_url, soort.naam)}>
             <IconEye size={14} /> Bekijken
           </button>
         )}
 
-        <button className="btn sm primary" disabled={bezig} onClick={() => inputRef.current?.click()}>
-          <IconUpload size={14} />
-          {bezig ? "Bezig…" : actief ? "Nieuwe versie" : "Uploaden"}
-        </button>
+        {!readOnly && (
+          <button className="btn sm primary" disabled={bezig} onClick={() => inputRef.current?.click()}>
+            <IconUpload size={14} />
+            {bezig ? "Bezig…" : heeftBestand ? "Nieuwe versie" : "Uploaden"}
+          </button>
+        )}
         <input
           ref={inputRef}
           type="file"
@@ -193,10 +199,14 @@ export default function StudentDocumentsPage() {
   const [documenten, setDocumenten] = useState([]);
   const [soorten, setSoorten]       = useState([]);
   const [contractData, setContractData] = useState(null);
+  const [dossierStatus, setDossierStatus] = useState(null);
+  const [dossierFout, setDossierFout] = useState(false);
+  const [soortenFout, setSoortenFout] = useState(false);
   const [loading, setLoading]       = useState(true);
   const [fout, setFout]             = useState(null);
   const [uploadFout, setUploadFout] = useState(null);
   const [preview, setPreview] = useState(null); // { url, naam }
+  const [iframeErr, setIframeErr] = useState(false);
   const [eigenBezig, setEigenBezig] = useState(false);
   const eigenInputRef = useRef(null);
 
@@ -205,15 +215,24 @@ export default function StudentDocumentsPage() {
   async function laadData() {
     setLoading(true);
     setFout(null);
+    // Dashboard ("Mijn stage") leest documenten uit cache — die invalideren zodat statuswijzigingen daar meekomen.
+    cacheDelete("student_documents", "student_document_soorten");
     try {
       const [docsRes, soortenRes] = await Promise.all([
         apiRequest("GET", "/documents/my"),
-        apiRequest("GET", "/documents/soorten").catch(() => ({ data: [] })),
+        // Markeer een mislukte call expliciet: anders lijkt een laadfout op "geen verplichte documenten" (338).
+        apiRequest("GET", "/documents/soorten").catch(() => ({ data: null, _failed: true })),
       ]);
       setDocumenten(docsRes.data ?? []);
-      // Reflectiebijlage en Eindoverzicht niet tonen (automatisch/niet van toepassing)
-      const VERBERG = new Set(["reflectiebijlage", "eindoverzicht"]);
-      setSoorten((soortenRes.data ?? []).filter((s) => !VERBERG.has(s.type) && !VERBERG.has(s.naam?.toLowerCase())));
+      if (soortenRes._failed) {
+        setSoortenFout(true);
+      } else {
+        setSoortenFout(false);
+        // Reflectiebijlage en Eindoverzicht niet tonen (automatisch/niet van toepassing)
+        const VERBERG = new Set(["reflectiebijlage", "eindoverzicht"]);
+        // Alleen verplichte, actieve documentsoorten als "verplichte documenten" tonen (optionele/gearchiveerde niet).
+        setSoorten((soortenRes.data ?? []).filter((s) => !VERBERG.has(s.type) && !VERBERG.has(s.naam?.toLowerCase()) && s.is_verplicht !== 0));
+      }
     } catch (err) {
       setFout(err.response?.data?.message || "Documenten konden niet geladen worden.");
     } finally {
@@ -226,7 +245,19 @@ export default function StudentDocumentsPage() {
     } catch {
       setContractData(null);
     }
+    // Dossierstatus bepaalt of het dossier read-only is (na afronding/vrijgave).
+    try {
+      const r = await apiRequest("GET", "/internships/my");
+      setDossierStatus(r.data?.dossier_status ?? null);
+      setDossierFout(false);
+    } catch {
+      // Status onbekend door een laadfout: conservatief read-only zodat we geen upload-UI tonen in een
+      // mogelijk afgerond dossier (de backend zou de upload toch met 409 weigeren) — auditpunt 342.
+      setDossierFout(true);
+    }
   }
+
+  const readOnlyDossier = dossierFout || ["resultaat_vrijgegeven", "afgerond"].includes(dossierStatus);
 
   function groeperPerSoort(soortId) {
     return documenten
@@ -306,7 +337,9 @@ export default function StudentDocumentsPage() {
           <IconFile size={16} />
           Verplichte documenten
         </div>
-        {soorten.length === 0 ? (
+        {soortenFout ? (
+          <span className="status s_rood"><IconAlertCircle size={14} /> De verplichte documenttypes konden niet geladen worden. Herlaad de pagina.</span>
+        ) : soorten.length === 0 ? (
           <p style={{ fontSize: 13, color: "var(--sub)" }}>Geen verplichte documenten gevonden.</p>
         ) : (
           soorten.map((soort) => {
@@ -321,6 +354,7 @@ export default function StudentDocumentsPage() {
                 onUpload={laadData}
                 onFout={setUploadFout}
                 onBekijken={(url, naam) => setPreview({ url, naam })}
+                readOnly={readOnlyDossier}
               />
             );
           })
@@ -341,15 +375,19 @@ export default function StudentDocumentsPage() {
           </div>
         )}
 
-        <div
-          className="dropzone"
-          onClick={() => !eigenBezig && eigenInputRef.current?.click()}
-          style={{ cursor: eigenBezig ? "not-allowed" : "pointer", opacity: eigenBezig ? .6 : 1 }}
-        >
-          <i className="ti ti-upload"></i>
-          <div className="dz-t">{eigenBezig ? "Bezig met uploaden…" : "Document toevoegen"}</div>
-          {!eigenBezig && <div className="dz-s">pdf, docx, png, jpg</div>}
-        </div>
+        {readOnlyDossier ? (
+          <div className="dz-s" style={{ padding: "8px 0" }}>Je stage is afgerond; documenten kunnen niet meer toegevoegd of gewijzigd worden.</div>
+        ) : (
+          <div
+            className="dropzone"
+            onClick={() => !eigenBezig && eigenInputRef.current?.click()}
+            style={{ cursor: eigenBezig ? "not-allowed" : "pointer", opacity: eigenBezig ? .6 : 1 }}
+          >
+            <i className="ti ti-upload"></i>
+            <div className="dz-t">{eigenBezig ? "Bezig met uploaden…" : "Document toevoegen"}</div>
+            {!eigenBezig && <div className="dz-s">pdf, png, jpg</div>}
+          </div>
+        )}
         <input
           ref={eigenInputRef}
           type="file"
@@ -363,39 +401,58 @@ export default function StudentDocumentsPage() {
     </div>
 
     {/* Preview-modal */}
-    <Modal
-      wide
-      open={!!preview}
-      onClose={() => setPreview(null)}
-      titel={preview?.naam ?? "Document"}
-      footer={
-        <a
-          href={bestandSrc(preview?.url)}
-          target="_blank"
-          rel="noreferrer"
-          className="btn"
-          style={{ marginRight: "auto" }}
+    {preview && (
+      <div
+        style={{ position: "fixed", inset: 0, background: "rgba(17,17,17,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 999, padding: 20 }}
+        onClick={() => { setPreview(null); setIframeErr(false); }}
+      >
+        <div
+          style={{ background: "var(--white)", borderRadius: 14, border: "0.5px solid var(--border)", width: "92vw", maxWidth: 860, display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.18)" }}
+          onClick={(e) => e.stopPropagation()}
         >
-          <i className="ti ti-external-link"></i> Openen in nieuw tabblad
-        </a>
-      }
-    >
-      {preview && (
-        isAfbeelding(preview.url) ? (
-          <img
-            src={bestandSrc(preview.url)}
-            alt={preview.naam}
-            style={{ maxWidth: "100%", display: "block", borderRadius: 6 }}
-          />
-        ) : (
-          <iframe
-            src={bestandSrc(preview.url)}
-            title={preview.naam}
-            style={{ width: "100%", height: "65vh", border: "none", borderRadius: 6 }}
-          />
-        )
-      )}
-    </Modal>
+          {/* Header */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 18px", borderBottom: "0.5px solid var(--border)" }}>
+            <span style={{ fontSize: 14, fontWeight: 600, color: "var(--dark)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1, minWidth: 0 }}>
+              {preview.naam}
+            </span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0, marginLeft: 12 }}>
+              <a href={bestandSrc(preview.url)} target="_blank" rel="noreferrer" className="btn sm">
+                <i className="ti ti-external-link" style={{ fontSize: 13 }}></i> Openen in nieuw venster
+              </a>
+              <button
+                style={{ width: 30, height: 30, border: "0.5px solid var(--border)", borderRadius: 7, background: "var(--white)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "var(--sub)", flexShrink: 0 }}
+                onClick={() => { setPreview(null); setIframeErr(false); }}
+              >
+                <IconX size={16} stroke={2} />
+              </button>
+            </div>
+          </div>
+          {/* Body */}
+          <div style={{ padding: 0 }}>
+            {isAfbeelding(preview.url) ? (
+              <img src={bestandSrc(preview.url)} alt={preview.naam} style={{ maxWidth: "100%", display: "block", borderRadius: "0 0 14px 14px" }} />
+            ) : iframeErr ? (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, height: "70vh", color: "var(--faint)" }}>
+                <IconFileOff size={40} stroke={1.4} />
+                <span style={{ fontSize: 13, fontWeight: 500 }}>Document niet beschikbaar</span>
+              </div>
+            ) : (
+              <iframe
+                src={bestandSrc(preview.url)}
+                title={preview.naam}
+                style={{ width: "100%", height: "70vh", border: "none", borderRadius: "0 0 14px 14px", display: "block" }}
+                onLoad={(e) => {
+                  try {
+                    const text = e.target.contentDocument?.body?.innerText || "";
+                    if (text.includes('"success":false')) setIframeErr(true);
+                  } catch {}
+                }}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Fout-modal bij mislukte upload */}
     <Modal

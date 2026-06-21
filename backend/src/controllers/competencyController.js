@@ -1,8 +1,9 @@
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 
-function getUserId(req, fallbackId) {
-  return Number(req.user?.id || fallbackId);
+function getUserId(req) {
+  // Geen demo-fallback meer (auditpunt 312): zonder ingelogde gebruiker liever null dan stil user 1.
+  return Number(req.user?.id) || null;
 }
 
 // Zoekt het actieve competentieprofiel, anders het meest recente.
@@ -92,6 +93,16 @@ async function createCompetency(req, res) {
       return fail(res, 404, "Geen competentieprofiel gevonden om aan toe te voegen");
     }
 
+    // Een actief profiel is read-only: net als bij wijzigen/verwijderen mag er ook niet
+    // stilzwijgend een competentie aan toegevoegd worden (anders verandert een lopende evaluatie).
+    const [prof] = await db.query(
+      `SELECT status FROM competentie_profielen WHERE id = ? LIMIT 1`,
+      [profielId]
+    );
+    if (prof[0]?.status === "actief") {
+      return fail(res, 409, "Een actief competentieprofiel is read-only; dupliceer het en pas de nieuwe versie aan");
+    }
+
     const [result] = await db.query(
       `
       INSERT INTO competenties
@@ -117,6 +128,16 @@ async function updateCompetency(req, res) {
     return fail(res, 400, "Ongeldig competentie-id");
   }
 
+  // Een actief profiel is read-only zodat lopende evaluaties niet stilzwijgend wijzigen — bewerk een concept-versie.
+  const [prof] = await db.query(
+    `SELECT p.status FROM competenties c JOIN competentie_profielen p ON p.id = c.competentie_profiel_id WHERE c.id = ? LIMIT 1`,
+    [id]
+  );
+  if (prof.length === 0) return fail(res, 404, "Competentie niet gevonden");
+  if (prof[0].status === "actief") {
+    return fail(res, 409, "Een actief competentieprofiel is read-only; dupliceer het en pas de nieuwe versie aan");
+  }
+
   const { naam, beschrijving, gewichtPercentage, gewicht_percentage, volgorde, isActief, is_actief } = req.body;
 
   const fields = [];
@@ -125,8 +146,12 @@ async function updateCompetency(req, res) {
   if (naam !== undefined) { fields.push("naam = ?"); values.push(String(naam).trim()); }
   if (beschrijving !== undefined) { fields.push("beschrijving = ?"); values.push(beschrijving || null); }
   if (gewichtPercentage !== undefined || gewicht_percentage !== undefined) {
+    const g = Number(gewichtPercentage ?? gewicht_percentage);
+    if (!Number.isFinite(g) || g < 0 || g > 100) {
+      return fail(res, 400, "Gewicht moet een getal tussen 0 en 100 zijn");
+    }
     fields.push("gewicht_percentage = ?");
-    values.push(Number(gewichtPercentage ?? gewicht_percentage));
+    values.push(g);
   }
   if (volgorde !== undefined) { fields.push("volgorde = ?"); values.push(volgorde); }
   if (isActief !== undefined || is_actief !== undefined) {
@@ -213,6 +238,16 @@ async function deleteCompetency(req, res) {
     return fail(res, 400, "Ongeldig competentie-id");
   }
 
+  // Een actief profiel is read-only — verwijderen mag enkel op een concept-versie.
+  const [prof] = await db.query(
+    `SELECT p.status FROM competenties c JOIN competentie_profielen p ON p.id = c.competentie_profiel_id WHERE c.id = ? LIMIT 1`,
+    [id]
+  );
+  if (prof.length === 0) return fail(res, 404, "Competentie niet gevonden");
+  if (prof[0].status === "actief") {
+    return fail(res, 409, "Een actief competentieprofiel is read-only; dupliceer het en pas de nieuwe versie aan");
+  }
+
   try {
     const [result] = await db.query(
       "DELETE FROM competenties WHERE id = ?",
@@ -256,6 +291,27 @@ async function createNewVersion(req, res) {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
+
+    // Veiligheid: een actief profiel mag nooit destructief gereset worden (zelfde regel als wijzigen/
+    // verwijderen/toevoegen). Voor een nieuwe versie hoort 'dupliceren', niet dit profiel leegmaken.
+    const [prof] = await conn.query("SELECT status FROM competentie_profielen WHERE id = ? LIMIT 1", [profielId]);
+    if (prof.length === 0) { await conn.rollback(); return fail(res, 404, "Profiel niet gevonden"); }
+    if (prof[0].status === "actief") {
+      await conn.rollback();
+      return fail(res, 409, "Een actief competentieprofiel is read-only; dupliceer het om een nieuwe versie te maken");
+    }
+
+    // Veiligheid: nooit een profiel resetten waarvan al evaluatiescores bestaan — dupliceer dan i.p.v. wissen.
+    const [scoreCount] = await conn.query(
+      `SELECT COUNT(*) AS aantal FROM competentie_scores cs
+       JOIN competenties c ON c.id = cs.competentie_id
+       WHERE c.competentie_profiel_id = ?`,
+      [profielId]
+    );
+    if (Number(scoreCount[0].aantal) > 0) {
+      await conn.rollback();
+      return fail(res, 409, "Dit profiel heeft al evaluaties; gebruik 'dupliceren' om een nieuwe versie te maken");
+    }
 
     // Verwijder alle huidige competenties (scores eerst vanwege FK constraint)
     const [bestaande] = await conn.query(
@@ -374,6 +430,16 @@ async function archiveProfile(req, res) {
   }
 
   try {
+    // Het enige actieve profiel niet archiveren — anders vallen evaluaties zonder actieve competenties.
+    const [[huidig]] = await db.query("SELECT status FROM competentie_profielen WHERE id = ? LIMIT 1", [profielId]);
+    if (!huidig) return fail(res, 404, "Profiel niet gevonden");
+    if (huidig.status === "actief") {
+      const [[telling]] = await db.query("SELECT COUNT(*) AS aantal FROM competentie_profielen WHERE status = 'actief'");
+      if (Number(telling.aantal) <= 1) {
+        return fail(res, 409, "Je kan het enige actieve competentieprofiel niet archiveren; publiceer eerst een ander profiel");
+      }
+    }
+
     const [result] = await db.query(
       "UPDATE competentie_profielen SET status = 'gearchiveerd', aangepast_op = NOW() WHERE id = ?",
       [profielId]

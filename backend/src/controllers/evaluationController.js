@@ -5,8 +5,9 @@ const { buildSimplePdf } = require("../utils/pdf");
 
 const GELDIGE_TYPES = ["tussentijds", "finaal"];
 
-function getUserId(req, fallbackId) {
-  return Number(req.user?.id || fallbackId);
+function getUserId(req) {
+  // Geen demo-fallback meer (auditpunt 312): zonder ingelogde gebruiker liever null dan stil user 1.
+  return Number(req.user?.id) || null;
 }
 
 async function getLatestDossierForStudent(conn, studentId) {
@@ -26,8 +27,8 @@ async function getActiveCompetencies(conn) {
     `SELECT c.id, c.code, c.naam, c.beschrijving, c.gewicht_percentage, c.volgorde
      FROM competenties c
      JOIN competentie_profielen p ON p.id = c.competentie_profiel_id
-     WHERE c.is_actief = 1
-     ORDER BY (p.status = 'actief') DESC, c.volgorde ASC, c.id ASC`
+     WHERE c.is_actief = 1 AND p.status = 'actief'
+     ORDER BY c.volgorde ASC, c.id ASC`
   );
   return rows;
 }
@@ -42,8 +43,17 @@ async function openEvaluation(req, res) {
   if (!GELDIGE_TYPES.includes(finalType)) return fail(res, 400, "type moet 'tussentijds' of 'finaal' zijn");
 
   try {
-    const [dossier] = await db.query("SELECT id FROM stagedossiers WHERE id = ? LIMIT 1", [dossierId]);
+    const [dossier] = await db.query("SELECT id, status, stagebegeleider_id FROM stagedossiers WHERE id = ? LIMIT 1", [dossierId]);
     if (dossier.length === 0) return fail(res, 404, "Stagedossier niet gevonden");
+    // Docent mag enkel een evaluatie openen voor een dossier waaraan hij/zij gekoppeld is (admin mag alles).
+    if (req.user?.hoofdrol === "docent" && Number(dossier[0].stagebegeleider_id) !== Number(req.user?.id)) {
+      return fail(res, 403, "Je bent niet de stagebegeleider van deze student");
+    }
+    // Evaluatie enkel openen wanneer de stage geregistreerd is of loopt — niet in de contract-/controlefase
+    // en ook niet meer nadat het resultaat vrijgegeven of het dossier afgerond is (eindfase = read-only).
+    if (!["geregistreerd", "stage_loopt"].includes(dossier[0].status)) {
+      return fail(res, 409, "Een evaluatie kan enkel geopend worden zolang het stagedossier geregistreerd is of loopt");
+    }
 
     const [existing] = await db.query(
       "SELECT id, status FROM evaluaties WHERE stagedossier_id = ? AND type = ? LIMIT 1",
@@ -51,10 +61,15 @@ async function openEvaluation(req, res) {
     );
 
     if (existing.length > 0) {
-      if (existing[0].status === "niet_open") {
+      // Enkel een nog-niet-geopende evaluatie effectief openen; voor een evaluatie die al verder staat
+      // (ingediend/geregistreerd/vrijgegeven) de ECHTE status teruggeven i.p.v. altijd "open" te beweren.
+      let huidigeStatus = existing[0].status;
+      if (huidigeStatus === "niet_open") {
         await db.query("UPDATE evaluaties SET status = 'open', aangepast_op = NOW() WHERE id = ?", [existing[0].id]);
+        huidigeStatus = "open";
       }
-      return ok(res, { id: existing[0].id, type: finalType, status: "open" }, "Evaluatie bestond al en staat open");
+      return ok(res, { id: existing[0].id, type: finalType, status: huidigeStatus },
+        huidigeStatus === "open" ? "Evaluatie staat open" : "Evaluatie bestaat al en is al in behandeling");
     }
 
     const [result] = await db.query(
@@ -120,10 +135,18 @@ async function getEvaluationsForStudent(req, res) {
     // Student en mentor mogen het berekende resultaat pas zien nadat de docent het vrijgegeven heeft.
     const verbergResultaat = role === "student" || role === "mentor";
     const result = evaluaties.map((e) => {
-      const basis = verbergResultaat && e.status !== "vrijgegeven"
+      const nogNietVrijgegeven = e.status !== "vrijgegeven";
+      const basis = verbergResultaat && nogNietVrijgegeven
         ? { ...e, eindcijfer: null, competentie_score: null, eindpresentatie_score: null }
         : e;
-      return { ...basis, scores: scores.filter((s) => s.evaluatie_id === e.id) };
+      let eigenScores = scores.filter((s) => s.evaluatie_id === e.id);
+      // Vóór vrijgave: de student ziet enkel de eigen scores. De mentor mag óók de studentscores zien
+      // (die moet hij kunnen beoordelen om advies te geven), maar nog niet de docentscores/het eindcijfer.
+      if (verbergResultaat && nogNietVrijgegeven) {
+        const zichtbareRollen = role === "mentor" ? ["mentor", "student"] : [role];
+        eigenScores = eigenScores.filter((s) => zichtbareRollen.includes(s.rol));
+      }
+      return { ...basis, scores: eigenScores };
     });
 
     return ok(res, { stagedossierId: dossier.id, competenties, evaluaties: result }, "Evaluaties opgehaald");
@@ -136,6 +159,7 @@ async function loadEvaluationWithDossier(conn, evaluationId) {
   const [rows] = await conn.query(
     `SELECT e.id, e.type, e.status, e.stagedossier_id, e.eindcijfer,
             e.eindpresentatie_score, e.competentie_score, e.vrijgegeven_op,
+            e.student_ingediend_op, e.mentor_ingediend_op,
             d.student_id, d.mentor_id, d.stagebegeleider_id
      FROM evaluaties e
      JOIN stagedossiers d ON d.id = e.stagedossier_id
@@ -183,8 +207,42 @@ async function saveScores(req, res) {
     if (evaluatie.status === "vrijgegeven") { await conn.rollback(); return fail(res, 409, "Deze evaluatie is al vrijgegeven"); }
     if (!userMayEditAsRole(evaluatie, role, userId)) { await conn.rollback(); return fail(res, 403, "Je bent niet gekoppeld aan deze evaluatie"); }
 
+    // Rolspecifieke fase-gate: elke partij vult enkel in tijdens haar eigen venster en niet meer na indienen.
+    const evStatus = evaluatie.status;
+    if (role === "student") {
+      if (evaluatie.student_ingediend_op || !["open", "mentor_ingediend"].includes(evStatus)) {
+        await conn.rollback();
+        return fail(res, 409, "Je zelfevaluatie is al ingediend en kan niet meer gewijzigd worden");
+      }
+    } else if (role === "mentor") {
+      if (evaluatie.mentor_ingediend_op || !["open", "student_ingediend"].includes(evStatus)) {
+        await conn.rollback();
+        return fail(res, 409, "Je mentorinput is al ingediend en kan niet meer gewijzigd worden");
+      }
+    } else if (role === "docent") {
+      // Docent scoort enkel in het eigen venster; na registratie/berekening is de evaluatie afgesloten
+      // (gelijk aan de read-only UI). Correcties daarna vereisen een bewuste heropening, geen stille update.
+      if (evStatus !== "klaar_voor_docent") {
+        await conn.rollback();
+        const reden = ["geregistreerd", "klaar_voor_vrijgave", "vrijgegeven"].includes(evStatus)
+          ? "Deze evaluatie is al geregistreerd en kan niet meer gewijzigd worden"
+          : "De docent kan pas scoren wanneer student en mentor hebben ingediend";
+        return fail(res, 409, reden);
+      }
+    }
+
+    const active = await getActiveCompetencies(conn);
+    const activeIds = new Set(active.map((c) => c.id));
+    // Geen scores voor competenties die niet bij het actieve profiel horen.
+    for (const s of scores) {
+      const cid = Number(s.competentieId || s.competentie_id);
+      if (cid && !activeIds.has(cid)) {
+        await conn.rollback();
+        return fail(res, 400, "Score voor een competentie die niet bij het actieve profiel hoort");
+      }
+    }
+
     if (ingediend) {
-      const active = await getActiveCompetencies(conn);
       const ingevuld = scores
         .filter((s) => s.score !== null && s.score !== undefined && s.score !== "")
         .map((s) => Number(s.competentieId || s.competentie_id));
@@ -236,10 +294,13 @@ async function saveScores(req, res) {
 
       if (role === "student") {
         nieuweStatus = Number(andereRolIngediend[0][0].aantal) > 0 ? "klaar_voor_docent" : "student_ingediend";
-        await conn.query("UPDATE evaluaties SET status = ?, student_ingediend_op = NOW(), aangepast_op = NOW() WHERE id = ?", [nieuweStatus, evaluationId]);
+        // Conditioneel zodat een tweede indien-klik niet opnieuw verwerkt (auditpunt 388).
+        const [r] = await conn.query("UPDATE evaluaties SET status = ?, student_ingediend_op = NOW(), aangepast_op = NOW() WHERE id = ? AND student_ingediend_op IS NULL", [nieuweStatus, evaluationId]);
+        if (r.affectedRows === 0) { await conn.rollback(); return fail(res, 409, "Je hebt deze evaluatie al ingediend; vernieuw de pagina"); }
       } else if (role === "mentor") {
         nieuweStatus = Number(andereRolIngediend[0][0].aantal) > 0 ? "klaar_voor_docent" : "mentor_ingediend";
-        await conn.query("UPDATE evaluaties SET status = ?, mentor_ingediend_op = NOW(), aangepast_op = NOW() WHERE id = ?", [nieuweStatus, evaluationId]);
+        const [r] = await conn.query("UPDATE evaluaties SET status = ?, mentor_ingediend_op = NOW(), aangepast_op = NOW() WHERE id = ? AND mentor_ingediend_op IS NULL", [nieuweStatus, evaluationId]);
+        if (r.affectedRows === 0) { await conn.rollback(); return fail(res, 409, "Deze evaluatie is al ingediend; vernieuw de pagina"); }
       }
     }
 
@@ -319,10 +380,14 @@ async function calculateResult(req, res) {
     if (!evaluatie) { await conn.rollback(); return fail(res, 404, "Evaluatie niet gevonden"); }
     if (!mayActAsDocent(evaluatie, role, userId)) { await conn.rollback(); return fail(res, 403, "Alleen de gekoppelde docent of administratie kan dit doen"); }
     if (evaluatie.status === "vrijgegeven") { await conn.rollback(); return fail(res, 409, "Resultaat is al vrijgegeven"); }
-    // Berekenen kan pas nadat student en mentor hun evaluatie indienden (status klaar_voor_docent of later).
-    if (!["klaar_voor_docent", "geregistreerd", "klaar_voor_vrijgave"].includes(evaluatie.status)) {
+    // Berekenen kan enkel vanuit klaar_voor_docent. Daarna is het resultaat geregistreerd/klaar voor vrijgave
+    // en mag het niet stil herberekend worden (anders wijzigt een geregistreerd resultaat ongemerkt).
+    if (evaluatie.status !== "klaar_voor_docent") {
       await conn.rollback();
-      return fail(res, 409, "De student en de mentor moeten eerst hun evaluatie indienen");
+      const reden = ["geregistreerd", "klaar_voor_vrijgave"].includes(evaluatie.status)
+        ? "Het resultaat is al berekend en geregistreerd; het kan niet opnieuw berekend worden"
+        : "De student en de mentor moeten eerst hun evaluatie indienen";
+      return fail(res, 409, reden);
     }
 
     const [rows] = await conn.query(
@@ -356,6 +421,9 @@ async function calculateResult(req, res) {
       );
       if (pres.length === 0 || !["gegeven", "geweest"].includes(pres[0].status)) ontbreekt.push("een gegeven eindpresentatie");
 
+      // De eindpresentatiescore (20%) is verplicht voor een finale berekening — nu meegegeven of al opgeslagen.
+      if (eindpresentatieScore == null && evaluatie.eindpresentatie_score == null) ontbreekt.push("de eindpresentatiescore");
+
       if (ontbreekt.length > 0) {
         await conn.rollback();
         return fail(res, 409, `Het eindresultaat kan nog niet berekend worden — ontbrekend: ${ontbreekt.join(" en ")}.`);
@@ -383,14 +451,16 @@ async function calculateResult(req, res) {
     }
     const nieuweStatus = isFinaal ? "klaar_voor_vrijgave" : "geregistreerd";
 
-    await conn.query(
+    // Conditioneel op klaar_voor_docent zodat een dubbelklik niet herberekent (auditpunt 388).
+    const [berekenResult] = await conn.query(
       `UPDATE evaluaties
        SET competentie_score = ?, eindcijfer = ?, eindpresentatie_score = COALESCE(?, eindpresentatie_score),
            verslag = COALESCE(?, verslag),
            status = ?, docent_geregistreerd_op = NOW(), aangepast_op = NOW()
-       WHERE id = ?`,
+       WHERE id = ? AND status = 'klaar_voor_docent'`,
       [competentieScore, eindcijfer, eindpresentatieScore, verslag, nieuweStatus, evaluationId]
     );
+    if (berekenResult.affectedRows === 0) { await conn.rollback(); return fail(res, 409, "Deze evaluatie is ondertussen al verwerkt; vernieuw de pagina"); }
 
     await conn.commit();
 
@@ -435,6 +505,7 @@ async function releaseResult(req, res) {
     if (!evaluatie) { await conn.rollback(); return fail(res, 404, "Evaluatie niet gevonden"); }
     if (!mayActAsDocent(evaluatie, role, userId)) { await conn.rollback(); return fail(res, 403, "Alleen de gekoppelde docent of administratie kan vrijgeven"); }
     if (evaluatie.type === "tussentijds") { await conn.rollback(); return fail(res, 409, "Een tussentijdse evaluatie wordt niet vrijgegeven — enkel de finale evaluatie levert een vrij te geven eindresultaat."); }
+    if (evaluatie.status === "vrijgegeven") { await conn.rollback(); return fail(res, 409, "Het resultaat is al vrijgegeven"); }
     if (evaluatie.status !== "klaar_voor_vrijgave") { await conn.rollback(); return fail(res, 409, "Resultaat moet eerst berekend worden voor het vrijgegeven kan worden"); }
 
     // Finale-gating: logboek moet afgewerkt zijn en de eindpresentatie moet gegeven zijn.
@@ -448,6 +519,18 @@ async function releaseResult(req, res) {
       await conn.rollback();
       return fail(res, 409, "Er zijn nog logboekweken die niet volledig nagekeken zijn — die moeten eerst afgehandeld zijn voor je het resultaat vrijgeeft.");
     }
+    const [dossierRij] = await conn.query("SELECT aantal_weken FROM stagedossiers WHERE id = ? LIMIT 1", [evaluatie.stagedossier_id]);
+    const aantalWeken = Number(dossierRij[0]?.aantal_weken || 0);
+    if (aantalWeken > 0) {
+      const [goedWeken] = await conn.query(
+        "SELECT COUNT(*) AS aantal FROM logboek_weken WHERE stagedossier_id = ? AND status = 'goedgekeurd_door_docent'",
+        [evaluatie.stagedossier_id]
+      );
+      if (goedWeken[0].aantal < aantalWeken) {
+        await conn.rollback();
+        return fail(res, 409, `Niet alle logboekweken zijn nagekeken: ${goedWeken[0].aantal} van ${aantalWeken} goedgekeurd.`);
+      }
+    }
     const [pres] = await conn.query(
       "SELECT status FROM planning_momenten WHERE stagedossier_id = ? AND type = 'eindpresentatie' ORDER BY id DESC LIMIT 1",
       [evaluatie.stagedossier_id]
@@ -457,10 +540,12 @@ async function releaseResult(req, res) {
       return fail(res, 409, "De eindpresentatie moet eerst gepland en gegeven zijn voor je het resultaat vrijgeeft.");
     }
 
-    await conn.query(
-      "UPDATE evaluaties SET status = 'vrijgegeven', vrijgegeven_door_id = ?, vrijgegeven_op = NOW(), aangepast_op = NOW() WHERE id = ?",
+    // Conditioneel zodat een dubbele vrijgave het eindresultaat niet twee keer (en mogelijk inconsistent) zet (388).
+    const [vrijgaveResult] = await conn.query(
+      "UPDATE evaluaties SET status = 'vrijgegeven', vrijgegeven_door_id = ?, vrijgegeven_op = NOW(), aangepast_op = NOW() WHERE id = ? AND status = 'klaar_voor_vrijgave'",
       [userId, evaluationId]
     );
+    if (vrijgaveResult.affectedRows === 0) { await conn.rollback(); return fail(res, 409, "Dit resultaat is ondertussen al vrijgegeven; vernieuw de pagina"); }
 
     await conn.query(
       "UPDATE stagedossiers SET eindresultaat = ?, eindresultaat_vrijgegeven_op = NOW(), status = 'resultaat_vrijgegeven', aangepast_op = NOW() WHERE id = ?",

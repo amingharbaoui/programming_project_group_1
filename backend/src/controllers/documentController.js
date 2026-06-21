@@ -39,14 +39,15 @@ const upload = multer({
 const uploadMiddleware = upload.single("bestand");
 
 function getUserId(req) {
-  return Number(req.user?.id || 1);
+  // Geen demo-fallback meer (auditpunt 312): zonder ingelogde gebruiker liever null dan stil user 1.
+  return Number(req.user?.id) || null;
 }
 
 /* GET /api/documents/soorten */
 async function getSoorten(req, res) {
   try {
     const [rows] = await db.query(
-      `SELECT id, naam, type FROM document_soorten ORDER BY naam ASC`
+      `SELECT id, naam, type, is_verplicht FROM document_soorten WHERE status = 'actief' ORDER BY naam ASC`
     );
     return ok(res, rows, "Document soorten opgehaald");
   } catch (error) {
@@ -107,7 +108,7 @@ async function uploadDocument(req, res) {
     await connection.beginTransaction();
 
     const [dossiers] = await connection.query(
-      `SELECT id FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1`,
+      `SELECT id, status FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1`,
       [studentId]
     );
 
@@ -117,14 +118,24 @@ async function uploadDocument(req, res) {
     }
 
     const dossier_id = dossiers[0].id;
+    if (["resultaat_vrijgegeven", "afgerond"].includes(dossiers[0].status)) {
+      await connection.rollback();
+      return fail(res, 409, "Je stagedossier is afgerond; documenten kunnen niet meer gewijzigd worden");
+    }
 
     const bestandUrl = `/uploads/${req.file.filename}`;
 
     /* Controleer of er al een rij bestaat voor deze soort in dit dossier */
     const [bestaand] = await connection.query(
-      `SELECT id, versie_nummer FROM documenten WHERE stagedossier_id = ? AND document_soort_id = ? LIMIT 1`,
+      `SELECT id, versie_nummer, status FROM documenten WHERE stagedossier_id = ? AND document_soort_id = ? LIMIT 1`,
       [dossier_id, document_soort_id]
     );
+
+    // Een al goedgekeurd/geregistreerd document mag niet zomaar opnieuw geüpload worden.
+    if (bestaand.length > 0 && ["goedgekeurd", "geregistreerd"].includes(bestaand[0].status)) {
+      await connection.rollback();
+      return fail(res, 409, "Dit document is al goedgekeurd en kan niet meer vervangen worden");
+    }
 
     let resultId;
     let nieuw_versie;
@@ -136,7 +147,7 @@ async function uploadDocument(req, res) {
       await connection.query(
         `UPDATE documenten
          SET status = 'ingediend', versie_nummer = ?, bestand_url = ?, bestand_naam = ?,
-             opgeladen_door_id = ?, afkeurreden = NULL, aangepast_op = NOW()
+             opgeladen_door_id = ?, afkeurreden = NULL, opgeladen_op = NOW(), aangepast_op = NOW()
          WHERE id = ?`,
         [nieuw_versie, bestandUrl, req.file.originalname, studentId, resultId]
       );
@@ -145,8 +156,8 @@ async function uploadDocument(req, res) {
       nieuw_versie = 1;
       const [ins] = await connection.query(
         `INSERT INTO documenten
-           (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam, opgeladen_door_id, aangemaakt_op, aangepast_op)
-         VALUES (?, ?, 'ingediend', 1, ?, ?, ?, NOW(), NOW())`,
+           (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam, opgeladen_door_id, opgeladen_op, aangemaakt_op, aangepast_op)
+         VALUES (?, ?, 'ingediend', 1, ?, ?, ?, NOW(), NOW(), NOW())`,
         [dossier_id, document_soort_id, bestandUrl, req.file.originalname, studentId]
       );
       resultId = ins.insertId;
@@ -174,6 +185,8 @@ async function uploadDocument(req, res) {
     );
   } catch (error) {
     await connection.rollback();
+    // De transactie is teruggedraaid → het net geüploade bestand is een wees en wordt opgeruimd (310).
+    if (req.file?.path) { try { fs.unlinkSync(req.file.path); } catch { /* al weg */ } }
     return fail(res, 500, "Upload mislukt", error.message);
   } finally {
     connection.release();
@@ -194,7 +207,7 @@ async function uploadEigenDocument(req, res) {
     await connection.beginTransaction();
 
     const [dossiers] = await connection.query(
-      `SELECT id FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1`,
+      `SELECT id, status FROM stagedossiers WHERE student_id = ? ORDER BY aangemaakt_op DESC LIMIT 1`,
       [studentId]
     );
 
@@ -204,13 +217,17 @@ async function uploadEigenDocument(req, res) {
     }
 
     const dossier_id = dossiers[0].id;
+    if (["resultaat_vrijgegeven", "afgerond"].includes(dossiers[0].status)) {
+      await connection.rollback();
+      return fail(res, 409, "Je stagedossier is afgerond; documenten kunnen niet meer gewijzigd worden");
+    }
     const bestandUrl = `/uploads/${req.file.filename}`;
 
     const [result] = await connection.query(
       `
       INSERT INTO documenten
-        (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam, opgeladen_door_id, aangemaakt_op, aangepast_op)
-      VALUES (?, NULL, 'ingediend', 1, ?, ?, ?, NOW(), NOW())
+        (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam, opgeladen_door_id, opgeladen_op, aangemaakt_op, aangepast_op)
+      VALUES (?, NULL, 'ingediend', 1, ?, ?, ?, NOW(), NOW(), NOW())
       `,
       [dossier_id, bestandUrl, req.file.originalname, studentId]
     );
@@ -237,6 +254,8 @@ async function uploadEigenDocument(req, res) {
     );
   } catch (error) {
     await connection.rollback();
+    // De transactie is teruggedraaid → het net geüploade bestand is een wees en wordt opgeruimd (310).
+    if (req.file?.path) { try { fs.unlinkSync(req.file.path); } catch { /* al weg */ } }
     return fail(res, 500, "Upload mislukt", error.message);
   } finally {
     connection.release();
@@ -249,13 +268,31 @@ async function approveDocument(req, res) {
   if (!id) return fail(res, 400, "Ongeldig document-id");
 
   try {
+    const [docs] = await db.query(
+      `SELECT doc.bestand_url, doc.bestand_naam, doc.status, sd.status AS dossier_status
+       FROM documenten doc LEFT JOIN stagedossiers sd ON sd.id = doc.stagedossier_id
+       WHERE doc.id = ? LIMIT 1`,
+      [id]
+    );
+    if (docs.length === 0) return fail(res, 404, "Document niet gevonden");
+    if (["resultaat_vrijgegeven", "afgerond"].includes(docs[0].dossier_status)) {
+      return fail(res, 409, "Het dossier is afgerond; documenten kunnen niet meer gecontroleerd worden");
+    }
+    if (!docs[0].bestand_url && !docs[0].bestand_naam) {
+      return fail(res, 400, "Een document zonder geupload bestand kan niet goedgekeurd worden");
+    }
+    if (!["ingediend", "in_controle"].includes(docs[0].status)) {
+      return fail(res, 409, "Dit document is niet meer in behandeling en kan niet goedgekeurd worden");
+    }
+
+    // Conditioneel op de status zodat twee gelijktijdige controles (twee admins) elkaar niet overschrijven (394).
     const [r] = await db.query(
       `UPDATE documenten
        SET status = 'goedgekeurd', afkeurreden = NULL, gecontroleerd_door_id = ?, gecontroleerd_op = NOW(), aangepast_op = NOW()
-       WHERE id = ?`,
+       WHERE id = ? AND status IN ('ingediend', 'in_controle')`,
       [Number(req.user?.id), id]
     );
-    if (r.affectedRows === 0) return fail(res, 404, "Document niet gevonden");
+    if (r.affectedRows === 0) return fail(res, 409, "Dit document is ondertussen al verwerkt; vernieuw de pagina");
 
     try {
       const studentId = await getDocumentStudentId(id);
@@ -276,13 +313,28 @@ async function rejectDocument(req, res) {
   if (!reden) return fail(res, 400, "Een afkeuringsreden is verplicht");
 
   try {
+    const [docs] = await db.query(
+      `SELECT doc.status, sd.status AS dossier_status
+       FROM documenten doc LEFT JOIN stagedossiers sd ON sd.id = doc.stagedossier_id
+       WHERE doc.id = ? LIMIT 1`,
+      [id]
+    );
+    if (docs.length === 0) return fail(res, 404, "Document niet gevonden");
+    if (["resultaat_vrijgegeven", "afgerond"].includes(docs[0].dossier_status)) {
+      return fail(res, 409, "Het dossier is afgerond; documenten kunnen niet meer gecontroleerd worden");
+    }
+    if (!["ingediend", "in_controle"].includes(docs[0].status)) {
+      return fail(res, 409, "Dit document is niet meer in behandeling en kan niet afgekeurd worden");
+    }
+
+    // Conditioneel op de status zodat twee gelijktijdige controles elkaar niet overschrijven (394).
     const [r] = await db.query(
       `UPDATE documenten
        SET status = 'afgekeurd', afkeurreden = ?, gecontroleerd_door_id = ?, gecontroleerd_op = NOW(), aangepast_op = NOW()
-       WHERE id = ?`,
+       WHERE id = ? AND status IN ('ingediend', 'in_controle')`,
       [reden, Number(req.user?.id), id]
     );
-    if (r.affectedRows === 0) return fail(res, 404, "Document niet gevonden");
+    if (r.affectedRows === 0) return fail(res, 409, "Dit document is ondertussen al verwerkt; vernieuw de pagina");
 
     try {
       const studentId = await getDocumentStudentId(id);
@@ -299,16 +351,50 @@ async function rejectDocument(req, res) {
 const fs = require("fs");
 const UPLOADS_DIR = path.join(__dirname, "../../uploads");
 
-function serveBestand(req, res) {
+async function serveBestand(req, res) {
   // Auth vereist: token via Authorization-header of ?t= query (een iframe/preview kan geen header sturen).
   const headerToken = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  if (!verifyToken(headerToken || req.query.t)) {
+  const sessie = verifyToken(headerToken || req.query.t);
+  if (!sessie) {
     return res.status(401).json({ success: false, message: "Authenticatie vereist" });
   }
-  const filename = req.params.filename;
-  if (!filename || filename.includes("..") || filename.includes("/") || filename.includes("\\")) {
+  // Wildcard route: req.params[0] bevat het volledige pad incl. subdirectories
+  // Regex route: capture group 0 bevat het volledige pad incl. subdirectories
+  const filename = (req.params[0] ?? req.params.filename ?? "").toString();
+  if (!filename || filename.includes("..") || filename.includes("\\")) {
     return res.status(400).json({ success: false, message: "Ongeldige bestandsnaam" });
   }
+
+  // Eigenaarschap: enkel betrokkenen van het dossier mogen het bestand openen (administratie alles).
+  try {
+    const [users] = await db.query("SELECT hoofdrol, status FROM gebruikers WHERE id = ? LIMIT 1", [sessie.id]);
+    // Zelfde regel als de auth-middleware: een gedeactiveerde gebruiker mag geen bestanden meer openen (392).
+    if (!users[0] || users[0].status !== "actief") {
+      return res.status(401).json({ success: false, message: "Sessie niet meer geldig" });
+    }
+    const rol = users[0].hoofdrol;
+    if (rol !== "administratie") {
+      const [docs] = await db.query(
+        `SELECT d.student_id, d.mentor_id, d.stagebegeleider_id
+         FROM documenten doc JOIN stagedossiers d ON d.id = doc.stagedossier_id
+         WHERE doc.bestand_url = CONCAT('/uploads/', ?) OR doc.bestand_naam = ?
+         LIMIT 1`,
+        [filename, filename]
+      );
+      const d = docs[0];
+      const toegestaan = d && (
+        (rol === "student" && d.student_id === sessie.id) ||
+        (rol === "mentor" && d.mentor_id === sessie.id) ||
+        (rol === "docent" && d.stagebegeleider_id === sessie.id)
+      );
+      if (!toegestaan) {
+        return res.status(403).json({ success: false, message: "Geen toegang tot dit bestand" });
+      }
+    }
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Toegangscontrole mislukt" });
+  }
+
   const filePath = path.join(UPLOADS_DIR, filename);
   if (!fs.existsSync(filePath)) {
     return res.status(404).json({ success: false, message: "Bestand niet gevonden" });

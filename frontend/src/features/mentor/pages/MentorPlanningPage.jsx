@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import "./MentorPlanningPage.css";
+import { cacheGet, cacheSet, cacheDelete } from "../mentorCache";
+import { kiesMentorStagiair, onthoudMentorDossier } from "../mentorSelection";
 
 function formatDateTime(value) {
   if (!value) return "-";
@@ -38,6 +42,7 @@ function getTypeLabel(type) {
 export default function MentorPlanningPage() {
   const { user } = useAuth();
 
+  const [searchParams] = useSearchParams();
   const [studenten, setStudenten] = useState([]);
   const [geselecteerdDossier, setGeselecteerdDossier] = useState(null);
   const [momenten, setMomenten] = useState([]);
@@ -51,15 +56,20 @@ export default function MentorPlanningPage() {
 
   useEffect(() => {
     async function loadStudenten() {
+      const cached = cacheGet("mentor_students");
+      if (cached) {
+        setStudenten(cached);
+        if (cached.length > 0) setGeselecteerdDossier(kiesMentorStagiair(cached, searchParams)?.dossier_id);
+        setLoading(false);
+        return;
+      }
       try {
         setLoading(true);
-        const res = await api.get("/mentor/students", {
-        });
+        const res = await api.get("/mentor/students");
         const data = res.data.data || [];
+        cacheSet("mentor_students", data);
         setStudenten(data);
-        if (data.length > 0) {
-          setGeselecteerdDossier(data[0].dossier_id);
-        }
+        if (data.length > 0) setGeselecteerdDossier(kiesMentorStagiair(data, searchParams)?.dossier_id);
       } catch (err) {
         console.error(err);
       } finally {
@@ -74,14 +84,19 @@ export default function MentorPlanningPage() {
     loadPlanning(geselecteerdDossier);
   }, [geselecteerdDossier]);
 
-  async function loadPlanning(dossierId) {
+  async function loadPlanning(dossierId, forceRefresh = false) {
+    if (!forceRefresh) {
+      const cached = cacheGet(`mentor_planning_${dossierId}`);
+      if (cached) { setMomenten(cached); setPlanningLoading(false); return; }
+    }
     try {
       setPlanningLoading(true);
       setMomenten([]);
       setMelding({ id: null, tekst: "", type: "" });
-      const res = await api.get(`/mentor/planning/${dossierId}`, {
-      });
-      setMomenten(res.data.data || []);
+      const res = await api.get(`/mentor/planning/${dossierId}`);
+      const data = res.data.data || [];
+      cacheSet(`mentor_planning_${dossierId}`, data);
+      setMomenten(data);
     } catch {
       setMomenten([]);
     } finally {
@@ -93,10 +108,10 @@ export default function MentorPlanningPage() {
     try {
       setBezig(momentId);
       setMelding({ id: null, tekst: "", type: "" });
-      await api.patch(`/mentor/planning/${momentId}/bevestig`, {}, {
-      });
+      await api.patch(`/mentor/planning/${momentId}/bevestig`, {});
       setMelding({ id: momentId, tekst: "Bedrijfsbezoek bevestigd! De docent en student kregen een melding.", type: "s_ok" });
-      await loadPlanning(geselecteerdDossier);
+      cacheDelete(`mentor_planning_${geselecteerdDossier}`);
+      await loadPlanning(geselecteerdDossier, true);
     } catch (err) {
       setMelding({ id: momentId, tekst: err.response?.data?.message || "Bevestigen mislukt.", type: "s_rood" });
     } finally {
@@ -109,12 +124,12 @@ export default function MentorPlanningPage() {
     try {
       setBezig(momentId);
       setMelding({ id: null, tekst: "", type: "" });
-      await api.patch(`/mentor/planning/${momentId}/alternatief`, { bericht: alternatifTekst }, {
-      });
+      await api.patch(`/mentor/planning/${momentId}/alternatief`, { bericht: alternatifTekst });
       setMelding({ id: momentId, tekst: "Alternatief voorstel verstuurd. De docent plant het bezoek opnieuw in.", type: "s_ok" });
       setAlternatifOpen(null);
       setAlternatifTekst("");
-      await loadPlanning(geselecteerdDossier);
+      cacheDelete(`mentor_planning_${geselecteerdDossier}`);
+      await loadPlanning(geselecteerdDossier, true);
     } catch (err) {
       setMelding({ id: momentId, tekst: err.response?.data?.message || "Versturen mislukt.", type: "s_rood" });
     } finally {
@@ -123,34 +138,32 @@ export default function MentorPlanningPage() {
   }
 
   const geselecteerdeStudent = studenten.find((s) => s.dossier_id === geselecteerdDossier);
+  // In de eindfase is planning read-only; toon dan geen bevestig/alternatief-knoppen (auditpunt 421,
+  // gelijk aan MentorDossierPage). De backend weigert die acties toch met 409.
+  const dossierAfgerond = ["afgerond", "voltooid", "resultaat_vrijgegeven"].includes(geselecteerdeStudent?.dossier_status);
 
   return (
-    <div className="page_inner">
-      <div className="page_header">
-        <div>
-          <h1>Planning</h1>
-          <p>Bekijk geplande bezoeken en bevestig of stel een alternatief voor.</p>
-        </div>
+    <div className="page-inner">
+      <div className="page-header">
+        <h1>Planning</h1>
+        <p>Bekijk geplande bezoeken en bevestig of stel een alternatief voor</p>
       </div>
 
-      {/* Student selector */}
-      {!loading && studenten.length > 0 && (
-        <div className="card" style={{ marginBottom: "12px" }}>
-          <div className="card_title">Stagiair kiezen</div>
-          <div className="form_group" style={{ marginBottom: 0 }}>
-            <label className="form_label">Stagiair</label>
-            <select
-              className="form_input"
-              value={geselecteerdDossier || ""}
-              onChange={(e) => setGeselecteerdDossier(Number(e.target.value))}
-            >
-              {studenten.map((s) => (
-                <option key={s.dossier_id} value={s.dossier_id}>
-                  {s.voornaam} {s.achternaam} — {s.bedrijf}
-                </option>
-              ))}
-            </select>
-          </div>
+      {/* Student selector — enkel bij meerdere stagiairs */}
+      {!loading && studenten.length > 1 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div className="card_title">Stagiair</div>
+          <select
+            className="form_input"
+            value={geselecteerdDossier || ""}
+            onChange={(e) => { const v = Number(e.target.value); setGeselecteerdDossier(v); onthoudMentorDossier(v); }}
+          >
+            {studenten.map((s) => (
+              <option key={s.dossier_id} value={s.dossier_id}>
+                {s.voornaam} {s.achternaam} — {s.bedrijf}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -170,17 +183,14 @@ export default function MentorPlanningPage() {
       )}
 
       {!planningLoading && momenten.map((moment) => {
-        const teBevestigen = ["voorgesteld", "gepland"].includes(moment.status);
+        const teBevestigen = !dossierAfgerond && moment.type === "bedrijfsbezoek" && ["voorgesteld", "gepland"].includes(moment.status);
         const isAlternatifOpen = alternatifOpen === moment.id;
 
         return (
           <div
             key={moment.id}
             className="card"
-            style={{
-              marginBottom: "12px",
-              borderColor: teBevestigen ? "var(--red)" : undefined,
-            }}
+            style={teBevestigen ? { marginBottom: 12, border: "1.5px solid #0a0a0a", boxShadow: "0 4px 14px rgba(0,0,0,.10)" } : { marginBottom: 12 }}
           >
             <div className="card_title">
               <i className="ti ti-calendar" style={{ color: "var(--red)" }} />
@@ -231,49 +241,32 @@ export default function MentorPlanningPage() {
             )}
 
             {teBevestigen && (
-              <div className="actions" style={{ marginTop: "12px" }}>
+              <div style={{ marginTop: 12 }}>
                 {!isAlternatifOpen ? (
-                  <>
-                    <button
-                      className="btn primary"
-                      disabled={bezig === moment.id}
-                      onClick={() => handleBevestig(moment.id)}
-                    >
-                      <i className="ti ti-check" /> {bezig === moment.id ? "Bezig..." : "Bevestigen"}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button className="btn primary" disabled={bezig === moment.id} onClick={() => handleBevestig(moment.id)}>
+                      <i className="ti ti-check" />{bezig === moment.id ? "Bezig..." : "Bevestigen"}
                     </button>
-                    <button
-                      className="btn"
-                      disabled={bezig === moment.id}
-                      onClick={() => { setAlternatifOpen(moment.id); setAlternatifTekst(""); }}
-                    >
-                      <i className="ti ti-calendar-x" /> Ander moment voorstellen
+                    <button className="btn sm" disabled={bezig === moment.id} onClick={() => { setAlternatifOpen(moment.id); setAlternatifTekst(""); }}>
+                      <i className="ti ti-calendar-x" />Ander moment voorstellen
                     </button>
-                  </>
-                ) : (
-                  <div style={{ width: "100%" }}>
-                    <div className="form_group">
-                      <label className="form_label">Jouw voorstel</label>
-                      <textarea
-                        className="form_textarea"
-                        placeholder="Geef een alternatief moment of reden op..."
-                        value={alternatifTekst}
-                        onChange={(e) => setAlternatifTekst(e.target.value)}
-                        rows={3}
-                      />
-                    </div>
-                    <div className="actions">
-                      <button
-                        className="btn primary"
-                        disabled={bezig === moment.id || !alternatifTekst.trim()}
-                        onClick={() => handleAlternatief(moment.id)}
-                      >
-                        {bezig === moment.id ? "Versturen..." : "Versturen"}
-                      </button>
-                      <button className="btn" onClick={() => setAlternatifOpen(null)}>
-                        Annuleren
-                      </button>
-                    </div>
                   </div>
+                ) : (
+                  <>
+                    <textarea
+                      className="form_input"
+                      style={{ minHeight: 52, fontSize: 12.5, marginBottom: 8 }}
+                      placeholder="Geef een alternatief moment of reden op..."
+                      value={alternatifTekst}
+                      onChange={(e) => setAlternatifTekst(e.target.value)}
+                    />
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <button className="btn primary" disabled={bezig === moment.id || !alternatifTekst.trim()} onClick={() => handleAlternatief(moment.id)}>
+                        <i className="ti ti-send" />{bezig === moment.id ? "Versturen..." : "Versturen"}
+                      </button>
+                      <button className="btn" onClick={() => setAlternatifOpen(null)}>Annuleren</button>
+                    </div>
+                  </>
                 )}
               </div>
             )}

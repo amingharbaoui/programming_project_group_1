@@ -94,8 +94,16 @@ async function reactivateUser(req, res) {
   if (!id) return fail(res, 400, "Ongeldig gebruikers-id");
 
   try {
-    const [r] = await db.query("UPDATE gebruikers SET status = 'actief', aangepast_op = NOW() WHERE id = ?", [id]);
-    if (r.affectedRows === 0) return fail(res, 404, "Gebruiker niet gevonden");
+    const [rows] = await db.query("SELECT status, wachtwoord_hash, auth_provider FROM gebruikers WHERE id = ? LIMIT 1", [id]);
+    if (rows.length === 0) return fail(res, 404, "Gebruiker niet gevonden");
+    const u = rows[0];
+    if (u.status === "uitgenodigd") return fail(res, 409, "Een uitgenodigde gebruiker kan niet heractiveerd worden; verstuur de uitnodiging opnieuw");
+    if (u.status === "actief") return fail(res, 409, "Gebruiker is al actief");
+    // Een lokaal account zonder wachtwoord kan niet inloggen — niet activeren tot er een wachtwoord is.
+    if ((u.auth_provider || "local") === "local" && !u.wachtwoord_hash) {
+      return fail(res, 409, "Deze gebruiker heeft nog geen wachtwoord ingesteld en kan niet geactiveerd worden");
+    }
+    await db.query("UPDATE gebruikers SET status = 'actief', aangepast_op = NOW() WHERE id = ?", [id]);
     return ok(res, { id, status: "actief" }, "Gebruiker geactiveerd");
   } catch (error) {
     return fail(res, 500, "Activeren mislukt", error.message);
@@ -116,9 +124,28 @@ async function updateUser(req, res) {
     return fail(res, 400, `Ongeldige rol. Kies uit: ${GELDIGE_ROLLEN.join(", ")}`);
   }
 
-  // Eigen rol mag niet gewijzigd worden
+  // Eigen rol mag niet gewijzigd worden — maar je eigen naam/e-mail opslaan met dezelfde rol mag wel.
   if (id === me && hoofdrol) {
-    return fail(res, 400, "Je kan je eigen rol niet wijzigen");
+    const [eigen] = await db.query("SELECT hoofdrol FROM gebruikers WHERE id = ? LIMIT 1", [id]);
+    if (eigen.length > 0 && eigen[0].hoofdrol !== hoofdrol) {
+      return fail(res, 400, "Je kan je eigen rol niet wijzigen");
+    }
+  }
+
+  // E-mailformaat valideren (backend blijft de bron van waarheid, niet enkel de HTML-input).
+  if (email !== undefined && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email).trim())) {
+    return fail(res, 400, "Ongeldig e-mailadres");
+  }
+
+  // Een rol mag niet naar een andere rolfamilie wisselen: dat zou student-/mentor-/medewerkerrijen
+  // inconsistent maken. Voor zo'n wissel hoort een nieuwe gebruiker via de uitnodigingsflow.
+  if (hoofdrol !== undefined) {
+    const [huidig] = await db.query("SELECT hoofdrol FROM gebruikers WHERE id = ? LIMIT 1", [id]);
+    if (huidig.length === 0) return fail(res, 404, "Gebruiker niet gevonden");
+    const familie = (rol) => (rol === "student" ? "student" : rol === "mentor" ? "mentor" : "medewerker");
+    if (familie(hoofdrol) !== familie(huidig[0].hoofdrol)) {
+      return fail(res, 409, "Een gebruiker kan niet naar een andere rolfamilie (student, mentor, medewerker) gewijzigd worden. Maak hiervoor een nieuwe gebruiker aan via een uitnodiging.");
+    }
   }
 
   const fields = [];
@@ -137,6 +164,16 @@ async function updateUser(req, res) {
       [...values, id]
     );
     if (r.affectedRows === 0) return fail(res, 404, "Gebruiker niet gevonden");
+
+    // Rolwissel binnen de medewerker-familie (docent/stagecommissie/administratie) moet ook de
+    // gekoppelde medewerkers-rij meenemen, anders kiest backendlogica (bv. defaultdocent) nog op de oude rol.
+    if (hoofdrol !== undefined && ["docent", "stagecommissie", "administratie"].includes(hoofdrol)) {
+      await db.query(
+        "UPDATE medewerkers SET medewerker_type = ? WHERE gebruiker_id = ?",
+        [hoofdrol, id]
+      );
+    }
+
     return ok(res, { id }, "Gebruiker bijgewerkt");
   } catch (error) {
     if (error.code === "ER_DUP_ENTRY") return fail(res, 409, "Dit e-mailadres is al in gebruik");
@@ -152,6 +189,9 @@ async function inviteMentor(req, res) {
 
   if (!voornaam || !achternaam || !email) {
     return fail(res, 400, "Voornaam, achternaam en e-mail zijn verplicht");
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return fail(res, 400, "Ongeldig e-mailadres");
   }
 
   // Admin e-mailadres ophalen als afzender
@@ -276,9 +316,14 @@ async function getMentorInvitation(req, res) {
 async function activateMentor(req, res) {
   const { token, wachtwoord, telefoon } = req.body;
   if (!token) return fail(res, 400, "Token ontbreekt");
+  if (!wachtwoord || String(wachtwoord).length < 8) return fail(res, 400, "Kies een wachtwoord van minstens 8 tekens");
 
+  // Eén transactie: het gebruikersaccount en de mentor-uitnodiging horen samen actief te worden.
+  // Faalt de tweede update, dan mag de eerste (account actief + wachtwoord) niet blijven staan.
+  const conn = await db.getConnection();
   try {
-    const [rows] = await db.query(
+    await conn.beginTransaction();
+    const [rows] = await conn.query(
       `
       SELECT m.gebruiker_id, m.uitnodiging_vervalt_op
       FROM mentoren m
@@ -290,13 +335,14 @@ async function activateMentor(req, res) {
     );
 
     const mentor = rows[0];
-    if (!mentor) return fail(res, 404, "Uitnodiging niet gevonden");
+    if (!mentor) { await conn.rollback(); return fail(res, 404, "Uitnodiging niet gevonden"); }
     if (mentor.uitnodiging_vervalt_op && new Date(mentor.uitnodiging_vervalt_op) < new Date()) {
+      await conn.rollback();
       return fail(res, 410, "Uitnodiging is verlopen");
     }
 
-    const wachtwoordHash = wachtwoord ? hashLocalPassword(wachtwoord) : null;
-    await db.query(
+    const wachtwoordHash = hashLocalPassword(wachtwoord);
+    await conn.query(
       `
       UPDATE gebruikers
       SET status = 'actief',
@@ -306,21 +352,31 @@ async function activateMentor(req, res) {
       `,
       [wachtwoordHash, mentor.gebruiker_id]
     );
-    await db.query(
+    // Conditioneel op de token: na een "opnieuw versturen" (nieuwe token) mag een oude open activatiepagina
+    // de mentor niet alsnog activeren en de nieuwe token wissen (auditpunt 415).
+    const [mentorActivatie] = await conn.query(
       `
       UPDATE mentoren
       SET uitnodiging_status = 'geactiveerd',
           uitnodiging_token = NULL,
           geactiveerd_op = NOW(),
           telefoon = COALESCE(?, telefoon)
-      WHERE gebruiker_id = ?
+      WHERE gebruiker_id = ? AND uitnodiging_token = ?
       `,
-      [telefoon || null, mentor.gebruiker_id]
+      [telefoon || null, mentor.gebruiker_id, token]
     );
+    if (mentorActivatie.affectedRows === 0) {
+      await conn.rollback();
+      return fail(res, 409, "Deze uitnodiging is intussen vernieuwd; gebruik de nieuwste activatielink");
+    }
 
+    await conn.commit();
     return ok(res, { mentorId: mentor.gebruiker_id }, "Mentoraccount geactiveerd");
   } catch (error) {
+    await conn.rollback();
     return fail(res, 500, "Mentor activeren mislukt", error.message);
+  } finally {
+    conn.release();
   }
 }
 
@@ -386,6 +442,66 @@ async function resendInvitation(req, res) {
   }
 }
 
+// POST /api/admin/users/:id/resend-invitation — uitnodiging opnieuw versturen voor een NIET-mentor
+// (student/docent/administratie/stagecommissie). Hun token leeft op `gebruikers` (auditpunt 327);
+// mentors houden hun eigen flow via /admin/invitations/:id/resend.
+async function resendUserInvitation(req, res) {
+  const userId = Number(req.params.id);
+  if (!userId) return fail(res, 400, "Ongeldig gebruikers-id");
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.query(
+      "SELECT id, email, status, hoofdrol FROM gebruikers WHERE id = ? LIMIT 1",
+      [userId]
+    );
+    if (rows.length === 0) { await conn.rollback(); return fail(res, 404, "Gebruiker niet gevonden"); }
+    const u = rows[0];
+    if (u.hoofdrol === "mentor") { await conn.rollback(); return fail(res, 400, "Gebruik de mentor-uitnodigingsroute voor mentors"); }
+    if (u.status === "actief") { await conn.rollback(); return fail(res, 409, "Deze gebruiker heeft het account al geactiveerd"); }
+    if (u.status !== "uitgenodigd") { await conn.rollback(); return fail(res, 409, "Alleen een uitgenodigde gebruiker kan een nieuwe uitnodiging krijgen"); }
+
+    const token = crypto.randomBytes(24).toString("hex");
+    await conn.query(
+      `UPDATE gebruikers
+       SET uitnodiging_token = ?, uitnodiging_status = 'verstuurd', uitnodiging_vervalt_op = DATE_ADD(NOW(), INTERVAL 14 DAY), aangepast_op = NOW()
+       WHERE id = ?`,
+      [token, userId]
+    );
+    await conn.commit();
+
+    const activatielink = `/activeren?token=${token}`;
+    await emailMelding(userId, {
+      titel: "Uitnodiging stageplatform (opnieuw verstuurd)",
+      bericht: `Hier is je nieuwe activatielink: ${activatielink}`,
+      type: "herinnering",
+      ernst: "medium",
+      aangemaaktDoorId: Number(req.user?.id) || null
+    });
+    const volledigeLink = `${process.env.APP_URL || "http://localhost:5173"}${activatielink}`;
+    const mailResultaat = await sendMail({
+      to: u.email,
+      subject: "Nieuwe activatielink — Stagify",
+      text: `Hier is je nieuwe activatielink voor Stagify:\n${volledigeLink}\n\nDeze link is 14 dagen geldig.`,
+      html: buildMailHtml({
+        title: "Nieuwe activatielink",
+        body: `<p>Hallo,</p>
+               <p>Hier is je nieuwe activatielink voor <strong>Stagify</strong>.</p>
+               <p>Klik op de knop hieronder om je account te activeren. Deze link is <strong>14 dagen</strong> geldig.</p>`,
+        buttonText: "Account activeren",
+        buttonUrl: volledigeLink,
+      })
+    });
+    return ok(res, { id: userId, activatielink, emailStatus: mailResultaat.sent ? "verzonden" : "geregistreerd" }, "Uitnodiging opnieuw verstuurd");
+  } catch (error) {
+    await conn.rollback();
+    return fail(res, 500, "Uitnodiging opnieuw versturen mislukt", error.message);
+  } finally {
+    conn.release();
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Generieke onboarding: admin nodigt student/docent/administratie/stagecommissie uit.
 // Zelfde patroon als de mentor (uitnodiging -> activatielink -> wachtwoord), maar de
@@ -404,6 +520,7 @@ async function inviteUser(req, res) {
   const rol = String(req.body.rol ?? req.body.hoofdrol ?? "").trim();
 
   if (!voornaam || !achternaam || !email) return fail(res, 400, "Voornaam, achternaam en e-mail zijn verplicht");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return fail(res, 400, "Ongeldig e-mailadres");
   if (!GELDIGE_INVITE_ROLLEN.includes(rol)) {
     return fail(res, 400, `Ongeldige rol. Kies uit: ${GELDIGE_INVITE_ROLLEN.join(", ")}`);
   }
@@ -440,7 +557,7 @@ async function inviteUser(req, res) {
 
     await conn.commit();
 
-    const activatielink = `/mentor/activate?token=${token}`;
+    const activatielink = `/activeren?token=${token}`;
     await emailMelding(userId, {
       titel: "Uitnodiging stageplatform",
       bericht: `Je bent uitgenodigd op Stagify. Activeer je account via ${activatielink}`,
@@ -510,12 +627,17 @@ async function activateAccount(req, res) {
     if (u.uitnodiging_vervalt_op && new Date(u.uitnodiging_vervalt_op) < new Date()) {
       return fail(res, 410, "Uitnodiging is verlopen");
     }
-    await db.query(
+    // Conditioneel op de token: als de admin intussen "opnieuw versturen" deed (nieuwe token), mag een
+    // oude open activatiepagina het account niet alsnog activeren en de nieuwe token wissen (auditpunt 415).
+    const [r] = await db.query(
       `UPDATE gebruikers
        SET status='actief', wachtwoord_hash=?, uitnodiging_token=NULL, uitnodiging_status='geactiveerd', aangepast_op=NOW()
-       WHERE id = ?`,
-      [hashLocalPassword(wachtwoord), u.id]
+       WHERE id = ? AND uitnodiging_token = ? AND status = 'uitgenodigd'`,
+      [hashLocalPassword(wachtwoord), u.id, token]
     );
+    if (r.affectedRows === 0) {
+      return fail(res, 409, "Deze uitnodiging is intussen vernieuwd of al gebruikt; gebruik de nieuwste activatielink");
+    }
     return ok(res, { userId: u.id }, "Account geactiveerd");
   } catch (error) {
     return fail(res, 500, "Account activeren mislukt", error.message);
@@ -529,6 +651,7 @@ module.exports = {
   reactivateUser,
   inviteMentor,
   resendInvitation,
+  resendUserInvitation,
   getMentorInvitation,
   activateMentor,
   inviteUser,

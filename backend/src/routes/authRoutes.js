@@ -2,6 +2,7 @@ const express = require("express");
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 const { createToken, verifyPassword } = require("../utils/token");
+const { authenticateDemoUser } = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
@@ -70,8 +71,10 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.get("/me", (req, res) => {
-  return ok(res, null, "Gebruik het token in de Authorization-header");
+// Sessiecheck: valideert het token en geeft de actuele ingelogde gebruiker terug.
+// Zo kan de frontend bij opstart een stale localStorage-sessie verifiëren i.p.v. wachten op de eerste 401.
+router.get("/me", authenticateDemoUser, (req, res) => {
+  return ok(res, req.user, "Ingelogde gebruiker");
 });
 
 module.exports = router;

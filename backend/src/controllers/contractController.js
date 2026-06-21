@@ -4,7 +4,8 @@ const { meld } = require("../utils/notify");
 const { buildSimplePdf } = require("../utils/pdf");
 
 function getUserId(req) {
-  return Number(req.user?.id || 1);
+  // Geen demo-fallback meer (auditpunt 312): zonder ingelogde gebruiker liever null dan stil user 1.
+  return Number(req.user?.id) || null;
 }
 
 /* GET /api/contracts/my
@@ -61,6 +62,11 @@ async function getContract(req, res) {
    Student tekent de stageovereenkomst digitaal */
 async function signContract(req, res) {
   const studentId = getUserId(req);
+
+  if (req.body?.bevestigd !== true) {
+    return fail(res, 400, "Je moet bevestigen dat je de stageovereenkomst gelezen hebt voor je tekent");
+  }
+
   const connection = await db.getConnection();
 
   try {
@@ -89,18 +95,33 @@ async function signContract(req, res) {
       await connection.rollback();
       return fail(res, 409, "Je hebt deze overeenkomst al ondertekend");
     }
+    // Enkel tekenen wanneer de overeenkomst effectief op de student wacht.
+    if (contract.status && contract.status !== "klaar_voor_student") {
+      await connection.rollback();
+      return fail(res, 409, "Deze overeenkomst kan op dit moment niet getekend worden");
+    }
 
     const now = new Date();
 
-    await connection.query(
+    // Conditioneel zodat een dubbelklik/tweede tab niet alsnog "tekent" o.b.v. een oude status (387).
+    const [tekenResult] = await connection.query(
       `
       UPDATE stageovereenkomsten
       SET student_getekend_op = ?,
           status = 'getekend_door_student',
           aangepast_op = NOW()
-      WHERE id = ?
+      WHERE id = ? AND status = 'klaar_voor_student' AND student_getekend_op IS NULL
       `,
       [now, contract.id]
+    );
+    if (tekenResult.affectedRows === 0) {
+      await connection.rollback();
+      return fail(res, 409, "Deze overeenkomst is ondertussen al gewijzigd; vernieuw de pagina");
+    }
+
+    await connection.query(
+      "UPDATE stagedossiers SET status = 'wacht_op_bedrijf', aangepast_op = NOW() WHERE id = ? AND status = 'wacht_op_student'",
+      [contract.stagedossier_id]
     );
 
     await connection.commit();
@@ -171,20 +192,38 @@ async function registerOvereenkomst(req, res) {
       return fail(res, 409, "De overeenkomst is nog niet door alle partijen ondertekend");
     }
 
-    await conn.query(
+    const [docs] = await conn.query(
+      `SELECT COUNT(*) AS openstaand
+       FROM documenten doc JOIN document_soorten ds ON ds.id = doc.document_soort_id
+       WHERE doc.stagedossier_id = ? AND ds.is_verplicht = 1 AND ds.type != 'stageovereenkomst' AND doc.status NOT IN ('goedgekeurd', 'geregistreerd')`,
+      [dossierId]
+    );
+    if (docs[0].openstaand > 0) {
+      await conn.rollback();
+      return fail(res, 400, `Dossier nog niet startklaar: ${docs[0].openstaand} verplichte document(en) nog niet goedgekeurd`);
+    }
+
+    // Conditioneel zodat twee admins/dubbelklik niet allebei registreren o.b.v. een oude status (387).
+    const [regResult] = await conn.query(
       `UPDATE stageovereenkomsten
        SET status = 'geregistreerd',
            opleiding_getekend_op = COALESCE(opleiding_getekend_op, NOW()),
            gecontroleerd_door_id = ?, gecontroleerd_op = NOW(),
            geregistreerd_door_id = ?, geregistreerd_op = NOW(),
            aangepast_op = NOW()
-       WHERE id = ?`,
+       WHERE id = ? AND status = 'volledig_ondertekend'`,
       [adminId, adminId, o.id]
     );
+    if (regResult.affectedRows === 0) {
+      await conn.rollback();
+      return fail(res, 409, "Deze overeenkomst is ondertussen al geregistreerd of gewijzigd; vernieuw de pagina");
+    }
 
-    // Verzekering in orde op het dossier.
+    // Verzekering in orde + dossier startklaar registreren. Forward-only: nooit een dossier dat al verder
+    // staat terugzetten naar 'geregistreerd' (auditpunt 404).
     await conn.query(
-      "UPDATE stagedossiers SET verzekering_in_orde = 1, aangepast_op = NOW() WHERE id = ?",
+      `UPDATE stagedossiers SET status = 'geregistreerd', verzekering_in_orde = 1, aangepast_op = NOW()
+       WHERE id = ? AND status NOT IN ('geregistreerd', 'stage_loopt', 'resultaat_vrijgegeven', 'afgerond')`,
       [dossierId]
     );
 
@@ -275,4 +314,61 @@ async function downloadContractPdf(req, res) {
   }
 }
 
-module.exports = { getContract, signContract, registerOvereenkomst, downloadContractPdf };
+/* GET /api/admin/dossiers/:id/contract-pdf
+   Admin bekijkt de stageovereenkomst als pdf */
+async function adminDownloadContractPdf(req, res) {
+  const dossierId = Number(req.params.id);
+  try {
+    const [rows] = await db.query(
+      `
+      SELECT
+        so.status, so.student_getekend_op, so.bedrijf_getekend_op, so.opleiding_getekend_op,
+        so.bestand_url,
+        d.dossiernummer, d.startdatum, d.einddatum,
+        CONCAT(gs.voornaam, ' ', gs.achternaam) AS student_naam,
+        b.naam AS bedrijf_naam,
+        CONCAT(gm.voornaam, ' ', gm.achternaam) AS mentor_naam,
+        CONCAT(gdoc.voornaam, ' ', gdoc.achternaam) AS docent_naam
+      FROM stageovereenkomsten so
+      JOIN stagedossiers d ON d.id = so.stagedossier_id
+      JOIN gebruikers gs ON gs.id = d.student_id
+      JOIN bedrijven b ON b.id = d.bedrijf_id
+      LEFT JOIN gebruikers gm ON gm.id = d.mentor_id
+      LEFT JOIN gebruikers gdoc ON gdoc.id = d.stagebegeleider_id
+      WHERE so.stagedossier_id = ?
+      ORDER BY so.aangemaakt_op DESC
+      LIMIT 1
+      `,
+      [dossierId]
+    );
+
+    if (rows.length === 0) return fail(res, 404, "Geen stageovereenkomst gevonden");
+
+    const c = rows[0];
+    const tekenStatus = (datum) => (datum ? `getekend op ${new Date(datum).toISOString().slice(0, 10)}` : "nog niet getekend");
+    const lines = [
+      "Stageovereenkomst",
+      `Dossier: ${c.dossiernummer || "-"}`,
+      "",
+      `Student: ${c.student_naam}`,
+      `Stagebedrijf: ${c.bedrijf_naam || "-"}`,
+      `Stagementor: ${c.mentor_naam || "-"}`,
+      `Stagebegeleider: ${c.docent_naam || "-"}`,
+      `Periode: ${c.startdatum || "-"} tot ${c.einddatum || "-"}`,
+      "",
+      `Status: ${c.status}`,
+      `Handtekening student: ${tekenStatus(c.student_getekend_op)}`,
+      `Handtekening stagebedrijf: ${tekenStatus(c.bedrijf_getekend_op)}`,
+      `Handtekening opleiding: ${tekenStatus(c.opleiding_getekend_op)}`
+    ];
+
+    const pdf = buildSimplePdf(lines);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", 'inline; filename="stageovereenkomst.pdf"');
+    return res.send(pdf);
+  } catch (error) {
+    return fail(res, 500, "Stageovereenkomst-pdf genereren mislukt", error.message);
+  }
+}
+
+module.exports = { getContract, signContract, registerOvereenkomst, downloadContractPdf, adminDownloadContractPdf };

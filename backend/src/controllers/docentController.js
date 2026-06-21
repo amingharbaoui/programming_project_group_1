@@ -38,7 +38,10 @@ async function getDocentStudents(req, res) {
           WHERE e.stagedossier_id = sd.id AND e.status = 'klaar_voor_vrijgave') AS eval_te_vrijgeven,
         (SELECT e.deadline_docent FROM evaluaties e
           WHERE e.stagedossier_id = sd.id AND e.status IN ('klaar_voor_docent','klaar_voor_vrijgave')
-          ORDER BY e.deadline_docent IS NULL, e.deadline_docent ASC LIMIT 1) AS actie_deadline
+          ORDER BY e.deadline_docent IS NULL, e.deadline_docent ASC LIMIT 1) AS actie_deadline,
+        (SELECT COUNT(*) FROM planning_momenten pm
+          WHERE pm.stagedossier_id = sd.id AND pm.type = 'bedrijfsbezoek'
+            AND pm.status NOT IN ('geannuleerd', 'alternatief_gevraagd')) AS aantal_bezoeken
       FROM stagedossiers sd
       JOIN studenten   st ON st.gebruiker_id = sd.student_id
       JOIN gebruikers   g ON g.id             = st.gebruiker_id
@@ -50,21 +53,31 @@ async function getDocentStudents(req, res) {
       [docentId]
     );
 
-    // Volgende actie per student afleiden (prioriteit: vrijgeven > registreren > logboek nalezen).
+    const actief = (status) => ["actief", "stage_loopt"].includes(status);
+    // Een stage is planbaar zodra ze geregistreerd is (startklaar) of loopt — zelfde regel als de planning-backend.
+    const planbaar = (status) => ["geregistreerd", "actief", "stage_loopt"].includes(status);
+
+    // Volgende actie + type per student afleiden (prioriteit: vrijgeven > registreren > logboek nalezen > bezoek plannen).
+    // Type bepaalt de filterchip (logboek/evaluatie/planning/geen) — zelfde indeling als het HTML-prototype.
     const volgendeActie = (r) => {
-      if (Number(r.eval_te_vrijgeven) > 0) return "Eindresultaat vrijgeven";
-      if (Number(r.eval_te_registreren) > 0) return "Evaluatie registreren";
-      if (Number(r.te_review_weken) > 0) return "Logboekweek nalezen";
-      if (r.dossier_status === "resultaat_vrijgegeven" || r.dossier_status === "afgerond") return "Afgerond";
-      return "—";
+      if (Number(r.eval_te_vrijgeven) > 0) return { titel: "Eindresultaat vrijgeven", type: "evaluatie" };
+      if (Number(r.eval_te_registreren) > 0) return { titel: "Evaluatie registreren", type: "evaluatie" };
+      if (Number(r.te_review_weken) > 0) return { titel: "Logboekweek nalezen", type: "logboek" };
+      if (planbaar(r.dossier_status) && Number(r.aantal_bezoeken) === 0) return { titel: "Bedrijfsbezoek plannen", type: "planning" };
+      if (r.dossier_status === "resultaat_vrijgegeven" || r.dossier_status === "afgerond") return { titel: "Afgerond", type: "geen" };
+      return { titel: "—", type: "geen" };
     };
     // Deadline bij de openstaande actie: de docent-deadline van de te-registreren/vrij te geven evaluatie,
     // anders de einddatum van de stage als zachte deadline.
-    const out = rows.map((r) => ({
-      ...r,
-      volgende_actie: volgendeActie(r),
-      deadline: r.actie_deadline || r.einddatum || null
-    }));
+    const out = rows.map((r) => {
+      const a = volgendeActie(r);
+      return {
+        ...r,
+        volgende_actie: a.titel,
+        actie_type: a.type,
+        deadline: r.actie_deadline || r.einddatum || null
+      };
+    });
 
     return ok(res, out, "Docent studenten opgehaald");
   } catch (err) {
@@ -99,6 +112,8 @@ async function getDocentProposals(req, res) {
         sv.uren_per_week,
         sv.totaal_uren,
         sp.status AS voorstel_status,
+        sp.ingediend_op,
+        sp.goedgekeurd_op,
         d.id AS dossier_id,
         d.status AS dossier_status,
         CONCAT(gs.voornaam, ' ', gs.achternaam) AS student_naam,
@@ -136,6 +151,8 @@ async function getDocentProposalById(req, res) {
       SELECT
         sv.*,
         sp.status AS voorstel_status,
+        sp.ingediend_op,
+        sp.goedgekeurd_op,
         d.id AS dossier_id,
         d.status AS dossier_status,
         CONCAT(gs.voornaam, ' ', gs.achternaam) AS student_naam,

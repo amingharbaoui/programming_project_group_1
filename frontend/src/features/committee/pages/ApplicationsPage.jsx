@@ -25,7 +25,9 @@ function formatDate(v) {
 }
 
 function kanBeslissen(status) {
-  return ["ingediend", "heringediend", "aanpassingen_gevraagd"].includes(status);
+  // Enkel deze statussen zijn echt beslisbaar (gelijk aan de backend). 'aanpassingen_gevraagd'
+  // wacht op de student en hoort onder de aparte "Wacht op student"-filter, niet onder "open".
+  return ["ingediend", "heringediend"].includes(status);
 }
 
 function statusLabel(status) {
@@ -34,6 +36,7 @@ function statusLabel(status) {
     aanpassingen_gevraagd: "Aanpassingen vereist",
     heringediend:          "Heringediend",
     goedgekeurd:           "Goedgekeurd",
+    goedgekeurd_met_uitzondering: "Goedgekeurd (uitzondering)",
     afgekeurd:             "Afgekeurd",
     ingetrokken:           "Ingetrokken",
   }[status] || status;
@@ -41,11 +44,16 @@ function statusLabel(status) {
 
 function statusKlasse(status) {
   if (status === "goedgekeurd")            return "s_ok";
+  if (status === "goedgekeurd_met_uitzondering") return "s_ok";
   if (status === "afgekeurd")              return "s_rood";
   if (status === "aanpassingen_gevraagd")  return "s_amber";
   if (status === "ingediend")              return "s_info";
   if (status === "heringediend")           return "s_amber";
   return "s_grijs";
+}
+
+function isGoedgekeurdStatus(status) {
+  return ["goedgekeurd", "goedgekeurd_met_uitzondering"].includes(status);
 }
 
 function statusIconKlasse(status) {
@@ -54,6 +62,7 @@ function statusIconKlasse(status) {
     aanpassingen_gevraagd: "ti-message-circle",
     heringediend:          "ti-refresh",
     goedgekeurd:           "ti-check",
+    goedgekeurd_met_uitzondering: "ti-check",
     afgekeurd:             "ti-x",
     ingetrokken:           "ti-arrow-back-up",
   }[status] || "ti-hourglass";
@@ -65,6 +74,7 @@ function stappenIndex(status) {
     aanpassingen_gevraagd: 2,
     heringediend:          1,
     goedgekeurd:           3,
+    goedgekeurd_met_uitzondering: 3,
     afgekeurd:             3,
     ingetrokken:           3,
   }[status] ?? 1;
@@ -77,37 +87,40 @@ function stappenSubs(status, aanvraag) {
     aanpassingen_gevraagd: [ingDatum, "Feedback verstuurd", "Aanpassingen vereist", ""],
     heringediend:          [ingDatum, "Herbeoordeling", "", ""],
     goedgekeurd:           [ingDatum, "Afgerond", "Goedgekeurd", "Dossier opstarten"],
+    goedgekeurd_met_uitzondering: [ingDatum, "Afgerond", "Goedgekeurd (uitzondering)", "Dossier opstarten"],
     afgekeurd:             [ingDatum, "Afgerond", "Afgekeurd", "Geen dossier"],
     ingetrokken:           [ingDatum, "Gestopt", "Ingetrokken door student", "Geen dossier"],
   }[status] || ["", "", "", ""];
 }
 
-/* ── Auto-hints berekenen op basis van aanvraagdata ── */
-function computeHints(aanvraag) {
-  if (!aanvraag) return CRITERIA_DEFS.map(() => ({ cls: "ok", txt: "Ok" }));
+/* ── Auto-hints per systeemcriterium (gekoppeld aan een stabiele id, niet aan positie) ──
+   Zo blijven hints bij het juiste criterium, ook als de admin criteria toevoegt/herordent.
+   Onbekende/custom criteria krijgen geen automatische hint. */
+function computeHints(aanvraag, minWeken = 12, minUren = 456) {
+  if (!aanvraag) return {};
   const weken = Number(aanvraag.aantal_weken) || 0;
   const uren  = Number(aanvraag.totaal_uren || aanvraag.uren_per_week * weken) || 0;
   const heeftMentorFunctie = !!(aanvraag.mentor_functie && aanvraag.mentor_functie.trim());
   const geldige = aanvraag.startdatum && aanvraag.einddatum &&
     new Date(aanvraag.startdatum) < new Date(aanvraag.einddatum);
 
-  return [
-    weken >= 12
+  return {
+    min_weken: weken >= minWeken
       ? { cls: "ok",  txt: `Ok — ${weken} weken` }
       : { cls: "nok", txt: `Niet ok — ${weken} weken` },
-    uren >= 456
+    min_uren: uren >= minUren
       ? { cls: "ok",  txt: `Ok — ${uren} uur` }
       : { cls: "nok", txt: `Niet ok — ${uren || "?"} uur` },
-    { cls: "ok", txt: "Beoordeel de opdrachtomschrijving" },
-    heeftMentorFunctie
+    it_relevant: { cls: "ok", txt: "Beoordeel de opdrachtomschrijving" },
+    tech_mentor: heeftMentorFunctie
       ? { cls: "ok",  txt: `Ok — ${aanvraag.mentor_functie}` }
       : { cls: "nok", txt: "Mentorfunctie ontbreekt" },
-    { cls: "ok", txt: "Beoordeel de opdrachtomschrijving" },
-    { cls: "ok", txt: "Ok" },
-    geldige
+    omschrijving: { cls: "ok", txt: "Beoordeel de opdrachtomschrijving" },
+    prof_omgeving: { cls: "ok", txt: "Ok" },
+    stagevenster: geldige
       ? { cls: "ok",  txt: `Ok — ${formatDate(aanvraag.startdatum)} – ${formatDate(aanvraag.einddatum)}` }
       : { cls: "nok", txt: "Controleer de data" },
-  ];
+  };
 }
 
 /* ══════════════════════════════════════════
@@ -214,21 +227,22 @@ function VoorstelKaart({ aanvraag, versie }) {
 /* ══════════════════════════════════════════
    CRITERIA KAART
 ══════════════════════════════════════════ */
-function CriteriaKaart({ aanvraag, criteria, onChange, readonly }) {
+function CriteriaKaart({ aanvraag, criteria, onChange, readonly, defs = CRITERIA_DEFS }) {
   const hints    = computeHints(aanvraag);
-  const aangevinkt = CRITERIA_DEFS.filter((c) => criteria[c.id]).length;
+  const aangevinkt = defs.filter((c) => criteria[c.id]).length;
+  // hints zijn nu per criterium-id; custom criteria krijgen geen automatische hint.
 
   return (
     <div className="card">
       <div className="card_title">
         <i className="ti ti-list-check" />
-        Checklist ({aangevinkt}/{CRITERIA_DEFS.length})
+        Checklist ({aangevinkt}/{defs.length})
       </div>
       <p style={{ fontSize: 11.5, color: "var(--sub)", margin: "-4px 0 10px" }}>
         Verplichte criteria — vink elk criterium af. Goedkeuren kan pas als alles in orde is, of met een expliciet gemotiveerde uitzondering.
       </p>
-      {CRITERIA_DEFS.map((c, i) => {
-        const hint = hints[i];
+      {defs.map((c) => {
+        const hint = hints[c.id] || { cls: "ok", txt: "" };
         const ok   = hint.cls === "ok";
         return (
           <label key={c.id} className={`comm-crit${ok ? "" : " nok"}`} style={{ cursor: readonly ? "default" : "pointer" }}>
@@ -349,7 +363,7 @@ const ONDERDEEL_OPTIES = [
   "Algemeen",
 ];
 
-function BeslisModal({ type, aanvraag, criteria, onSluit, onBeslissing }) {
+function BeslisModal({ type, aanvraag, criteria, onSluit, onBeslissing, defs = CRITERIA_DEFS }) {
   const [feedback, setFeedback]   = useState("");
   const [onderdeel, setOnderdeel] = useState("Algemeen");
   const [motivering, setMotivering] = useState("");
@@ -358,7 +372,7 @@ function BeslisModal({ type, aanvraag, criteria, onSluit, onBeslissing }) {
   const [bezig, setBezig]         = useState(false);
   const [fout, setFout]           = useState("");
 
-  const allesCriteria = CRITERIA_DEFS.every((c) => criteria[c.id]);
+  const allesCriteria = defs.every((c) => criteria[c.id]);
 
   async function verstuur() {
     if (type === "aanpassingen" && !feedback.trim()) { setFout("Feedback is verplicht."); return; }
@@ -374,7 +388,7 @@ function BeslisModal({ type, aanvraag, criteria, onSluit, onBeslissing }) {
     try {
       // Bij goedkeuren eerst de criteria-checklist opslaan — de backend leest die bij de beslissing.
       if (type === "goedkeuren") {
-        const items = CRITERIA_DEFS.map((c) => ({
+        const items = defs.map((c) => ({
           criterium: c.label,
           isVerplicht: true,
           isInOrde: !!criteria[c.id],
@@ -589,6 +603,8 @@ function VergelijkModal({ aanvraagId, feedbackVorige, onSluit }) {
 ══════════════════════════════════════════ */
 function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
   const [criteria, setCriteria]     = useState({});
+  // Beoordelingscriteria komen uit de admin-instellingen (configureerbaar), met de vaste lijst als fallback.
+  const [criteriaDefs, setCriteriaDefs] = useState(CRITERIA_DEFS);
   const [beslissModal, setBeslis]   = useState(null); // 'aanpassingen'|'afkeuren'|'goedkeuren'
   const [vergelijkOpen, setVergelijk] = useState(false);
   const [versies, setVersies]       = useState([]);
@@ -598,7 +614,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
   const status     = aanvraag.status;
   const isBeslis   = ["ingediend", "heringediend"].includes(status);
   const isWacht    = status === "aanpassingen_gevraagd";
-  const isGoed     = status === "goedgekeurd";
+  const isGoed     = isGoedgekeurdStatus(status);
   const isAfgekeurd = status === "afgekeurd";
   const isIngetrokken = status === "ingetrokken";
   const heeftMeerdereVersies = aanvraag.huidige_versie_nummer > 1;
@@ -615,6 +631,16 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
         .finally(() => setVLaden(false));
     }
   }, [aanvraag.id, status, heeftMeerdereVersies]);
+
+  // Actieve criteria uit de admin-instellingen laden (configureerbaar); valt terug op de vaste lijst.
+  useEffect(() => {
+    api.get("/committee/checklist-criteria")
+      .then((r) => {
+        const rows = r.data?.data?.criteria || [];
+        if (rows.length > 0) setCriteriaDefs(rows.map((c) => ({ id: c.id, label: c.tekst })));
+      })
+      .catch(() => {});
+  }, []);
 
   // Echte historiek + eerder opgeslagen criteriaresultaten laden.
   useEffect(() => {
@@ -636,14 +662,17 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
           const items = r.data?.data?.items || [];
           const seed = {};
           items.forEach((it) => {
-            const def = CRITERIA_DEFS.find((c) => c.label === it.criterium);
+            const def = criteriaDefs.find((c) => c.label === it.criterium);
             if (def) seed[def.id] = !!it.is_in_orde;
           });
           if (Object.keys(seed).length > 0) { cacheSet(CKEY, seed); setCriteria(seed); }
         })
         .catch(() => {});
     }
-  }, [aanvraag.id]);
+    // criteriaDefs in de deps: de checklist wordt op label tegen de criteria gemapt; laadt de criteria
+    // later (async uit instellingen), dan moet de mapping opnieuw lopen, anders missen opgeslagen vinkjes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aanvraag.id, criteriaDefs]);
 
   function toggleCrit(id, val) {
     setCriteria((prev) => ({ ...prev, [id]: val }));
@@ -665,6 +694,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
           type={beslissModal}
           aanvraag={aanvraag}
           criteria={criteria}
+          defs={criteriaDefs}
           onSluit={() => setBeslis(null)}
           onBeslissing={onBeslissing}
         />
@@ -793,7 +823,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
                 />
               </div>
               <div className="comm-gap-16">
-                <CriteriaKaart aanvraag={aanvraag} criteria={criteria} onChange={toggleCrit} readonly={false} />
+                <CriteriaKaart aanvraag={aanvraag} criteria={criteria} onChange={toggleCrit} readonly={false} defs={criteriaDefs} />
                 <HistoriekKaart items={historiek} />
               </div>
             </div>
@@ -812,7 +842,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
               />
             </div>
             <div className="comm-gap-16">
-              <CriteriaKaart aanvraag={aanvraag} criteria={criteria} onChange={toggleCrit} readonly={false} />
+              <CriteriaKaart aanvraag={aanvraag} criteria={criteria} onChange={toggleCrit} readonly={false} defs={criteriaDefs} />
             </div>
           </div>
         )}
@@ -821,7 +851,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
         {(isGoed || isAfgekeurd || isIngetrokken) && (
           <>
             <VoorstelKaart aanvraag={aanvraag} />
-            <CriteriaKaart aanvraag={aanvraag} criteria={{}} onChange={() => {}} readonly />
+            <CriteriaKaart aanvraag={aanvraag} criteria={criteria} onChange={() => {}} readonly defs={criteriaDefs} />
             <HistoriekKaart items={historiek} />
           </>
         )}
@@ -839,13 +869,13 @@ function OverzichtView({ aanvragen, loading, fout, onVernieuwen, onOpen }) {
     { lbl: "Nieuwe aanvragen", n: aanvragen.filter((a) => a.status === "ingediend").length,             ic: "ti-file-plus" },
     { lbl: "Heringediend",     n: aanvragen.filter((a) => a.status === "heringediend").length,           ic: "ti-refresh" },
     { lbl: "Wacht op student", n: aanvragen.filter((a) => a.status === "aanpassingen_gevraagd").length,  ic: "ti-hourglass" },
-    { lbl: "Afgerond",         n: aanvragen.filter((a) => ["goedgekeurd","afgekeurd","ingetrokken"].includes(a.status)).length, ic: "ti-circle-check" },
+    { lbl: "Afgerond",         n: aanvragen.filter((a) => isGoedgekeurdStatus(a.status) || ["afgekeurd","ingetrokken"].includes(a.status)).length, ic: "ti-circle-check" },
   ];
 
   /* Filter (nieuw+heringediend / afgerond / alle) */
   const zichtbaar = aanvragen.filter((a) => {
     if (filter === "open") return kanBeslissen(a.status);
-    if (filter === "afgerond") return ["goedgekeurd", "afgekeurd", "ingetrokken"].includes(a.status);
+    if (filter === "afgerond") return isGoedgekeurdStatus(a.status) || ["afgekeurd", "ingetrokken"].includes(a.status);
     return true;
   });
 

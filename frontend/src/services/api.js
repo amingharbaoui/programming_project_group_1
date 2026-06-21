@@ -16,6 +16,34 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Verlopen of ongeldig token: sessie wissen en terug naar login i.p.v. losse 401-fouten tonen.
+api.interceptors.response.use(
+  (res) => res,
+  (error) => {
+    const status = error.response?.status;
+    const url = error.config?.url || "";
+    // Achtergrond-polls (meldingen, sidebar-status) zetten skipAuthRedirect: een vluchtige 401 daar mag
+    // de gebruiker NIET uitloggen (auditpunt 333). Alleen expliciete acties + de opstart-/auth/me-check
+    // beëindigen de sessie. Zo wordt niemand zomaar uitgekickt door een achtergrondrequest.
+    if (status === 401 && !error.config?.skipAuthRedirect && typeof window !== "undefined"
+        && !url.includes("/auth/login")
+        && !window.location.pathname.startsWith("/login")) {
+      setAuthToken(null);
+      try {
+        localStorage.removeItem("stagify_user");
+        // Ook alle rolgebonden caches wissen — anders kan na opnieuw inloggen (of snel van gebruiker
+        // wisselen) oude localStorage-data van de vorige sessie blijven hangen.
+        Object.keys(localStorage)
+          .filter((k) => /^(admin|committee|mentor|student|docent)_/.test(k))
+          .forEach((k) => localStorage.removeItem(k));
+        sessionStorage.removeItem("mentor_dossier");
+      } catch { /* ignore */ }
+      window.location.assign("/login");
+    }
+    return Promise.reject(error);
+  }
+);
+
 export function setAuthToken(token) {
   authToken = token || null;
   if (typeof localStorage !== "undefined") {
@@ -36,8 +64,8 @@ export function fileUrl(bestandUrl) {
   return `/api/documents/bestand/${filename}${suffix}`;
 }
 
-export async function apiRequest(method, url, data = null) {
-  const res = await api({ method, url, data });
+export async function apiRequest(method, url, data = null, config = {}) {
+  const res = await api({ method, url, data, ...config });
   return res.data;
 }
 

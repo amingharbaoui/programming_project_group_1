@@ -217,8 +217,8 @@
 
 /* ── Beslis kaart ── */
 .comm-beslis-kaart {
-  border: 1.5px solid #0a0a0a !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.10) !important;
+  border: 0.5px solid var(--border) !important;
+  box-shadow: none !important;
 }
 
 /* ── Diff ── */

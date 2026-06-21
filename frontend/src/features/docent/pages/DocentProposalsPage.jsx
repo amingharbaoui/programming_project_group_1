@@ -1,23 +1,32 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
+import "./DocentProposalsPage.css";
+import { IconX, IconRefresh, IconEye } from "@tabler/icons-react";
+import { cacheGet, cacheSet } from "../docentCache";
 
+// Alle mogelijke statussen van stagevoorstellen:
+// concept · ingediend · aanpassingen_gevraagd · heringediend · goedgekeurd · afgekeurd · ingetrokken
 function getStatusClass(status) {
   if (status === "goedgekeurd" || status === "goedgekeurd_met_uitzondering") return "s_ok";
   if (status === "ingediend" || status === "heringediend") return "s_info";
   if (status === "aanpassingen_gevraagd") return "s_amber";
-  if (status === "afgekeurd") return "s_rood";
-  return "s_grijs";
+  if (status === "afgekeurd" || status === "ingetrokken") return "s_rood";
+  return "s_grijs"; // concept
 }
 
 function getStatusLabel(status) {
-  if (status === "goedgekeurd") return "Goedgekeurd";
-  if (status === "goedgekeurd_met_uitzondering") return "Goedgekeurd (uitzondering)";
-  if (status === "ingediend") return "Ingediend";
-  if (status === "heringediend") return "Heringediend";
-  if (status === "aanpassingen_gevraagd") return "Aanpassingen gevraagd";
-  if (status === "afgekeurd") return "Afgekeurd";
-  return status || "-";
+  const labels = {
+    concept:                    "Concept",
+    ingediend:                  "Ingediend",
+    aanpassingen_gevraagd:      "Aanpassingen gevraagd",
+    heringediend:               "Heringediend",
+    goedgekeurd:                "Goedgekeurd",
+    goedgekeurd_met_uitzondering:"Goedgekeurd (uitzondering)",
+    afgekeurd:                  "Afgekeurd",
+    ingetrokken:                "Ingetrokken door student",
+  };
+  return labels[status] || status || "-";
 }
 
 function formatDate(v) {
@@ -30,16 +39,23 @@ export default function DocentProposalsPage() {
   const [voorstellen, setVoorstellen] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [detail, setDetail] = useState(null);        // { huidige, versies, beslissingen }
+  const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [zoek, setZoek] = useState("");
+  const [filterStatus, setFilterStatus] = useState("alle");
 
-  async function loadVoorstellen() {
+  async function loadVoorstellen(force = false) {
     try {
-      setLoading(true);
       setError("");
-      const res = await api.get("/docent/proposals", {
-      });
-      setVoorstellen(res.data.data || []);
+      if (!force) {
+        const cached = cacheGet("docent_proposals");
+        if (cached) { setVoorstellen(cached); setLoading(false); return; }
+      }
+      setLoading(true);
+      const res = await api.get("/docent/proposals");
+      const data = res.data.data || [];
+      cacheSet("docent_proposals", data);
+      setVoorstellen(data);
     } catch (err) {
       setError(err.response?.data?.message || "Voorstellen ophalen mislukt");
     } finally {
@@ -68,68 +84,128 @@ export default function DocentProposalsPage() {
 
   const h = detail?.huidige || null;
 
+  const STATUS_OPTIES = [
+    { key: "alle", label: "Alle statussen" },
+    { key: "ingediend", label: "Ingediend" },
+    { key: "heringediend", label: "Heringediend" },
+    { key: "aanpassingen_gevraagd", label: "Aanpassingen gevraagd" },
+    { key: "goedgekeurd", label: "Goedgekeurd" },
+    { key: "afgekeurd", label: "Afgekeurd" },
+  ];
+
+  const gefilterd = voorstellen.filter((v) => {
+    if (zoek) {
+      const q = zoek.toLowerCase();
+      if (!(v.student_naam || "").toLowerCase().includes(q) &&
+          !(v.bedrijf_naam || "").toLowerCase().includes(q)) return false;
+    }
+    if (filterStatus !== "alle" && v.voorstel_status !== filterStatus) return false;
+    return true;
+  });
+
   return (
-    <div className="page_inner">
-      <div className="page_header">
+    <div className="page-inner">
+      <div className="page-header">
         <div>
-          <h1>Stagevoorstellen</h1>
-          <p>Voorstellen van jouw studenten — alleen-lezen (de stagecommissie beslist).</p>
+          <h1>Voorstellen</h1>
+          <p>Read-only — de stagecommissie beslist over stagevoorstellen.</p>
         </div>
-        <button className="btn sm" onClick={loadVoorstellen}>Vernieuwen</button>
+        <button className="btn primary" onClick={() => loadVoorstellen(true)}><IconRefresh size={14} stroke={1.8} /> Vernieuwen</button>
+      </div>
+
+      <div className="banner blauw" style={{ marginBottom: 16 }}>
+        <IconEye size={18} stroke={1.8} />
+        <div>
+          <div className="b-title">Voorstel inkijken — beslissing door stagecommissie</div>
+          <div className="b-text">Je bent (voorlopig) gekoppeld als stagebegeleider. Je kan elk stagevoorstel en de feedback inkijken, maar de stagecommissie neemt de beslissing.</div>
+        </div>
+      </div>
+
+      <div className="doc_filters" style={{ marginBottom: 16 }}>
+        <input
+          className="doc_zoek"
+          placeholder="Zoek op student of bedrijf..."
+          value={zoek}
+          onChange={(e) => setZoek(e.target.value)}
+        />
+        <select
+          className="doc_select"
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value)}
+        >
+          {STATUS_OPTIES.map((o) => (
+            <option key={o.key} value={o.key}>{o.label}</option>
+          ))}
+        </select>
+        {(zoek || filterStatus !== "alle") && (
+          <button className="btn sm primary" onClick={() => { setZoek(""); setFilterStatus("alle"); }}>
+            Wis filters
+          </button>
+        )}
       </div>
 
       {loading && <div className="card"><p className="muted">Voorstellen laden...</p></div>}
       {error && <div className="card"><span className="status s_rood">{error}</span></div>}
-      {!loading && !error && voorstellen.length === 0 && (
-        <div className="empty_state">Geen voorstellen gevonden.</div>
+      {!loading && !error && gefilterd.length === 0 && (
+        <div className="card"><p className="muted">Geen voorstellen gevonden.</p></div>
       )}
 
-      {!loading && !error && voorstellen.length > 0 && (
-        <div className="card">
-          <div className="card_title">Voorstellen ({voorstellen.length})</div>
-          <table className="tbl">
+      {!loading && !error && gefilterd.length > 0 && (
+        <div className="card doc_students_card">
+          <table className="doc_students_tbl">
             <thead>
               <tr>
                 <th>Student</th>
-                <th>Bedrijf</th>
-                <th>Stagefunctie</th>
+                <th>Ingediend</th>
+                <th>Vergadering</th>
                 <th>Status</th>
-                <th className="right">Detail</th>
+                <th style={{ textAlign: "right" }}>Detail</th>
               </tr>
             </thead>
             <tbody>
-              {voorstellen.map((v) => (
-                <tr key={v.versie_id}>
-                  <td>
-                    <strong>{v.student_naam || "-"}</strong>
-                    <br />
-                    <span className="muted">{v.studentennummer || ""}</span>
-                  </td>
-                  <td>{v.bedrijf_naam || "-"}</td>
-                  <td>{v.stagefunctie || "-"}</td>
-                  <td>
-                    <span className={"status " + getStatusClass(v.voorstel_status)}>
-                      {getStatusLabel(v.voorstel_status)}
-                    </span>
-                  </td>
-                  <td className="right">
-                    <button className="btn sm" onClick={() => openDetail(v)}>Bekijken</button>
-                  </td>
-                </tr>
-              ))}
+              {gefilterd.map((v) => {
+                const initialen = (v.student_naam || "?").split(" ").filter(Boolean).map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+                return (
+                  <tr key={v.versie_id}>
+                    <td>
+                      <div className="doc_student_cell">
+                        <div className="doc_avatar">{initialen}</div>
+                        <div className="doc_student_info">
+                          <div className="doc_naam">{v.student_naam || "-"}</div>
+                          {v.studentennummer && <div className="doc_bedrijf">{v.studentennummer}</div>}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="doc_sub" style={{ whiteSpace: "nowrap" }}>
+                      {v.ingediend_op ? `${formatDate(v.ingediend_op)} · v${v.versie_nummer ?? 1}` : "—"}
+                    </td>
+                    <td className="doc_sub" style={{ whiteSpace: "nowrap" }}>
+                      {v.goedgekeurd_op ? formatDate(v.goedgekeurd_op) : "—"}
+                    </td>
+                    <td>
+                      <span className={"status " + getStatusClass(v.voorstel_status)}>
+                        {getStatusLabel(v.voorstel_status)}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <button className="btn sm" onClick={() => openDetail(v)}><IconEye size={14} stroke={1.8} /> Bekijken</button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
       )}
 
       {detail && h && (
-        <div className="popup-overlay" onClick={() => setDetail(null)}>
-          <div className="popup" style={{ maxWidth: 620 }} onClick={(e) => e.stopPropagation()}>
-            <div className="popup-header">
-              <strong>Voorsteldetail (read-only)</strong>
-              <button className="btn sm" onClick={() => setDetail(null)}><i className="ti ti-x" /></button>
+        <div className="modal_overlay" onClick={() => setDetail(null)}>
+          <div className="modal_box" style={{ maxWidth: 620 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal_header">
+              <span className="modal_title">Voorsteldetail</span>
+              <button className="icon_btn" onClick={() => setDetail(null)}><IconX size={16} stroke={1.8} /></button>
             </div>
-            <div className="popup-body">
+            <div className="modal_body" style={{ overflowY: "auto", maxHeight: "75vh" }}>
               <div className="kv"><span className="k">Student</span><span className="v">{h.student_naam}</span></div>
               <div className="kv"><span className="k">Bedrijf</span><span className="v">{h.bedrijf_naam || "-"}{h.bedrijfsafdeling ? ` · ${h.bedrijfsafdeling}` : ""}</span></div>
               <div className="kv"><span className="k">Mentor</span><span className="v">{h.mentor_naam || "-"}{h.mentor_functie ? ` (${h.mentor_functie})` : ""}</span></div>

@@ -59,10 +59,44 @@ function WijzigenModal({ rawUser, koppeling, onClose, onSaved, onDeactiveerClick
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  const [resendMsg, setResendMsg] = useState("");
   const isActief = rawUser.status === "actief";
+  // Elke uitgenodigde gebruiker kan een nieuwe uitnodiging krijgen (heractiveren werkt niet op status
+  // 'uitgenodigd'). Zo is er een herstelpad als de mail niet aankwam — voor mentors én niet-mentors (327).
+  const isUitgenodigd = rawUser.status === "uitgenodigd";
+  // De backend weigert rolwissels tussen families (student / mentor / medewerker). Toon daarom enkel
+  // de rollen binnen de huidige familie; voor een andere rol hoort een nieuwe uitnodiging.
+  const ROL_FAMILIES = {
+    student: ["student"],
+    mentor: ["mentor"],
+    docent: ["docent", "administratie", "stagecommissie"],
+    administratie: ["docent", "administratie", "stagecommissie"],
+    stagecommissie: ["docent", "administratie", "stagecommissie"],
+  };
+  const toegestaneRollen = ROL_FAMILIES[rawUser.hoofdrol] || [rawUser.hoofdrol];
 
   function set(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  async function handleResend() {
+    setSaving(true); setErr(""); setResendMsg("");
+    try {
+      // Mentors houden hun eigen endpoint (token op mentoren); andere rollen via de generieke route (327).
+      const url = rawUser.hoofdrol === "mentor"
+        ? `/admin/invitations/${rawUser.id}/resend`
+        : `/admin/users/${rawUser.id}/resend-invitation`;
+      const res = await api.post(url);
+      const rel = res.data?.data?.activatielink;
+      const link = rel ? `${window.location.origin}${rel}` : "";
+      setResendMsg(res.data?.data?.emailStatus === "verzonden"
+        ? "Uitnodiging opnieuw verzonden per e-mail."
+        : `Uitnodiging vernieuwd. Bezorg deze link: ${link}`);
+    } catch (e) {
+      setErr(e.response?.data?.message || "Opnieuw versturen mislukt");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleSubmit() {
@@ -115,23 +149,38 @@ function WijzigenModal({ rawUser, koppeling, onClose, onSaved, onDeactiveerClick
           </div>
           <div className="modal_field">
             <label className="modal_label">Rol</label>
-            <select className="modal_input" value={form.hoofdrol} onChange={(e) => set("hoofdrol", e.target.value)}>
-              <option value="student">student</option>
-              <option value="docent">docent</option>
-              <option value="mentor">mentor</option>
-              <option value="administratie">administratie</option>
-              <option value="stagecommissie">stagecommissie</option>
+            <select
+              className="modal_input"
+              value={form.hoofdrol}
+              onChange={(e) => set("hoofdrol", e.target.value)}
+              disabled={toegestaneRollen.length <= 1}
+            >
+              {toegestaneRollen.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
             </select>
+            {toegestaneRollen.length <= 1 && (
+              <p className="modal_label" style={{ marginTop: 4, color: "var(--sub)", fontWeight: 400 }}>
+                Voor een andere rol nodig je een nieuwe gebruiker uit.
+              </p>
+            )}
           </div>
           {err && <p className="modal_error">{err}</p>}
+          {resendMsg && <p className="status s_ok" style={{ fontSize: 12, wordBreak: "break-all" }}>{resendMsg}</p>}
         </div>
         <div className="modal_footer" style={{ justifyContent: "space-between" }}>
-          <button
-            className={`btn ${isActief ? "btn-danger" : "btn-success"}`}
-            onClick={onDeactiveerClick} type="button" disabled={saving}
-          >
-            {isActief ? "Deactiveren" : "Heractiveren"}
-          </button>
+          {isUitgenodigd ? (
+            <button className="btn btn-success" onClick={handleResend} type="button" disabled={saving}>
+              Uitnodiging opnieuw versturen
+            </button>
+          ) : (
+            <button
+              className={`btn ${isActief ? "btn-danger" : "btn-success"}`}
+              onClick={onDeactiveerClick} type="button" disabled={saving}
+            >
+              {isActief ? "Deactiveren" : "Heractiveren"}
+            </button>
+          )}
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn" onClick={onClose} type="button" disabled={saving}>Annuleren</button>
             <button className="btn primary" onClick={handleSubmit} disabled={saving} type="button">
@@ -149,6 +198,7 @@ function MentorUitnodigingModal({ onClose, onSaved }) {
   const [form, setForm] = useState({ voornaam: "", achternaam: "", email: "", bedrijfNaam: "", functie: "" });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  const [resultaat, setResultaat] = useState(null);
 
   function set(field, value) { setForm((f) => ({ ...f, [field]: value })); }
 
@@ -158,19 +208,54 @@ function MentorUitnodigingModal({ onClose, onSaved }) {
     }
     setSaving(true); setErr("");
     try {
-      await api.post("/admin/invitations", {
+      const res = await api.post("/admin/invitations", {
         voornaam: form.voornaam,
         achternaam: form.achternaam,
         email: form.email,
         bedrijfNaam: form.bedrijfNaam,
         functie: form.functie || "Mentor",
       });
-      onSaved();
+      cacheDelete("admin_users");
+      setResultaat(res.data?.data || {});
     } catch (e) {
       setErr(e.response?.data?.message || "Uitnodigen mislukt");
     } finally {
       setSaving(false);
     }
+  }
+
+  if (resultaat) {
+    const relLink = resultaat.activatielink || resultaat.activationLink;
+    // Volledige link tonen zodat hij ook buiten de huidige site-context bruikbaar is (zelfde als bij algemene uitnodiging).
+    const link = relLink ? `${window.location.origin}${relLink}` : "";
+    const mailVerzonden = resultaat.emailStatus === "verzonden";
+    return (
+      <div className="modal_overlay" onClick={onClose}>
+        <div className="modal_box" onClick={(e) => e.stopPropagation()}>
+          <div className="modal_header">
+            <span className="modal_title">Mentor uitgenodigd</span>
+            <button className="icon_btn" onClick={onSaved} type="button"><IconX size={16} stroke={1.8} /></button>
+          </div>
+          <div className="modal_body">
+            <p style={{ fontSize: 13 }}>
+              {mailVerzonden
+                ? "De activatielink is per e-mail verstuurd. Je kan hem hieronder ook kopiëren als back-up."
+                : "E-mail kon niet verstuurd worden. Bezorg onderstaande activatielink aan de mentor."}
+            </p>
+            {link && (
+              <div className="modal_field">
+                <label className="modal_label">Activatielink</label>
+                <input className="modal_input" readOnly value={link} onFocus={(e) => e.target.select()} />
+                <button className="btn" type="button" style={{ marginTop: 8 }} onClick={() => navigator.clipboard?.writeText(link)}>Kopieer link</button>
+              </div>
+            )}
+          </div>
+          <div className="modal_footer">
+            <button className="btn primary" onClick={onSaved} type="button">Klaar</button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -222,7 +307,7 @@ function MentorUitnodigingModal({ onClose, onSaved }) {
 }
 
 function AlgemeneUitnodigingModal({ onClose, onSaved }) {
-  const [form, setForm] = useState({ voornaam: "", achternaam: "", email: "", rol: "docent" });
+  const [form, setForm] = useState({ voornaam: "", achternaam: "", email: "", rol: "docent", opleiding: "", klasgroep: "", academiejaar: "" });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const [resultaat, setResultaat] = useState(null); // { activatielink, emailStatus }
@@ -240,6 +325,12 @@ function AlgemeneUitnodigingModal({ onClose, onSaved }) {
         achternaam: form.achternaam,
         email: form.email,
         rol: form.rol,
+        // Enkel relevant voor studenten; backend valt terug op standaardwaarden als ze leeg blijven.
+        ...(form.rol === "student" ? {
+          opleiding: form.opleiding || undefined,
+          klasgroep: form.klasgroep || undefined,
+          academiejaar: form.academiejaar || undefined,
+        } : {}),
       });
       setResultaat(res.data?.data || {});
     } catch (e) {
@@ -253,12 +344,14 @@ function AlgemeneUitnodigingModal({ onClose, onSaved }) {
     ? `${window.location.origin}${resultaat.activatielink}`
     : "";
 
+  // Na een succesvolle uitnodiging moet élke sluitroute de lijst verversen (onSaved), niet enkel "Klaar".
+  const sluit = resultaat ? onSaved : onClose;
   return (
-    <div className="modal_overlay" onClick={onClose}>
+    <div className="modal_overlay" onClick={sluit}>
       <div className="modal_box" onClick={(e) => e.stopPropagation()}>
         <div className="modal_header">
           <span className="modal_title">Gebruiker uitnodigen</span>
-          <button className="icon_btn" onClick={onClose} type="button"><IconX size={16} stroke={1.8} /></button>
+          <button className="icon_btn" onClick={sluit} type="button"><IconX size={16} stroke={1.8} /></button>
         </div>
 
         {!resultaat ? (
@@ -287,6 +380,24 @@ function AlgemeneUitnodigingModal({ onClose, onSaved }) {
                   <option value="student">student</option>
                 </select>
               </div>
+              {form.rol === "student" && (
+                <>
+                  <div className="modal_row">
+                    <div className="modal_field">
+                      <label className="modal_label">Opleiding</label>
+                      <input className="modal_input" placeholder="Toegepaste Informatica" value={form.opleiding} onChange={(e) => set("opleiding", e.target.value)} />
+                    </div>
+                    <div className="modal_field">
+                      <label className="modal_label">Klasgroep</label>
+                      <input className="modal_input" placeholder="1TI-A" value={form.klasgroep} onChange={(e) => set("klasgroep", e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="modal_field">
+                    <label className="modal_label">Academiejaar</label>
+                    <input className="modal_input" placeholder="2025-2026" value={form.academiejaar} onChange={(e) => set("academiejaar", e.target.value)} />
+                  </div>
+                </>
+              )}
               <p style={{ fontSize: 12, color: "var(--sub)", marginTop: 8 }}>
                 Een stagementor nodig je uit via "Stagementor uitnodigen" (met bedrijfsgegevens).
               </p>
@@ -336,6 +447,8 @@ export default function UsersPage() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [zoek, setZoek] = useState("");
+  const [filterRol, setFilterRol] = useState("");
   const [wijzigenTarget, setWijzigenTarget] = useState(null);
   const [bevestigTarget, setBevestigTarget] = useState(null);
   const [uitnodigingOpen, setUitnodigingOpen] = useState(false);
@@ -376,9 +489,12 @@ export default function UsersPage() {
   }
 
   function formatUser(u) {
+    const voornaam = u.voornaam || "";
+    const achternaam = u.achternaam || "";
     return {
       id: u.id,
-      naam: `${u.voornaam || ""} ${u.achternaam || ""}`.trim() || "Onbekende gebruiker",
+      naam: `${voornaam} ${achternaam}`.trim() || "Onbekende gebruiker",
+      initialen: [voornaam, achternaam].filter(Boolean).map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?",
       email: u.email,
       rol: u.hoofdrol,
       status: u.status,
@@ -393,7 +509,7 @@ export default function UsersPage() {
           rawUser={wijzigenTarget}
           koppeling={wijzigenTarget.koppeling || "-"}
           onClose={() => setWijzigenTarget(null)}
-          onSaved={() => { setWijzigenTarget(null); loadUsers(); showToast("Gebruiker opgeslagen."); }}
+          onSaved={() => { setWijzigenTarget(null); cacheDelete("admin_users"); loadUsers(); showToast("Gebruiker opgeslagen."); }}
           onDeactiveerClick={() => setBevestigTarget(wijzigenTarget)}
         />
       )}
@@ -409,6 +525,7 @@ export default function UsersPage() {
           onClose={() => setUitnodigingOpen(false)}
           onSaved={() => {
             setUitnodigingOpen(false);
+            cacheDelete("admin_users");
             loadUsers();
             showToast("Mentor uitgenodigd — activatielink verstuurd.");
           }}
@@ -419,6 +536,7 @@ export default function UsersPage() {
           onClose={() => setAlgemeenOpen(false)}
           onSaved={() => {
             setAlgemeenOpen(false);
+            cacheDelete("admin_users");
             loadUsers();
             showToast("Gebruiker uitgenodigd.");
           }}
@@ -445,10 +563,34 @@ export default function UsersPage() {
           </div>
         </div>
 
+        <div className="dos_filters">
+          <input
+            className="dos_zoek"
+            placeholder="Zoek op naam of e-mail..."
+            value={zoek}
+            onChange={(e) => setZoek(e.target.value)}
+          />
+          <select
+            className="dos_select"
+            value={filterRol}
+            onChange={(e) => setFilterRol(e.target.value)}
+          >
+            <option value="">Alle rollen</option>
+            <option value="student">Student</option>
+            <option value="docent">Docent</option>
+            <option value="mentor">Mentor</option>
+            <option value="administratie">Administratie</option>
+            <option value="stagecommissie">Stagecommissie</option>
+          </select>
+          {(filterRol || zoek) && (
+            <button className="btn sm primary" onClick={() => { setFilterRol(""); setZoek(""); }}>
+              <IconX size={16} stroke={1.8} />
+              Wis filters
+            </button>
+          )}
+        </div>
+
         <div className="card users_card">
-          <div className="users_card_header">
-            <h2>Gebruikersoverzicht</h2>
-          </div>
           <table className="users-table">
             <thead>
               <tr>
@@ -464,11 +606,25 @@ export default function UsersPage() {
               {loading && <tr><td colSpan="6">Gebruikers laden...</td></tr>}
               {!loading && error && <tr><td colSpan="6" style={{ color: "var(--red)" }}>{error}</td></tr>}
               {!loading && !error && users.length === 0 && <tr><td colSpan="6">Geen gebruikers gevonden.</td></tr>}
-              {!loading && !error && users.map((rawUser) => {
+              {!loading && !error && users.filter((rawUser) => {
+                const z = zoek.toLowerCase();
+                const naam = `${rawUser.voornaam || ""} ${rawUser.achternaam || ""}`.toLowerCase();
+                const email = (rawUser.email || "").toLowerCase();
+                const matchZoek = !z || naam.includes(z) || email.includes(z);
+                const matchRol = !filterRol || (rawUser.hoofdrol || "").toLowerCase() === filterRol;
+                return matchZoek && matchRol;
+              }).map((rawUser) => {
                 const u = formatUser(rawUser);
                 return (
                   <tr key={u.id}>
-                    <td className="user-name">{u.naam}</td>
+                    <td>
+                      <div className="tw_student_cell">
+                        <div className="tw_avatar">{u.initialen}</div>
+                        <div className="tw_student_info">
+                          <div className="tw_naam">{u.naam}</div>
+                        </div>
+                      </div>
+                    </td>
                     <td>{u.email}</td>
                     <td>
                       <span className={`badge role-${u.rol.toLowerCase().replace(/\s+/g, "-")}`}>{u.rol}</span>

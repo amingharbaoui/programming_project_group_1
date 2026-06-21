@@ -22,6 +22,7 @@ async function getMentorStudents(req, res) {
         sd.status       AS dossier_status,
         sd.startdatum,
         sd.einddatum,
+        sd.aantal_weken,
         (
           SELECT lw.status
           FROM logboek_weken lw
@@ -50,6 +51,7 @@ async function getMentorStudents(req, res) {
 async function getMentorContract(req, res) {
   const mentorId  = Number(req.user?.id);
   const dossierId = Number(req.params.dossierId);
+  if (!Number.isInteger(dossierId)) return fail(res, 404, "Dossier niet gevonden");
 
   try {
     // Security: controleer of dit dossier van deze mentor is
@@ -76,43 +78,66 @@ async function getMentorContract(req, res) {
 async function tekenContract(req, res) {
   const mentorId  = Number(req.user?.id);
   const dossierId = Number(req.params.dossierId);
+  if (!Number.isInteger(dossierId)) return fail(res, 404, "Dossier niet gevonden");
   const tekenbevoegd = Boolean(req.body?.tekenbevoegd ?? req.body?.tekenBevoegd ?? req.body?.bevoegd);
 
   if (!tekenbevoegd) {
     return fail(res, 400, "Je moet eerst bevestigen dat je tekenbevoegd bent voor het stagebedrijf");
   }
 
+  // Eén transactie zodat contract-handtekening en dossierfase samen doorgaan of samen terugdraaien (317).
+  const conn = await db.getConnection();
+  let studentId = null;
   try {
+    await conn.beginTransaction();
+
     // Security check
-    const [[dossier]] = await db.query(
+    const [[dossier]] = await conn.query(
       "SELECT id, student_id FROM stagedossiers WHERE id = ? AND mentor_id = ? LIMIT 1",
       [dossierId, mentorId]
     );
-    if (!dossier) return fail(res, 403, "Geen toegang tot dit dossier");
+    if (!dossier) { await conn.rollback(); return fail(res, 403, "Geen toegang tot dit dossier"); }
+    studentId = dossier.student_id;
 
     // Haal huidige status op
-    const [[contract]] = await db.query(
+    const [[contract]] = await conn.query(
       "SELECT id, status, student_getekend_op, bedrijf_getekend_op FROM stageovereenkomsten WHERE stagedossier_id = ? LIMIT 1",
       [dossierId]
     );
-    if (!contract) return fail(res, 404, "Geen stageovereenkomst gevonden");
-    if (contract.bedrijf_getekend_op) return fail(res, 409, "Contract is al getekend door mentor");
-    if (!contract.student_getekend_op) return fail(res, 409, "De student moet de stageovereenkomst eerst tekenen");
+    if (!contract) { await conn.rollback(); return fail(res, 404, "Geen stageovereenkomst gevonden"); }
+    if (contract.bedrijf_getekend_op) { await conn.rollback(); return fail(res, 409, "Contract is al getekend door mentor"); }
+    if (!contract.student_getekend_op) { await conn.rollback(); return fail(res, 409, "De student moet de stageovereenkomst eerst tekenen"); }
+    if (contract.status && contract.status !== "getekend_door_student") {
+      await conn.rollback();
+      return fail(res, 409, "Deze overeenkomst wacht niet op de handtekening van het bedrijf");
+    }
 
     // Student tekende al, dus na de mentor is de overeenkomst volledig ondertekend.
     const nieuweStatus = "volledig_ondertekend";
 
-    await db.query(
+    // Conditioneel zodat een dubbelklik/tweede tab niet alsnog tekent o.b.v. een oude status (387).
+    const [tekenResult] = await conn.query(
       `UPDATE stageovereenkomsten
        SET bedrijf_getekend_op = NOW(), status = ?
-       WHERE stagedossier_id = ?`,
+       WHERE stagedossier_id = ? AND status = 'getekend_door_student' AND bedrijf_getekend_op IS NULL`,
       [nieuweStatus, dossierId]
     );
+    if (tekenResult.affectedRows === 0) {
+      await conn.rollback();
+      return fail(res, 409, "Deze overeenkomst is ondertussen al gewijzigd; vernieuw de pagina");
+    }
 
-    // Student en administratie verwittigen dat het stagebedrijf getekend heeft (story 28).
+    await conn.query(
+      "UPDATE stagedossiers SET status = 'in_controle_bij_administratie', aangepast_op = NOW() WHERE id = ? AND status IN ('wacht_op_student','wacht_op_bedrijf')",
+      [dossierId]
+    );
+
+    await conn.commit();
+
+    // Student en administratie verwittigen dat het stagebedrijf getekend heeft (story 28) — na de commit.
     try {
-      if (dossier.student_id) {
-        await meld(dossier.student_id, {
+      if (studentId) {
+        await meld(studentId, {
           titel: "Stagebedrijf ondertekende de overeenkomst",
           bericht: "Je mentor ondertekende de stageovereenkomst namens het stagebedrijf.",
           aangemaaktDoorId: mentorId,
@@ -134,8 +159,11 @@ async function tekenContract(req, res) {
 
     return ok(res, { status: nieuweStatus }, "Contract getekend door mentor");
   } catch (err) {
+    await conn.rollback();
     console.error("tekenContract error:", err);
     return fail(res, 500, "Tekenen mislukt");
+  } finally {
+    conn.release();
   }
 }
 
@@ -143,6 +171,7 @@ async function tekenContract(req, res) {
 async function getAfspraken(req, res) {
   const mentorId  = Number(req.user?.id);
   const dossierId = Number(req.params.dossierId);
+  if (!Number.isInteger(dossierId)) return fail(res, 404, "Dossier niet gevonden");
 
   try {
     const [[row]] = await db.query(
@@ -165,13 +194,13 @@ async function getAfspraken(req, res) {
 async function updateAfspraken(req, res) {
   const mentorId          = Number(req.user?.id);
   const dossierId         = Number(req.params.dossierId);
+  if (!Number.isInteger(dossierId)) return fail(res, 404, "Dossier niet gevonden");
   const { afspraken, velden } = req.body;
 
   // Story 29: de afspraken kunnen als losse velden komen (werkuren, thuiswerk, ...) of als één tekst.
   let veldenJson = null;
   let tekst = afspraken;
   if (velden && typeof velden === "object") {
-    veldenJson = JSON.stringify(velden);
     const labels = [
       ["Werkuren", velden.werkuren],
       ["Thuiswerk", velden.thuiswerk],
@@ -181,19 +210,30 @@ async function updateAfspraken(req, res) {
       ["Extra info", velden.extra]
     ];
     tekst = labels.filter(([, v]) => v && String(v).trim()).map(([k, v]) => `${k}: ${v}`).join("\n");
+    // Alleen als er minstens één veld effectief ingevuld is, bewaren we de gestructureerde data;
+    // een volledig leeg veldenobject mag niet als "gedeeld" tellen.
+    if (tekst.trim() !== "") veldenJson = JSON.stringify(velden);
   }
 
   if ((tekst === undefined || tekst === null || String(tekst).trim() === "") && !veldenJson) {
-    return fail(res, 400, "Veld 'afspraken' of 'velden' ontbreekt");
+    return fail(res, 400, "Vul minstens één praktische afspraak in voor je ze deelt");
   }
 
   try {
+    const [[dos]] = await db.query("SELECT status FROM stagedossiers WHERE id = ? AND mentor_id = ? LIMIT 1", [dossierId, mentorId]);
+    if (!dos) return fail(res, 403, "Geen toegang tot dit dossier");
+    if (["resultaat_vrijgegeven", "afgerond"].includes(dos.status)) {
+      return fail(res, 409, "Het dossier is afgerond; praktische afspraken kunnen niet meer gewijzigd worden");
+    }
+
     const [result] = await db.query(
       `UPDATE stagedossiers
        SET praktische_afspraken = ?,
-           praktische_afspraken_velden = ?,
+           praktische_afspraken_velden = COALESCE(?, praktische_afspraken_velden),
            praktische_afspraken_gedeeld_op = NOW()
        WHERE id = ? AND mentor_id = ?`,
+      // Komt er enkel vrije tekst binnen (geen velden), dan blijft de bestaande gestructureerde data staan
+      // i.p.v. ze te wissen — de twee mentorschermen overschrijven elkaar zo niet meer.
       [tekst || null, veldenJson, dossierId, mentorId]
     );
 
@@ -224,6 +264,7 @@ async function updateAfspraken(req, res) {
 async function downloadMentorContractPdf(req, res) {
   const mentorId = Number(req.user?.id);
   const dossierId = Number(req.params.dossierId);
+  if (!Number.isInteger(dossierId)) return fail(res, 404, "Dossier niet gevonden");
 
   try {
     const [rows] = await db.query(
