@@ -97,7 +97,7 @@ export default function DocentLogbooksPage() {
     const newId = Number(e.target.value);
     setStudentId(newId);
     setFeedbackByWeek({});
-    setRemindMelding({ weekNr: null, tekst: "", type: "" });
+    setRemindModal({ open: false, succes: true, tekst: "" });
     loadLogbooks(newId);
   }
 
