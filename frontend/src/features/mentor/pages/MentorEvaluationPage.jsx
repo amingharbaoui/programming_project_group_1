@@ -443,7 +443,8 @@ export default function MentorEvaluationPage() {
               )}
             </div>
             <div className="modal-foot">
-              <button className="btn primary" onClick={() => setModalCompId(null)}><i className="ti ti-check" />{kanInvullen ? "Bewaar" : "Sluiten"}</button>
+              {/* "Bewaar" slaat de score nu echt op (als concept) i.p.v. enkel de modal te sluiten (auditpunt 413). */}
+              <button className="btn primary" disabled={bezig} onClick={async () => { if (kanInvullen) await dienIn(false); setModalCompId(null); }}><i className="ti ti-check" />{kanInvullen ? "Bewaar" : "Sluiten"}</button>
             </div>
           </div>
         </div>

@@ -642,7 +642,7 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
               </button>
             </div>
             <p style={{ fontSize: 11.5, color: "var(--sub)", marginTop: 8 }}>
-              Een dag wordt pas definitief bewaard wanneer je onderaan <strong>Week indienen</strong> klikt.
+              Een opgeslagen dag wordt als concept bewaard. Klik onderaan <strong>Week indienen</strong> wanneer alle dagen klaar zijn om de week officieel in te dienen.
             </p>
           </div>
         )}
@@ -1037,8 +1037,8 @@ export default function StudentLogbookPage() {
     );
   }
 
-  // Gate: stagevoorstel moet goedgekeurd zijn
-  if (voorstelStatus !== "goedgekeurd") {
+  // Gate: stagevoorstel moet goedgekeurd zijn (ook 'met uitzondering' telt als goedgekeurd — auditpunt 423).
+  if (!["goedgekeurd", "goedgekeurd_met_uitzondering"].includes(voorstelStatus)) {
     const uitleg =
       !voorstelStatus || voorstelStatus === "concept" || voorstelStatus === "ingediend"
         ? "Je stagevoorstel is nog niet goedgekeurd door de stagecommissie."

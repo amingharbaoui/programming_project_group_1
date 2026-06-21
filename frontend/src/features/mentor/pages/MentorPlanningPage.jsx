@@ -138,6 +138,9 @@ export default function MentorPlanningPage() {
   }
 
   const geselecteerdeStudent = studenten.find((s) => s.dossier_id === geselecteerdDossier);
+  // In de eindfase is planning read-only; toon dan geen bevestig/alternatief-knoppen (auditpunt 421,
+  // gelijk aan MentorDossierPage). De backend weigert die acties toch met 409.
+  const dossierAfgerond = ["afgerond", "voltooid", "resultaat_vrijgegeven"].includes(geselecteerdeStudent?.dossier_status);
 
   return (
     <div className="page-inner">
@@ -180,7 +183,7 @@ export default function MentorPlanningPage() {
       )}
 
       {!planningLoading && momenten.map((moment) => {
-        const teBevestigen = moment.type === "bedrijfsbezoek" && ["voorgesteld", "gepland"].includes(moment.status);
+        const teBevestigen = !dossierAfgerond && moment.type === "bedrijfsbezoek" && ["voorgesteld", "gepland"].includes(moment.status);
         const isAlternatifOpen = alternatifOpen === moment.id;
 
         return (
