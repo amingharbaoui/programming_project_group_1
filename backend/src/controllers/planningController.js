@@ -100,6 +100,11 @@ async function createPlanningMoment(req, res, type) {
     if (!["geregistreerd", "stage_loopt"].includes(dossier.status)) {
       return fail(res, 409, "Planning kan enkel zolang de stage geregistreerd is of loopt");
     }
+    // Zonder gekoppelde mentor kan een moment niet bevestigd worden (de mentor krijgt de melding) — blokkeer
+    // dan het inplannen i.p.v. een stille planning zonder bevestiging te laten ontstaan (459).
+    if (!dossier.mentor_id) {
+      return fail(res, 409, "Koppel eerst een mentor aan dit dossier voor je een moment inplant");
+    }
 
     const status = type === "bedrijfsbezoek" ? "voorgesteld" : "gepland";
     const [result] = await db.query(

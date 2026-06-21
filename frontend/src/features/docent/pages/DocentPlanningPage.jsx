@@ -173,6 +173,23 @@ export default function DocentPlanningPage() {
     }
   }
 
+  // 446: docent accepteert het door de mentor voorgestelde alternatieve moment → bevestigd.
+  // De mentor en student krijgen daarna de bevestigingsmelding (backend).
+  async function accepteerAlternatief(id) {
+    try {
+      setGegevenId(id);
+      await api.patch("/docent/planning/" + id, { status: "bevestigd" });
+      cacheDelete("docent_planning");
+      cacheDelete("docent_students");
+      await loadPlanning(true);
+      setSuccesModal("Het voorgestelde moment is bevestigd. De mentor en student zijn verwittigd.");
+    } catch (err) {
+      setFoutModal(err.response?.data?.message || "Bevestigen mislukt");
+    } finally {
+      setGegevenId(null);
+    }
+  }
+
   const heeftFilters = typeFilter !== "alle" || zoek;
 
   return (
@@ -258,9 +275,6 @@ export default function DocentPlanningPage() {
                       </span>
                     </td>
                     <td style={{ textAlign: "right" }}>
-                      {/* De actie zet het moment op geweest/gegeven; dat mag backendmatig enkel vanuit
-                          bevestigd/gepland. Voor voorgesteld/alternatief_gevraagd toont de statuskolom
-                          al "Wacht op bevestiging"/"ander moment gevraagd" — daar hoort geen knop. */}
                       {["bevestigd", "gepland"].includes(p.status) && (
                         <button
                           className="btn sm"
@@ -269,6 +283,24 @@ export default function DocentPlanningPage() {
                         >
                           <IconCheck size={14} stroke={2} /> {p.type === "bedrijfsbezoek" ? "Markeer als geweest" : "Markeer als gegeven"}
                         </button>
+                      )}
+                      {/* 446: de mentor stelde een ander moment voor. Toon het voorstel en laat de docent het
+                          bevestigen (of via 'Inplannen' een nieuw moment voorstellen). */}
+                      {p.status === "alternatief_gevraagd" && (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
+                          {p.alternatief_voorstel && (
+                            <span className="doc_sub" style={{ fontStyle: "italic", maxWidth: 220 }}>
+                              Mentor: "{p.alternatief_voorstel}"
+                            </span>
+                          )}
+                          <button
+                            className="btn sm primary"
+                            disabled={gegevenId === p.id}
+                            onClick={() => accepteerAlternatief(p.id)}
+                          >
+                            <IconCheck size={14} stroke={2} /> Moment bevestigen
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>

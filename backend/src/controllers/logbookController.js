@@ -619,7 +619,7 @@ async function mentorCheckLogbookWeek(req, res) {
 
     // Een mentor mag enkel de weken van zijn eigen stagiair nakijken.
     const [mentorKoppeling] = await connection.query(
-      `SELECT d.mentor_id
+      `SELECT d.mentor_id, d.status AS dossier_status
        FROM logboek_weken lw
        JOIN stagedossiers d ON d.id = lw.stagedossier_id
        WHERE lw.id = ? LIMIT 1`,
@@ -627,6 +627,10 @@ async function mentorCheckLogbookWeek(req, res) {
     );
     if (Number(mentorKoppeling[0]?.mentor_id) !== requestedMentorId) {
       return fail(res, 403, "Je bent niet de mentor van deze stagiair");
+    }
+    // Een afgerond/vrijgegeven dossier is read-only — geen logboekmutaties meer (444).
+    if (["resultaat_vrijgegeven", "afgerond"].includes(mentorKoppeling[0]?.dossier_status)) {
+      return fail(res, 409, "Het dossier is afgerond; het logboek kan niet meer gewijzigd worden");
     }
 
     // Alleen een ingediende week kan nagekeken worden — een ontbrekende of al afgesloten week niet.
@@ -726,7 +730,7 @@ async function docentReviewLogbookWeek(req, res) {
 
     // Een docent mag enkel de weken van zijn eigen student nakijken.
     const [docentKoppeling] = await connection.query(
-      `SELECT d.stagebegeleider_id
+      `SELECT d.stagebegeleider_id, d.status AS dossier_status
        FROM logboek_weken lw
        JOIN stagedossiers d ON d.id = lw.stagedossier_id
        WHERE lw.id = ? LIMIT 1`,
@@ -734,6 +738,10 @@ async function docentReviewLogbookWeek(req, res) {
     );
     if (Number(docentKoppeling[0]?.stagebegeleider_id) !== requestedDocentId) {
       return fail(res, 403, "Je bent niet de stagebegeleider van deze student");
+    }
+    // Een afgerond/vrijgegeven dossier is read-only — geen logboekmutaties meer (444).
+    if (["resultaat_vrijgegeven", "afgerond"].includes(docentKoppeling[0]?.dossier_status)) {
+      return fail(res, 409, "Het dossier is afgerond; het logboek kan niet meer gewijzigd worden");
     }
 
     // De docent kijkt pas na nadat de mentor de week heeft afgecheckt.
@@ -803,13 +811,16 @@ async function studentAntwoordFeedback(req, res) {
   try {
     // Controleer of deze week bij de student hoort + haal mentor/docent op voor de melding.
     const [rows] = await db.query(
-      `SELECT lw.id, lw.week_nummer, lw.status, d.mentor_id, d.stagebegeleider_id
+      `SELECT lw.id, lw.week_nummer, lw.status, d.mentor_id, d.stagebegeleider_id, d.status AS dossier_status
        FROM logboek_weken lw
        JOIN stagedossiers d ON d.id = lw.stagedossier_id
        WHERE lw.id = ? AND d.student_id = ? LIMIT 1`,
       [weekId, studentId]
     );
     if (rows.length === 0) return fail(res, 403, "Geen toegang tot deze week");
+    if (["resultaat_vrijgegeven", "afgerond"].includes(rows[0].dossier_status)) {
+      return fail(res, 409, "Het dossier is afgerond; je kan niet meer antwoorden op feedback");
+    }
     if (!["teruggestuurd_door_mentor", "teruggestuurd_door_docent"].includes(rows[0].status)) {
       return fail(res, 409, "Je kan alleen antwoorden wanneer de week is teruggestuurd voor aanpassing");
     }
@@ -1272,7 +1283,7 @@ async function mentorConfirmLogbookDay(req, res) {
 
   try {
     const [rows] = await db.query(
-      `SELECT ld.id, ld.status, d.mentor_id, lw.status AS week_status
+      `SELECT ld.id, ld.status, d.mentor_id, d.status AS dossier_status, lw.status AS week_status
        FROM logboek_dagen ld
        JOIN logboek_weken lw ON lw.id = ld.logboek_week_id
        JOIN stagedossiers d ON d.id = lw.stagedossier_id
@@ -1281,6 +1292,9 @@ async function mentorConfirmLogbookDay(req, res) {
     );
     if (rows.length === 0) return fail(res, 404, "Logboekdag niet gevonden");
     if (Number(rows[0].mentor_id) !== mentorId) return fail(res, 403, "Je bent niet de mentor van deze stagiair");
+    if (["resultaat_vrijgegeven", "afgerond"].includes(rows[0].dossier_status)) {
+      return fail(res, 409, "Het dossier is afgerond; logboekdagen kunnen niet meer bevestigd worden");
+    }
     if (rows[0].status === "geen_stagedag") return fail(res, 400, "Een dag zonder stage kan niet bevestigd worden");
     // Bevestigen mag zodra de student de dag opgeslagen heeft (in_opbouw) of de volledige week ingediend heeft.
     if (!["ingediend", "in_opbouw"].includes(rows[0].week_status)) {

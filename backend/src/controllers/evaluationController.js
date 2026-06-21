@@ -132,6 +132,19 @@ async function openEvaluation(req, res) {
       return fail(res, 409, "Een evaluatie kan enkel geopend worden zolang het stagedossier geregistreerd is of loopt");
     }
 
+    // 448: de zelfevaluatie-deadline = 1 week vóór het relevante bevestigde moment (bezoek/presentatie).
+    // Zo is de "tot 1 week ervoor"-regel echte data in de DB en niet enkel een UI-tekst.
+    const planningType = finalType === "finaal" ? "eindpresentatie" : "bedrijfsbezoek";
+    const [planRows] = await db.query(
+      `SELECT DATE_SUB(gepland_op, INTERVAL 7 DAY) AS deadline
+       FROM planning_momenten
+       WHERE stagedossier_id = ? AND type = ? AND gepland_op IS NOT NULL
+         AND status IN ('bevestigd', 'gepland', 'gegeven', 'geweest')
+       ORDER BY id DESC LIMIT 1`,
+      [dossierId, planningType]
+    );
+    const deadlineStudent = planRows[0]?.deadline || null;
+
     const [existing] = await db.query(
       "SELECT id, status FROM evaluaties WHERE stagedossier_id = ? AND type = ? LIMIT 1",
       [dossierId, finalType]
@@ -145,14 +158,17 @@ async function openEvaluation(req, res) {
         await db.query("UPDATE evaluaties SET status = 'open', aangepast_op = NOW() WHERE id = ?", [existing[0].id]);
         huidigeStatus = "open";
       }
+      if (deadlineStudent) {
+        await db.query("UPDATE evaluaties SET deadline_student = COALESCE(deadline_student, ?), aangepast_op = NOW() WHERE id = ?", [deadlineStudent, existing[0].id]);
+      }
       return ok(res, { id: existing[0].id, type: finalType, status: huidigeStatus },
         huidigeStatus === "open" ? "Evaluatie staat open" : "Evaluatie bestaat al en is al in behandeling");
     }
 
     const [result] = await db.query(
-      `INSERT INTO evaluaties (stagedossier_id, type, status, aangemaakt_op, aangepast_op)
-       VALUES (?, ?, 'open', NOW(), NOW())`,
-      [dossierId, finalType]
+      `INSERT INTO evaluaties (stagedossier_id, type, status, deadline_student, aangemaakt_op, aangepast_op)
+       VALUES (?, ?, 'open', ?, NOW(), NOW())`,
+      [dossierId, finalType, deadlineStudent]
     );
 
     return ok(res, { id: result.insertId, type: finalType, status: "open" }, "Evaluatie geopend");
@@ -271,6 +287,19 @@ async function saveScores(req, res) {
     const waarde = Number(s.score);
     if (!Number.isFinite(waarde) || waarde < 1 || waarde > 5) {
       return fail(res, 400, "Score moet tussen 1 en 5 liggen");
+    }
+  }
+
+  // Bij définitief indienen (student/mentor) hoort elke gescoorde competentie een motivering te hebben —
+  // de frontend dwingt dit al af, de backend is de echte bron van waarheid (461). Concept opslaan mag wel leeg.
+  if (ingediend && ["student", "mentor"].includes(role)) {
+    const zonderMotivering = scores.some((s) => {
+      const heeftScore = !(s.score === null || s.score === undefined || s.score === "");
+      const motivering = String(s.motivering ?? "").trim();
+      return heeftScore && motivering === "";
+    });
+    if (zonderMotivering) {
+      return fail(res, 400, "Geef bij elke score ook een motivering voor je indient");
     }
   }
 
