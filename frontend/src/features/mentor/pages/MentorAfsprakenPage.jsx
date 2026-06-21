@@ -154,38 +154,39 @@ export default function MentorAfsprakenPage() {
   const geselecteerdeStudent = studenten.find(
     (s) => s.dossier_id === geselecteerdDossier
   );
-  // In de eindfase zijn de afspraken historisch — bewerken wordt door de backend geblokkeerd.
+  const dossierStatus = geselecteerdeStudent?.dossier_status || "";
+  // Contract nog niet getekend/geregistreerd → afspraken pagina nog niet relevant
+  const CONTRACT_FASES = ["wacht_op_student", "wacht_op_bedrijf", "in_controle_bij_administratie"];
   const AFGEROND_FASES = ["afgerond", "voltooid", "resultaat_vrijgegeven"];
-  const dossierAfgerond = AFGEROND_FASES.includes(geselecteerdeStudent?.dossier_status);
+  const contractNogNietKlaar = CONTRACT_FASES.includes(dossierStatus);
+  const dossierAfgerond = AFGEROND_FASES.includes(dossierStatus);
+  // Actiestijl: overeenkomst is geregistreerd maar afspraken nog niet gedeeld
+  const isActieKaart = dossierStatus === "geregistreerd" && !gedeeldOp && !editMode;
 
   return (
-    <div className="page_inner">
-      <div className="page_header">
-        <div>
-          <h1>Praktische afspraken</h1>
-          <p>Bekijk en bewerk de praktische afspraken voor je stagiair.</p>
-        </div>
+    <div className="page-inner">
+      <div className="page-header">
+        <h1>Praktische afspraken</h1>
+        <p>Bekijk en bewerk de praktische afspraken voor je stagiair</p>
       </div>
 
       {/* Student selector */}
-      {!loading && studenten.length > 0 && (
-        <div className="card" style={{ marginBottom: "12px" }}>
-          <div className="card_title">Stagiair kiezen</div>
-          <div className="form_group" style={{ marginBottom: 0 }}>
-            <label className="form_label">Stagiair</label>
-            <select
-              className="form_input"
-              value={geselecteerdDossier || ""}
-              onChange={(e) => { const v = Number(e.target.value); setGeselecteerdDossier(v); onthoudMentorDossier(v); }}
-            >
-              {studenten.map((s) => (
-                <option key={s.dossier_id} value={s.dossier_id}>
-                  {s.voornaam} {s.achternaam} — {s.bedrijf}
-                  {AFGEROND_FASES.includes(s.dossier_status) ? " (afgerond)" : ""}
-                </option>
-              ))}
-            </select>
-          </div>
+      {!loading && studenten.length > 1 && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <div className="card_title">Stagiair</div>
+          <select
+            className="form_input"
+            style={{ marginTop: 0 }}
+            value={geselecteerdDossier || ""}
+            onChange={(e) => { const v = Number(e.target.value); setGeselecteerdDossier(v); onthoudMentorDossier(v); }}
+          >
+            {studenten.map((s) => (
+              <option key={s.dossier_id} value={s.dossier_id}>
+                {s.voornaam} {s.achternaam} — {s.bedrijf}
+                {AFGEROND_FASES.includes(s.dossier_status) ? " (afgerond)" : ""}
+              </option>
+            ))}
+          </select>
         </div>
       )}
 
@@ -205,54 +206,71 @@ export default function MentorAfsprakenPage() {
         </div>
       )}
 
-      {!afsprakenLoading && geselecteerdDossier && (
+      {/* Nog niet relevant: contract niet geregistreerd */}
+      {!afsprakenLoading && geselecteerdDossier && contractNogNietKlaar && (
         <div className="card">
           <div className="card_title">
+            <i className="ti ti-message-circle" style={{ color: "var(--sub)" }} />
             Praktische afspraken
-            {geselecteerdeStudent && (
-              <span className="muted" style={{ fontWeight: 400, fontSize: "13px" }}>
-                {" "}— {geselecteerdeStudent.voornaam} {geselecteerdeStudent.achternaam}
+            <span className="status s_grijs" style={{ marginLeft: "auto" }}>
+              <i className="ti ti-lock" />Nog niet van toepassing
+            </span>
+          </div>
+          <p style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.6 }}>
+            De stageovereenkomst moet eerst geregistreerd zijn voor je praktische afspraken kan delen.
+          </p>
+        </div>
+      )}
+
+      {!afsprakenLoading && geselecteerdDossier && !contractNogNietKlaar && (
+        <div className="card" style={isActieKaart ? { border: "1.5px solid #0a0a0a", boxShadow: "0 4px 14px rgba(0,0,0,.10)" } : {}}>
+          <div className="card_title">
+            <i className="ti ti-message-circle" style={{ color: "var(--red)" }} />
+            {gedeeldOp ? "Praktische afspraken & berichten" : "Praktische afspraken delen"}
+            {gedeeldOp && !editMode && (
+              <span className="status s_ok" style={{ marginLeft: "auto" }}>
+                <i className="ti ti-check" />Gedeeld op {formatDate(gedeeldOp)}
+              </span>
+            )}
+            {!gedeeldOp && !editMode && (
+              <span className="status s_rood" style={{ marginLeft: "auto" }}>
+                <i className="ti ti-pencil" />Te delen vóór de start
               </span>
             )}
           </div>
 
-          {gedeeldOp && (
-            <p className="muted" style={{ fontSize: "12px", marginBottom: "12px" }}>
-              Laatst gedeeld op {formatDate(gedeeldOp)}
-            </p>
-          )}
-
           {!editMode ? (
             <>
-              <div
-                style={{
-                  background: "var(--bg-secondary, #f5f5f5)",
-                  borderRadius: "8px",
-                  padding: "14px",
-                  minHeight: "80px",
-                  whiteSpace: "pre-wrap",
-                  fontSize: "14px",
-                  lineHeight: "1.6",
-                  color: afspraken ? "inherit" : "var(--text-muted, #aaa)",
-                }}
-              >
-                {afspraken || "Nog geen afspraken ingevoerd."}
-              </div>
+              {veldenOpgeslagen && Object.values(veldenOpgeslagen).some(Boolean) ? (
+                <>
+                  {AFSPRAAK_VELDEN.filter((v) => veldenOpgeslagen[v.key]).map((v) => (
+                    <div className="kv" key={v.key}>
+                      <span className="k">{v.label}</span>
+                      <span className="v">{veldenOpgeslagen[v.key]}</span>
+                    </div>
+                  ))}
+                  {gedeeldOp && (
+                    <p style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 8 }}>
+                      {geselecteerdeStudent?.voornaam || "De student"} ziet deze afspraken in het studentendashboard.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p style={{ fontSize: 13, color: "var(--faint)" }}>Nog geen afspraken ingevoerd.</p>
+              )}
 
               {melding.tekst && (
-                <div style={{ marginTop: "10px" }}>
+                <div style={{ marginTop: 10 }}>
                   <span className={`status ${melding.type}`}>{melding.tekst}</span>
                 </div>
               )}
 
-              <div className="actions" style={{ marginTop: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
                 {dossierAfgerond ? (
-                  <span className="status s_grijs">
-                    <i className="ti ti-lock" /> Dossier afgerond — afspraken zijn read-only
-                  </span>
+                  <span className="status s_grijs"><i className="ti ti-lock" />Dossier afgerond — read-only</span>
                 ) : (
-                  <button className="btn primary" onClick={startEdit}>
-                    <i className="ti ti-pencil" /> Bewerken
+                  <button className="btn sm" onClick={startEdit}>
+                    <i className="ti ti-pencil" />Bewerken
                   </button>
                 )}
               </div>
@@ -284,21 +302,18 @@ export default function MentorAfsprakenPage() {
               ))}
 
               {melding.tekst && (
-                <div style={{ marginBottom: "10px" }}>
+                <div style={{ marginBottom: 10 }}>
                   <span className={`status ${melding.type}`}>{melding.tekst}</span>
                 </div>
               )}
 
-              <div className="actions">
-                <button
-                  className="btn primary"
-                  onClick={opslaan}
-                  disabled={bezig}
-                >
-                  <i className="ti ti-device-floppy" />{bezig ? "Opslaan..." : "Opslaan"}
-                </button>
-                <button className="btn" onClick={annuleer} disabled={bezig}>
-                  Annuleren
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 14 }}>
+                <button className="btn" onClick={annuleer} disabled={bezig}>Annuleren</button>
+                <span style={{ fontSize: 11.5, color: "var(--faint)" }}>
+                  {geselecteerdeStudent?.voornaam || "De student"} ziet deze afspraken in het studentendashboard.
+                </span>
+                <button className="btn primary" style={{ marginLeft: "auto" }} onClick={opslaan} disabled={bezig}>
+                  <i className="ti ti-send" />{bezig ? "Opslaan..." : "Praktische afspraken delen"}
                 </button>
               </div>
             </>
