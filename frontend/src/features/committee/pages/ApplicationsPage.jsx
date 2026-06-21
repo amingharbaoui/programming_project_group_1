@@ -662,7 +662,10 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
         })
         .catch(() => {});
     }
-  }, [aanvraag.id]);
+    // criteriaDefs in de deps: de checklist wordt op label tegen de criteria gemapt; laadt de criteria
+    // later (async uit instellingen), dan moet de mapping opnieuw lopen, anders missen opgeslagen vinkjes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aanvraag.id, criteriaDefs]);
 
   function toggleCrit(id, val) {
     setCriteria((prev) => ({ ...prev, [id]: val }));

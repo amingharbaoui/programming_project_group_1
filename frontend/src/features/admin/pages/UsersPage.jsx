@@ -64,6 +64,16 @@ function WijzigenModal({ rawUser, koppeling, onClose, onSaved, onDeactiveerClick
   // Uitgenodigde mentoren kunnen we opnieuw uitnodigen via de bestaande endpoint (heractiveren werkt niet
   // op status 'uitgenodigd'). Zo is er een herstelpad als de mail niet aankwam.
   const isUitgenodigdeMentor = rawUser.status === "uitgenodigd" && rawUser.hoofdrol === "mentor";
+  // De backend weigert rolwissels tussen families (student / mentor / medewerker). Toon daarom enkel
+  // de rollen binnen de huidige familie; voor een andere rol hoort een nieuwe uitnodiging.
+  const ROL_FAMILIES = {
+    student: ["student"],
+    mentor: ["mentor"],
+    docent: ["docent", "administratie", "stagecommissie"],
+    administratie: ["docent", "administratie", "stagecommissie"],
+    stagecommissie: ["docent", "administratie", "stagecommissie"],
+  };
+  const toegestaneRollen = ROL_FAMILIES[rawUser.hoofdrol] || [rawUser.hoofdrol];
 
   function set(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -135,13 +145,21 @@ function WijzigenModal({ rawUser, koppeling, onClose, onSaved, onDeactiveerClick
           </div>
           <div className="modal_field">
             <label className="modal_label">Rol</label>
-            <select className="modal_input" value={form.hoofdrol} onChange={(e) => set("hoofdrol", e.target.value)}>
-              <option value="student">student</option>
-              <option value="docent">docent</option>
-              <option value="mentor">mentor</option>
-              <option value="administratie">administratie</option>
-              <option value="stagecommissie">stagecommissie</option>
+            <select
+              className="modal_input"
+              value={form.hoofdrol}
+              onChange={(e) => set("hoofdrol", e.target.value)}
+              disabled={toegestaneRollen.length <= 1}
+            >
+              {toegestaneRollen.map((r) => (
+                <option key={r} value={r}>{r}</option>
+              ))}
             </select>
+            {toegestaneRollen.length <= 1 && (
+              <p className="modal_label" style={{ marginTop: 4, color: "var(--sub)", fontWeight: 400 }}>
+                Voor een andere rol nodig je een nieuwe gebruiker uit.
+              </p>
+            )}
           </div>
           {err && <p className="modal_error">{err}</p>}
           {resendMsg && <p className="status s_ok" style={{ fontSize: 12, wordBreak: "break-all" }}>{resendMsg}</p>}
@@ -285,7 +303,7 @@ function MentorUitnodigingModal({ onClose, onSaved }) {
 }
 
 function AlgemeneUitnodigingModal({ onClose, onSaved }) {
-  const [form, setForm] = useState({ voornaam: "", achternaam: "", email: "", rol: "docent" });
+  const [form, setForm] = useState({ voornaam: "", achternaam: "", email: "", rol: "docent", opleiding: "", klasgroep: "", academiejaar: "" });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
   const [resultaat, setResultaat] = useState(null); // { activatielink, emailStatus }
@@ -303,6 +321,12 @@ function AlgemeneUitnodigingModal({ onClose, onSaved }) {
         achternaam: form.achternaam,
         email: form.email,
         rol: form.rol,
+        // Enkel relevant voor studenten; backend valt terug op standaardwaarden als ze leeg blijven.
+        ...(form.rol === "student" ? {
+          opleiding: form.opleiding || undefined,
+          klasgroep: form.klasgroep || undefined,
+          academiejaar: form.academiejaar || undefined,
+        } : {}),
       });
       setResultaat(res.data?.data || {});
     } catch (e) {
@@ -316,12 +340,14 @@ function AlgemeneUitnodigingModal({ onClose, onSaved }) {
     ? `${window.location.origin}${resultaat.activatielink}`
     : "";
 
+  // Na een succesvolle uitnodiging moet élke sluitroute de lijst verversen (onSaved), niet enkel "Klaar".
+  const sluit = resultaat ? onSaved : onClose;
   return (
-    <div className="modal_overlay" onClick={onClose}>
+    <div className="modal_overlay" onClick={sluit}>
       <div className="modal_box" onClick={(e) => e.stopPropagation()}>
         <div className="modal_header">
           <span className="modal_title">Gebruiker uitnodigen</span>
-          <button className="icon_btn" onClick={onClose} type="button"><IconX size={16} stroke={1.8} /></button>
+          <button className="icon_btn" onClick={sluit} type="button"><IconX size={16} stroke={1.8} /></button>
         </div>
 
         {!resultaat ? (
@@ -350,6 +376,24 @@ function AlgemeneUitnodigingModal({ onClose, onSaved }) {
                   <option value="student">student</option>
                 </select>
               </div>
+              {form.rol === "student" && (
+                <>
+                  <div className="modal_row">
+                    <div className="modal_field">
+                      <label className="modal_label">Opleiding</label>
+                      <input className="modal_input" placeholder="Toegepaste Informatica" value={form.opleiding} onChange={(e) => set("opleiding", e.target.value)} />
+                    </div>
+                    <div className="modal_field">
+                      <label className="modal_label">Klasgroep</label>
+                      <input className="modal_input" placeholder="1TI-A" value={form.klasgroep} onChange={(e) => set("klasgroep", e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="modal_field">
+                    <label className="modal_label">Academiejaar</label>
+                    <input className="modal_input" placeholder="2025-2026" value={form.academiejaar} onChange={(e) => set("academiejaar", e.target.value)} />
+                  </div>
+                </>
+              )}
               <p style={{ fontSize: 12, color: "var(--sub)", marginTop: 8 }}>
                 Een stagementor nodig je uit via "Stagementor uitnodigen" (met bedrijfsgegevens).
               </p>
