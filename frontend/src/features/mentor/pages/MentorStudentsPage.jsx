@@ -52,12 +52,16 @@ function evalBadge(s) {
   return { cls: "s_grijs", icon: "ti-lock", txt: "Nog niet open" };
 }
 
-function eersteActie(s) {
-  if (s.logboek_status === "ingediend") return "Logboek af te checken";
+// Alle openstaande mentortaken in prioriteitsvolgorde (zoals het prototype: eerste actie + "+ x andere").
+function mentorTaken(s) {
+  const taken = [];
   const ds = s.dossier_status;
-  if (ds === "wacht_op_bedrijf") return "Stageovereenkomst ondertekenen";
-  if (ds === "geregistreerd") return "Praktische afspraken delen";
-  return null;
+  const es = s.evaluatie_status;
+  if (ds === "wacht_op_bedrijf") taken.push("Stageovereenkomst ondertekenen");
+  if (ds === "geregistreerd") taken.push("Praktische afspraken delen");
+  if (s.logboek_status === "ingediend") taken.push("Logboek afchecken");
+  if (es === "student_ingediend") taken.push("Mentorinput invullen");
+  return taken;
 }
 
 export default function MentorStudentsPage() {
@@ -114,7 +118,8 @@ export default function MentorStudentsPage() {
               {studenten.map((s) => {
                 const lb = logboekBadge(s.logboek_status);
                 const eb = evalBadge(s);
-                const actie = eersteActie(s);
+                const taken = mentorTaken(s);
+                const actie = taken[0] || null;
                 const pct = voortgangPct(s);
                 return (
                   <tr key={s.dossier_id ?? s.id}>
@@ -169,9 +174,12 @@ export default function MentorStudentsPage() {
                     {/* Actie */}
                     <td>
                       {actie ? (
-                        <span className="status s_rood">
-                          <span className="warn-mini">!</span>{actie}
-                        </span>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "flex-start" }}>
+                          <span className="status s_rood"><span className="warn-mini">!</span>{actie}</span>
+                          {taken.length > 1 && (
+                            <span style={{ fontSize: 11, color: "var(--sub)" }}>+ {taken.length - 1} andere {taken.length - 1 === 1 ? "taak" : "taken"}</span>
+                          )}
+                        </div>
                       ) : (
                         <span className="status s_ok"><i className="ti ti-check" />Niets te doen</span>
                       )}
