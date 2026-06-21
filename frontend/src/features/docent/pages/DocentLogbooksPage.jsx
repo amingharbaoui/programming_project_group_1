@@ -109,6 +109,7 @@ export default function DocentLogbooksPage() {
         herindieningNodig,
       });
       cacheDelete(`docent_logbooks_${studentId}`);
+      cacheDelete("docent_students");
       await loadLogbooks(studentId, true);
     } catch (err) {
       alert(err.response?.data?.message || err.message || "Docentcontrole mislukt");

@@ -137,6 +137,7 @@ export default function DocentPlanningPage() {
       });
       setNieuwModal(false);
       cacheDelete("docent_planning");
+      cacheDelete("docent_students");
       await loadPlanning(true);
       setSuccesModal("Moment succesvol ingepland.");
     } catch (err) {
@@ -152,6 +153,7 @@ export default function DocentPlanningPage() {
       setGegevenId(id);
       await api.patch("/docent/planning/" + id, { status: nieuweStatus });
       cacheDelete("docent_planning");
+      cacheDelete("docent_students");
       await loadPlanning(true);
       setSuccesModal(
         nieuweStatus === "geweest"

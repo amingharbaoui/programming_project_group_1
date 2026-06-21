@@ -79,7 +79,7 @@ function ScoreDisplay({ waarde }) {
   );
 }
 
-function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId }) {
+function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, dossierStatus }) {
   const evaluatie = evalData?.evaluaties?.find((e) => e.type === activeType) || null;
   const competenties = evalData?.competenties || [];
 
@@ -212,12 +212,35 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId })
     }
   }
 
+  async function handleOpenEval() {
+    if (!stagedossierId) return;
+    try {
+      setBezig(true);
+      await api.post("/evaluations/open", { stagedossierId, type: activeType });
+      onRefresh && onRefresh();
+    } catch (err) {
+      setFoutModal(err.response?.data?.message || "Evaluatie openen mislukt");
+    } finally {
+      setBezig(false);
+    }
+  }
+
   if (!evaluatie || evaluatie.status === "niet_open") {
+    // De docent kan de evaluatie openen zodra de stage geregistreerd is of loopt (niet in contract-/eindfase).
+    const planbaar = ["geregistreerd", "stage_loopt", "actief"].includes(dossierStatus);
     return (
       <div className="card">
         <p className="muted" style={{ margin: 0 }}>
           {activeType === "tussentijds" ? "Tussentijdse" : "Finale"} evaluatie is nog niet beschikbaar.
         </p>
+        {planbaar && !evaluatie && (
+          <div style={{ marginTop: 10 }}>
+            <button className="btn primary sm" disabled={bezig} onClick={handleOpenEval}>
+              <IconCircleCheck size={14} stroke={1.8} /> {activeType === "tussentijds" ? "Tussentijdse" : "Finale"} evaluatie openen
+            </button>
+          </div>
+        )}
+        {foutModal && <p className="status s_rood" style={{ marginTop: 10 }}>{foutModal}</p>}
       </div>
     );
   }
@@ -633,8 +656,9 @@ export default function DocentEvaluationsPage() {
               evalData={evalData}
               activeType={activeType}
               userId={user.id}
-              onRefresh={() => { cacheDelete(`docent_eval_${geselecteerdId}`); loadEval(geselecteerdId, true); }}
+              onRefresh={() => { cacheDelete(`docent_eval_${geselecteerdId}`); cacheDelete("docent_students"); loadEval(geselecteerdId, true); }}
               stagedossierId={geselecteerdeStudent?.dossier_id}
+              dossierStatus={geselecteerdeStudent?.dossier_status}
             />
           )}
         </div>
