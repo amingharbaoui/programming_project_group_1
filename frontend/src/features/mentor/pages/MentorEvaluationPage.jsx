@@ -35,6 +35,7 @@ export default function MentorEvaluationPage() {
   const [scores, setScores] = useState({ tussentijds: {}, finaal: {} });
   const [motiv, setMotiv] = useState({ tussentijds: {}, finaal: {} });
   const [modalCompId, setModalCompId] = useState(null);
+  const [verslagOpen, setVerslagOpen] = useState(false);
   const [bezig, setBezig] = useState(false);
   const [melding, setMelding] = useState({ tekst: "", type: "" });
 
@@ -239,6 +240,7 @@ export default function MentorEvaluationPage() {
             {finaalEval.verslag && (
               <div className="kv"><span className="k">Eindfeedback</span><span className="v">{finaalEval.verslag}</span></div>
             )}
+            <div className="kv"><span className="k">Open acties</span><span className="v">Geen</span></div>
           </div>
         )}
 
@@ -295,7 +297,13 @@ export default function MentorEvaluationPage() {
                 {kanInvullen ? (
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 14 }}>
                     <button className="btn" disabled={bezig} onClick={() => dienIn(false)}>Opslaan als concept</button>
-                    <button className="btn primary" disabled={bezig} onClick={() => dienIn(true)}><i className="ti ti-send" />Mentorinput indienen</button>
+                    <button className="btn primary" disabled={bezig} onClick={() => dienIn(true)}><i className="ti ti-send" />{activeTab === "finaal" ? "Finale mentorinput indienen" : "Mentorinput indienen"}</button>
+                  </div>
+                ) : activeTab === "tussentijds" && huidigeEval?.status === "geregistreerd" ? (
+                  <div className="zone-act leeg" style={{ marginTop: 12 }}>
+                    <i className="ti ti-circle-check" />
+                    <span>Je tussentijdse mentorinput is ingediend en werd verwerkt: de docent registreerde de tussentijdse bespreking. {detailStudent?.voornaam || "De student"} kan het verslag bekijken; jouw input staat hierboven read-only.</span>
+                    <button className="btn sm" style={{ marginLeft: "auto" }} onClick={() => setVerslagOpen(true)}><i className="ti ti-file-text" />Verslag bekijken</button>
                   </div>
                 ) : (
                   <p style={{ marginTop: 12, fontSize: 13, color: "var(--sub)" }}>Je mentorinput is ingediend en staat read-only.</p>
@@ -304,6 +312,29 @@ export default function MentorEvaluationPage() {
             )}
           </>
         )}
+
+      {/* verslag-modal — net als toonVerslag() in de HTML-prototype */}
+      {verslagOpen && (
+        <div className="modal-overlay" onClick={() => setVerslagOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <div className="mh-icon"><i className="ti ti-file-text" /></div>
+              <div>
+                <div className="mh-t">Verslag tussentijdse bespreking</div>
+                <div className="mh-s">Geregistreerd door de docent</div>
+              </div>
+              <button className="icon-btn mh-x btn sm" onClick={() => setVerslagOpen(false)}><i className="ti ti-x" /></button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: 13, lineHeight: 1.7 }}>{tussentijdsEval?.verslag || "Geen verslag ingevuld door de docent."}</p>
+              <div style={{ fontSize: 11.5, color: "var(--faint)", marginTop: 10 }}>Dit verslag is ook zichtbaar voor de student.</div>
+            </div>
+            <div className="modal-foot">
+              <button className="btn primary" onClick={() => setVerslagOpen(false)}>Sluiten</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* score-modal */}
       {modalComp && (

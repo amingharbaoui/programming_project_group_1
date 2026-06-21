@@ -206,7 +206,7 @@ export default function MentorLogbooksPage() {
         {loadingDetail && <div className="card"><p style={{ color: "var(--sub)", fontSize: 13 }}>Logboeken laden…</p></div>}
         {error && <div className="card"><span className="status s_rood">{error}</span></div>}
         {!loadingDetail && !error && weeks.length === 0 && ontbrekendeWeken.length === 0 && (
-          <div className="zone-act leeg"><i className="ti ti-info-circle" style={{ color: "var(--sub)" }} /><span>Nog geen ingediende weken voor deze student.</span></div>
+          <div className="zone-act leeg"><i className="ti ti-info-circle" style={{ color: "var(--sub)" }} /><span>De stage is nog niet gestart — het logboek opent op de eerste stagedag.</span></div>
         )}
 
         {!loadingDetail && ontbrekendeWeken.length > 0 && (

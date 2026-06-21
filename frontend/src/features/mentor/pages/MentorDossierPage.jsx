@@ -14,6 +14,10 @@ function dat(value) {
   if (!value) return "-";
   return new Date(value).toLocaleDateString("nl-BE");
 }
+function datLang(value) {
+  if (!value) return null;
+  return new Date(value).toLocaleDateString("nl-BE", { day: "numeric", month: "long", year: "numeric" });
+}
 function datTijd(value) {
   if (!value) return "-";
   const d = new Date(value);
@@ -22,7 +26,10 @@ function datTijd(value) {
 }
 function contractBadge(c) {
   const s = c.status;
-  if (s === "geregistreerd") return { cls: "s_ok", icon: "ti-shield-check", txt: "Geregistreerd" };
+  if (s === "geregistreerd") {
+    const datum = datLang(c.geregistreerd_op);
+    return { cls: "s_ok", icon: "ti-shield-check", txt: datum ? `Geregistreerd op ${datum}` : "Geregistreerd" };
+  }
   if (s === "in_controle_bij_administratie") return { cls: "s_amber", icon: "ti-shield", txt: "In controle bij administratie" };
   if (c.bedrijf_getekend_op) return { cls: "s_ok", icon: "ti-check", txt: "Door jou getekend" };
   if (c.student_getekend_op) return { cls: "s_rood", icon: "ti-signature", txt: "Jouw handtekening nodig" };
@@ -101,6 +108,8 @@ export default function MentorDossierPage() {
   const [altTekst, setAltTekst] = useState("");
   const [bezigMoment, setBezigMoment] = useState(null);
   const [dossierOpen, setDossierOpen] = useState(false);
+  const [akkoord, setAkkoord] = useState(false);
+  const [signFout, setSignFout] = useState(false);
 
   const H = {};
 
@@ -198,16 +207,40 @@ export default function MentorDossierPage() {
   }
 
   async function tekenContract() {
+    // Net als in de HTML-prototype (tekenContractM): pas effectief tekenen nadat de
+    // mentor expliciet bevestigd heeft tekenbevoegd te zijn — anders inline foutmelding.
+    if (!akkoord) {
+      setSignFout(true);
+      return;
+    }
+    setSignFout(false);
     try {
       setBezigTeken(true);
       cacheDelete(`mentor_contract_${dossierId}`, "mentor_students");
       await api.patch(`/mentor/contract/${dossierId}/teken`, { tekenbevoegd: true });
       await herlaad();
+      setAkkoord(false);
       setMelding({ tekst: "Stageovereenkomst ondertekend.", type: "s_ok" });
     } catch (err) {
       setMelding({ tekst: err.response?.data?.message || "Tekenen mislukt", type: "s_rood" });
     } finally {
       setBezigTeken(false);
+    }
+  }
+
+  async function downloadContractPdf() {
+    try {
+      const res = await api.get(`/mentor/contract/${dossierId}/pdf`, { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "stageovereenkomst.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setMelding({ tekst: err.response?.data?.message || "PDF downloaden mislukt", type: "s_rood" });
     }
   }
 
@@ -310,11 +343,28 @@ export default function MentorDossierPage() {
                 {!contract.bedrijf_getekend_op && (
                   <div style={{ marginTop: 12 }}>
                     <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 10 }}>
-                      Lees de overeenkomst na en onderteken digitaal namens het stagebedrijf. Na jouw handtekening controleert en registreert de administratie ze.
+                      Je ondertekent namens <b>{student?.bedrijf || "het stagebedrijf"}</b> de stageovereenkomst met de student en de opleiding voor de periode <b>{dat(student?.startdatum)} – {dat(student?.einddatum)}</b>. Na jouw handtekening controleert en registreert de administratie ze.{" "}
+                      <a href="#" onClick={(e) => { e.preventDefault(); downloadContractPdf(); }} style={{ color: "var(--red)", fontWeight: 600, textDecoration: "none" }}>
+                        Volledige overeenkomst lezen <i className="ti ti-eye" />
+                      </a>
                     </div>
+                    <label style={{ display: "flex", gap: 8, fontSize: 13, alignItems: "flex-start", marginBottom: 12, cursor: "pointer" }}>
+                      <input
+                        type="checkbox"
+                        checked={akkoord}
+                        onChange={(e) => { setAkkoord(e.target.checked); setSignFout(false); }}
+                        style={{ marginTop: 2 }}
+                      />
+                      Ik ben tekenbevoegd voor {student?.bedrijf || "het stagebedrijf"}, heb de stageovereenkomst gelezen en onderteken digitaal
+                    </label>
                     <button className="btn primary" disabled={bezigTeken} onClick={tekenContract}>
                       <i className="ti ti-signature" />{bezigTeken ? "Bezig…" : "Digitaal ondertekenen"}
                     </button>
+                    {signFout && (
+                      <div style={{ fontSize: 12, color: "var(--red)", marginTop: 6 }}>
+                        Vink eerst de bevestiging aan.
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
