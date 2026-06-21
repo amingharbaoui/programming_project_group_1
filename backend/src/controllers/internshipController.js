@@ -563,13 +563,18 @@ async function resubmitInternship(req, res) {
       ]
     );
 
-    // Voorstel updaten: versienummer ophogen + status heringediend
-    await conn.query(
+    // Voorstel updaten: versienummer ophogen + status heringediend. Conditioneel op 'aanpassingen_gevraagd'
+    // zodat een dubbele herindiening of een gelijktijdige commissiebeslissing elkaar niet overschrijven (410).
+    const [herindienResult] = await conn.query(
       `UPDATE stagevoorstellen
        SET huidige_versie_nummer = ?, status = 'heringediend', heringediend_op = NOW(), aangepast_op = NOW()
-       WHERE id = ?`,
+       WHERE id = ? AND status = 'aanpassingen_gevraagd'`,
       [nieuweVersieNummer, voorstel.id]
     );
+    if (herindienResult.affectedRows === 0) {
+      await conn.rollback();
+      return fail(res, 409, "De status van je voorstel is ondertussen gewijzigd; vernieuw de pagina");
+    }
 
     await conn.commit();
 
@@ -624,10 +629,16 @@ async function withdrawInternship(req, res) {
       return fail(res, 409, `Voorstel met status '${voorstel.status}' kan niet ingetrokken worden`);
     }
 
-    await conn.query(
-      "UPDATE stagevoorstellen SET status = 'ingetrokken', ingetrokken_op = NOW(), aangepast_op = NOW() WHERE id = ?",
+    // Conditioneel op een nog-intrekbare status zodat een gelijktijdige beslissing/herindiening niet
+    // stil overschreven wordt (410).
+    const [intrekResult] = await conn.query(
+      "UPDATE stagevoorstellen SET status = 'ingetrokken', ingetrokken_op = NOW(), aangepast_op = NOW() WHERE id = ? AND status IN ('concept', 'ingediend', 'aanpassingen_gevraagd', 'heringediend')",
       [voorstel.id]
     );
+    if (intrekResult.affectedRows === 0) {
+      await conn.rollback();
+      return fail(res, 409, "De status van je voorstel is ondertussen gewijzigd; intrekken kan niet meer");
+    }
 
     await conn.commit();
     return ok(res, { stagevoorstelId: voorstel.id, status: "ingetrokken" }, "Stagevoorstel ingetrokken");
@@ -1290,7 +1301,7 @@ async function getAdminDossiers(req, res) {
       JOIN gebruikers sg ON sg.id = s.gebruiker_id
       JOIN bedrijven b ON b.id = d.bedrijf_id
       LEFT JOIN gebruikers mg ON mg.id = d.mentor_id
-      JOIN gebruikers dg ON dg.id = d.stagebegeleider_id
+      LEFT JOIN gebruikers dg ON dg.id = d.stagebegeleider_id
       LEFT JOIN stageovereenkomsten so ON so.stagedossier_id = d.id
       ORDER BY d.aangemaakt_op DESC
       `
@@ -1356,7 +1367,7 @@ async function getAdminDossierById(req, res) {
       JOIN gebruikers sg ON sg.id = s.gebruiker_id
       JOIN bedrijven b ON b.id = d.bedrijf_id
       LEFT JOIN gebruikers mg ON mg.id = d.mentor_id
-      JOIN gebruikers dg ON dg.id = d.stagebegeleider_id
+      LEFT JOIN gebruikers dg ON dg.id = d.stagebegeleider_id
       WHERE d.id = ?
       LIMIT 1
       `,
@@ -1679,10 +1690,17 @@ async function generateEindoverzicht(req, res) {
       [dossierId, documentSoortId, bestandUrl, bestandsnaam]
     );
 
-    await conn.query(
-      "UPDATE stagedossiers SET eindoverzicht_gegenereerd_op = NOW(), status = 'afgerond', aangepast_op = NOW() WHERE id = ?",
+    // Race-safe: alleen de request die eindoverzicht_gegenereerd_op van NULL naar NOW() flipt wint; een
+    // gelijktijdige tweede generatie krijgt affectedRows 0 en rolt netjes terug (auditpunt 405).
+    const [eindResult] = await conn.query(
+      "UPDATE stagedossiers SET eindoverzicht_gegenereerd_op = NOW(), status = 'afgerond', aangepast_op = NOW() WHERE id = ? AND eindoverzicht_gegenereerd_op IS NULL",
       [dossierId]
     );
+    if (eindResult.affectedRows === 0) {
+      await conn.rollback();
+      if (nieuwePdfPad) { try { fs.unlinkSync(nieuwePdfPad); } catch { /* al weg */ } }
+      return ok(res, { dossierId, alGegenereerd: true }, "Eindoverzicht is al gegenereerd");
+    }
 
     await conn.commit();
 
