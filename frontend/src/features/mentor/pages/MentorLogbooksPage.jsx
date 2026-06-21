@@ -12,11 +12,11 @@ function initialen(s) {
 }
 
 function weekBadge(status) {
-  if (status === "ingediend") return { cls: "s_rood", icon: "ti-hourglass", txt: "Af te checken" };
+  if (status === "ingediend") return { cls: "s_rood", icon: "ti-hourglass", txt: "Week ingediend" };
   if (status === "afgecheckt_door_mentor") return { cls: "s_ok", icon: "ti-checks", txt: "Afgecheckt" };
   if (status === "goedgekeurd_door_docent") return { cls: "s_ok", icon: "ti-checks", txt: "Goedgekeurd" };
   if (status && status.includes("teruggestuurd")) return { cls: "s_amber", icon: "ti-hourglass", txt: "Teruggestuurd" };
-  return { cls: "s_info", icon: "ti-pencil", txt: "In opbouw" };
+  return { cls: "s_info", icon: "ti-pencil", txt: "Bezig" };
 }
 
 function dagIndex(datum) {
@@ -246,7 +246,11 @@ export default function MentorLogbooksPage() {
           const open = openWeeks.has(week.id);
           const dagen = week.dagen || [];
           const aanwezig = new Set(dagen.map((d) => dagIndex(d.datum)));
-          const kanChecken = week.status === "ingediend";
+          // Dagen bevestigen: zodra student ze opgeslagen heeft (in_opbouw) of de week ingediend heeft
+          const kanDagBevestigen = ["in_opbouw", "ingediend"].includes(week.status);
+          // Week afchecken: pas als student de volledige week ingediend heeft
+          const kanWeekAfchecken = week.status === "ingediend";
+          const kanChecken = kanWeekAfchecken; // alias voor auto-afchecken logica
           return (
             <div className="logweek" key={week.id}>
               <div className={`logweek-header ${open ? "open" : ""}`} onClick={() => toggleWeek(week.id)}>
@@ -267,7 +271,7 @@ export default function MentorLogbooksPage() {
                     : (d.competenties ? JSON.parse(d.competenties) : []);
                   const geenStage = d.status === "geen_stagedag";
                   return (
-                    <div className="entry" key={d.id}>
+                    <div className="entry" key={d.id} style={geenStage ? { opacity: 0.65 } : {}}>
                       <div className="e-dag">
                         {weekdagLang(d.datum)}
                         {d.titel && <span style={{ fontWeight: 400, color: "var(--sub)" }}>&nbsp;— {d.titel}</span>}
@@ -275,26 +279,37 @@ export default function MentorLogbooksPage() {
                         <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--sub)" }}>
                           {d.aantal_uren || 0}u
                         </span>
+                        {!geenStage && kanDagBevestigen && (
+                          <span style={{ marginLeft: 8 }}>
+                            {d.mentor_bevestigd_op ? (
+                              <span className="status s_ok"><i className="ti ti-check" />Dag bevestigd</span>
+                            ) : (
+                              <button
+                                className="btn primary sm"
+                                disabled={actionLoadingId === `dag-${d.id}`}
+                                onClick={() => confirmDag(d.id)}
+                              >
+                                <i className="ti ti-check" />Bevestig dag
+                              </button>
+                            )}
+                          </span>
+                        )}
+                        {!geenStage && !kanDagBevestigen && d.mentor_bevestigd_op && (
+                          <span style={{ marginLeft: 8 }}>
+                            <span className="status s_ok"><i className="ti ti-check" />Dag bevestigd</span>
+                          </span>
+                        )}
                       </div>
                       {!geenStage && (
                         <>
                           {d.uitgevoerde_taken && <div className="e-veld"><b>Taken</b><span style={{ flex: 1 }}>{d.uitgevoerde_taken}</span></div>}
                           {d.reflectie      && <div className="e-veld"><b>Reflectie</b><span style={{ flex: 1 }}>{d.reflectie}</span></div>}
-                          {d.problemen      && <div className="e-veld"><b>Problemen</b><span style={{ flex: 1 }}>{d.problemen}</span></div>}
+                          {d.problemen      && <div className="e-veld"><b>Problemen & leerpunten</b><span style={{ flex: 1 }}>{d.problemen}</span></div>}
                           {comps.length > 0 && (
                             <div className="e-chips">
                               {comps.map((c) => <span key={c} className="e-chip">{c}</span>)}
                             </div>
                           )}
-                          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
-                            {d.mentor_bevestigd_op ? (
-                              <span className="status s_ok"><i className="ti ti-check" />Dag bevestigd</span>
-                            ) : (
-                              <button className="btn sm" disabled={actionLoadingId === `dag-${d.id}`} onClick={() => confirmDag(d.id)}>
-                                <i className="ti ti-check" />Dag bevestigen
-                              </button>
-                            )}
-                          </div>
                         </>
                       )}
                     </div>
@@ -312,27 +327,35 @@ export default function MentorLogbooksPage() {
                   </div>
                 )}
 
-                {kanChecken && (
-                  <>
-                    <div className="form_group" style={{ marginTop: 12 }}>
-                      <label className="form_label">Feedback (optioneel)</label>
+                {(kanDagBevestigen || kanWeekAfchecken) && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: "0.5px solid var(--border)" }}>
+                    {kanWeekAfchecken && (
                       <textarea
                         className="form_input"
-                        style={{ minHeight: 48, fontSize: 12.5 }}
-                        placeholder="Korte feedback voor deze week…"
+                        style={{ minHeight: 52, fontSize: 12.5, marginBottom: 8 }}
+                        placeholder="Feedback voor de student (optioneel bij afchecken, verplicht bij aanpassing vragen)"
                         value={feedbackByWeek[week.id] || ""}
-                        onChange={(e) => setFeedbackByWeek({ ...feedbackByWeek, [week.id]: e.target.value })}
+                        onChange={(e) => setFeedbackByWeek((prev) => ({ ...prev, [week.id]: e.target.value }))}
                       />
-                    </div>
+                    )}
                     <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                      <button className="btn sm" disabled={actionLoadingId === week.id} onClick={() => checkWeek(week.id, true)}>
-                        <i className="ti ti-arrow-back-up" />Aanpassing vragen
-                      </button>
-                      <button className="btn primary sm" disabled={actionLoadingId === week.id} onClick={() => checkWeek(week.id, false)}>
-                        <i className="ti ti-check" />Week afchecken
-                      </button>
+                      {kanWeekAfchecken && (
+                        <>
+                          <button className="btn primary sm" disabled={!!actionLoadingId} onClick={() => checkWeek(week.id, false)}>
+                            <i className="ti ti-checks" />Week afchecken
+                          </button>
+                          <button className="btn sm" disabled={!!actionLoadingId} onClick={() => checkWeek(week.id, true)}>
+                            <i className="ti ti-arrow-back-up" />Aanpassing vragen
+                          </button>
+                        </>
+                      )}
+                      <span style={{ fontSize: 11.5, color: "var(--faint)" }}>
+                        {kanWeekAfchecken
+                          ? "Dag bevestigen is optioneel. Week afchecken is verplicht."
+                          : "Je kan al dagen bevestigen terwijl de student de week nog aanvult."}
+                      </span>
                     </div>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
