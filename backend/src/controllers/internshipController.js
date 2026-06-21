@@ -1558,6 +1558,26 @@ async function assignDossier(req, res) {
       }
     }
 
+    // De mentor niet meer wisselen zodra er mentorgebonden activiteit bestaat (evaluatiescores of afgevinkte
+    // logboekdagen) — anders erft een nieuwe mentor input die niet van hem is (auditpunt 418).
+    if (mentorId != null && d[0].mentor_id && Number(d[0].mentor_id) !== Number(mentorId)) {
+      const [[mScores]] = await db.query(
+        `SELECT COUNT(*) AS n FROM competentie_scores cs
+         JOIN evaluaties e ON e.id = cs.evaluatie_id
+         WHERE e.stagedossier_id = ? AND cs.rol = 'mentor'`,
+        [dossierId]
+      );
+      const [[mBevest]] = await db.query(
+        `SELECT COUNT(*) AS n FROM logboek_dagen ld
+         JOIN logboek_weken lw ON lw.id = ld.logboek_week_id
+         WHERE lw.stagedossier_id = ? AND ld.mentor_bevestigd_op IS NOT NULL`,
+        [dossierId]
+      );
+      if (mScores.n > 0 || mBevest.n > 0) {
+        return fail(res, 409, "De mentor kan niet meer gewijzigd worden: er is al mentorinput (evaluatie of logboekbevestiging) voor dit dossier");
+      }
+    }
+
     if (docentId != null) {
       const [g] = await db.query("SELECT hoofdrol, status FROM gebruikers WHERE id = ? LIMIT 1", [Number(docentId)]);
       if (g.length === 0 || g[0].hoofdrol !== "docent" || g[0].status !== "actief") {
