@@ -343,7 +343,10 @@ async function saveDraft(req, res) {
   } = req.body || {};
 
   const finalBedrijfNaam = bedrijfNaam || bedrijfsnaam || null;
-  const finalUrenPerWeek = Number(urenPerWeek || 38);
+  // Default van 38 geldt enkel voor een NIEUW concept; bij het bijwerken van een bestaand concept
+  // mag een ontbrekend urenPerWeek de bestaande waarde niet stil terugzetten (auditpunt 321).
+  const urenSent = urenPerWeek !== undefined && urenPerWeek !== null && urenPerWeek !== "";
+  const finalUrenPerWeek = Number(urenSent ? urenPerWeek : 38);
 
   const conn = await db.getConnection();
   try {
@@ -379,6 +382,10 @@ async function saveDraft(req, res) {
       stagevoorstelId = existing[0].id;
       const bedrijfId = existing[0].bedrijf_id;
 
+      // Niet meegestuurd urenPerWeek = behouden (COALESCE); enkel meegestuurde uren overschrijven.
+      const urenUpdate = urenSent ? Number(urenPerWeek) : null;
+      const totaalUpdate = (aantalWeken != null && urenSent) ? aantalWeken * Number(urenPerWeek) : null;
+
       await conn.query(
         `UPDATE bedrijven SET
           naam = COALESCE(?, naam), afdeling = ?, adres = ?,
@@ -401,7 +408,7 @@ async function saveDraft(req, res) {
           startdatum         = COALESCE(?, startdatum),
           einddatum          = COALESCE(?, einddatum),
           aantal_weken       = COALESCE(?, aantal_weken),
-          uren_per_week      = ?,
+          uren_per_week      = COALESCE(?, uren_per_week),
           totaal_uren        = COALESCE(?, totaal_uren)
          WHERE stagevoorstel_id = ? AND versie_nummer = 1`,
         [
@@ -409,7 +416,7 @@ async function saveDraft(req, res) {
           mentorNaam || null, mentorEmail || null, mentorTelefoon || null, mentorFunctie || null,
           stagefunctie || null, opdrachtomschrijving || null,
           startdatum || null, einddatum || null,
-          aantalWeken, finalUrenPerWeek, totaalUren,
+          aantalWeken, urenUpdate, totaalUpdate,
           stagevoorstelId
         ]
       );
@@ -469,7 +476,9 @@ async function resubmitInternship(req, res) {
   } = req.body || {};
 
   const finalBedrijfNaam = bedrijfNaam || bedrijfsnaam;
-  const finalUrenPerWeek = Number(urenPerWeek || 38);
+  // finalUrenPerWeek wordt pas na het ophalen van het bestaande voorstel bepaald, zodat een ontbrekend
+  // urenPerWeek de bestaande waarde behoudt i.p.v. stil terug te vallen op 38 (auditpunt 321).
+  const urenSent = urenPerWeek !== undefined && urenPerWeek !== null && urenPerWeek !== "";
 
   const conn = await db.getConnection();
   try {
@@ -497,6 +506,7 @@ async function resubmitInternship(req, res) {
 
     const voorstel = voorstellen[0];
     const nieuweVersieNummer = voorstel.huidige_versie_nummer + 1;
+    const finalUrenPerWeek = Number(urenSent ? urenPerWeek : (voorstel.uren_per_week ?? 38));
 
     const nieuwStartdatum = startdatum || voorstel.startdatum;
     const nieuwEinddatum = einddatum || voorstel.einddatum;
