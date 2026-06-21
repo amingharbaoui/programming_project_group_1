@@ -2,7 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
-import "../docent.css";
+import "./DocentStudentsPage.css";
+import { IconArrowRight, IconEye, IconRefresh, IconX } from "@tabler/icons-react";
+import { cacheGet, cacheSet } from "../docentCache";
 
 // Filterchips op actietype — zelfde indeling als het HTML-prototype (renderStudentenPage).
 const FILTERS = [
@@ -67,12 +69,12 @@ function getVoortgang(s) {
 }
 
 function getStatus(s) {
-  if (AFGEROND_STATUSSEN.includes(s.dossier_status)) return { cls: "s-ok", txt: "Afgerond" };
-  if (s.dossier_status === "document_afgekeurd") return { cls: "s-rood", txt: "Document afgekeurd" };
-  if (s.actie_type === "evaluatie" || s.actie_type === "logboek") return { cls: "s-rood", txt: "Actie nodig" };
-  if (s.actie_type === "planning") return { cls: "s-amber", txt: "Open" };
-  if (!ACTIEF_STATUSSEN.includes(s.dossier_status)) return { cls: "s-grijs", txt: "Contractfase" };
-  return { cls: "s-ok", txt: "In orde" };
+  if (AFGEROND_STATUSSEN.includes(s.dossier_status)) return { cls: "s_ok", txt: "Afgerond" };
+  if (s.dossier_status === "document_afgekeurd") return { cls: "s_rood", txt: "Document afgekeurd" };
+  if (s.actie_type === "evaluatie" || s.actie_type === "logboek") return { cls: "s_rood", txt: "Actie nodig" };
+  if (s.actie_type === "planning") return { cls: "s_amber", txt: "Open" };
+  if (!ACTIEF_STATUSSEN.includes(s.dossier_status)) return { cls: "s_grijs", txt: "Contractfase" };
+  return { cls: "s_ok", txt: "In orde" };
 }
 
 export default function DocentStudentsPage() {
@@ -82,14 +84,20 @@ export default function DocentStudentsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("alle");
+  const [zoek, setZoek] = useState("");
 
-  async function loadStudenten() {
+  async function loadStudenten(force = false) {
     try {
-      setLoading(true);
       setError("");
-      const res = await api.get("/docent/students", {
-      });
-      setStudenten(res.data.data || []);
+      if (!force) {
+        const cached = cacheGet("docent_students");
+        if (cached) { setStudenten(cached); setLoading(false); return; }
+      }
+      setLoading(true);
+      const res = await api.get("/docent/students");
+      const data = res.data.data || [];
+      cacheSet("docent_students", data);
+      setStudenten(data);
     } catch (err) {
       setError(err.response?.data?.message || "Studenten ophalen mislukt");
     } finally {
@@ -110,37 +118,54 @@ export default function DocentStudentsPage() {
     geen: studenten.filter((s) => s.actie_type === "geen").length,
   };
 
-  const gefilterd =
+  const opActie =
     filter === "alle"
       ? studenten
       : filter === "actie"
       ? studenten.filter((s) => s.actie_type !== "geen")
       : studenten.filter((s) => s.actie_type === filter);
 
+  const zoekTerm = zoek.trim().toLowerCase();
+  const gefilterd = zoekTerm
+    ? opActie.filter((s) =>
+        `${s.voornaam} ${s.achternaam}`.toLowerCase().includes(zoekTerm) ||
+        (s.bedrijf || "").toLowerCase().includes(zoekTerm)
+      )
+    : opActie;
+
   return (
-    <div className="doc">
     <div className="page-inner">
       <div className="page-header">
         <div>
           <h1>Mijn studenten</h1>
           <p>Overzicht van alle studenten die jij opvolgt als docent.</p>
         </div>
-        <button className="btn sm" onClick={loadStudenten}>
-          Vernieuwen
+        <button className="btn primary" onClick={() => loadStudenten(true)}>
+          <IconRefresh size={14} stroke={1.8} /> Vernieuwen
         </button>
       </div>
 
-      {/* Filter chips — op actietype, zoals het prototype */}
-      <div className="chips">
-        {FILTERS.map((f) => (
-          <button
-            key={f.key}
-            className={`chip${filter === f.key ? " aan" : ""}`}
-            onClick={() => setFilter(f.key)}
-          >
-            {f.label} ({aantallen[f.key]})
+      <div className="doc_filters">
+        <input
+          className="doc_zoek"
+          placeholder="Zoek op student of bedrijf..."
+          value={zoek}
+          onChange={(e) => setZoek(e.target.value)}
+        />
+        <select
+          className="doc_select"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        >
+          {FILTERS.map((f) => (
+            <option key={f.key} value={f.key}>{f.label}</option>
+          ))}
+        </select>
+        {(filter !== "alle" || zoek) && (
+          <button className="btn sm primary" onClick={() => { setFilter("alle"); setZoek(""); }}>
+            <IconX size={16} stroke={1.8} /> Wis filters
           </button>
-        ))}
+        )}
       </div>
 
       {loading && (
@@ -151,7 +176,7 @@ export default function DocentStudentsPage() {
 
       {error && (
         <div className="card">
-          <span className="status s-rood">{error}</span>
+          <span className="status s_rood">{error}</span>
         </div>
       )}
 
@@ -160,8 +185,8 @@ export default function DocentStudentsPage() {
       )}
 
       {!loading && gefilterd.length > 0 && (
-        <div className="card" style={{ padding: "6px 14px" }}>
-          <table className="tbl">
+        <div className="card doc_students_card">
+          <table className="doc_students_tbl">
             <thead>
               <tr>
                 <th>Student</th>
@@ -170,29 +195,32 @@ export default function DocentStudentsPage() {
                 <th>Deadline</th>
                 <th>Voortgang</th>
                 <th>Status</th>
-                <th className="right"></th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
               {gefilterd.map((s) => {
                 const status = getStatus(s);
                 const pct = getVoortgang(s);
+                const initialen = [s.voornaam, s.achternaam].filter(Boolean).map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?";
                 return (
                   <tr key={s.dossier_id}>
                     <td>
-                      <strong>{s.voornaam} {s.achternaam}</strong>
-                      <br />
-                      <span className="muted">{s.bedrijf}</span>
+                      <div className="doc_student_cell">
+                        <div className="doc_avatar">{initialen}</div>
+                        <div className="doc_student_info">
+                          <div className="doc_naam">{s.voornaam} {s.achternaam}</div>
+                          <div className="doc_bedrijf">{s.bedrijf}</div>
+                        </div>
+                      </div>
                     </td>
 
-                    <td style={{ fontSize: 12.5, color: "var(--sub)", whiteSpace: "nowrap" }}>
-                      {getStagefase(s)}
-                    </td>
+                    <td className="doc_sub">{getStagefase(s)}</td>
 
-                    <td style={{ fontSize: 12.5 }}>
+                    <td>
                       {s.actie_type !== "geen" ? (
-                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: ".3px", textTransform: "uppercase", color: "var(--faint)" }}>
+                        <span className="doc_actie_cell">
+                          <span className="doc_actie_type">
                             {s.actie_type === "logboek" ? "Logboek" : s.actie_type === "evaluatie" ? "Evaluatie" : "Planning"}
                           </span>
                           {s.volgende_actie}
@@ -202,22 +230,20 @@ export default function DocentStudentsPage() {
                       )}
                     </td>
 
-                    <td style={{ fontSize: 12, color: "var(--sub)", whiteSpace: "nowrap" }}>
-                      {s.actie_type !== "geen" ? (formatDeadline(s.deadline) || "—") : "—"}
-                    </td>
+                    <td className="doc_sub">{s.actie_type !== "geen" ? (formatDeadline(s.deadline) || "—") : "—"}</td>
 
-                    <td style={{ minWidth: 110 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <div className="prog-wrap" style={{ flex: 1 }}><div className="prog-fill" style={{ width: `${pct}%` }} /></div>
-                        <span style={{ fontSize: 11, color: "var(--sub)", minWidth: 30 }}>{pct}%</span>
+                    <td style={{ minWidth: 120 }}>
+                      <div className="doc_prog_row">
+                        <div className="prog_wrap" style={{ flex: 1 }}><div className="prog_fill" style={{ width: `${pct}%` }} /></div>
+                        <span className="doc_prog_pct">{pct}%</span>
                       </div>
                     </td>
 
                     <td><span className={`status ${status.cls}`}>{status.txt}</span></td>
 
-                    <td className="right">
+                    <td style={{ textAlign: "right" }}>
                       <button className="btn sm" onClick={() => navigate(`/docent/students/${s.dossier_id}/dossier`)}>
-                        <i className={`ti ti-${s.actie_type !== "geen" ? "arrow-right" : "eye"}`} />
+                        {s.actie_type !== "geen" ? <IconArrowRight size={14} stroke={1.8} /> : <IconEye size={14} stroke={1.8} />}
                         {s.actie_type !== "geen" ? "Openen" : "Bekijken"}
                       </button>
                     </td>
@@ -228,7 +254,6 @@ export default function DocentStudentsPage() {
           </table>
         </div>
       )}
-    </div>
     </div>
   );
 }

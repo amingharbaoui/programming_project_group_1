@@ -1,0 +1,121 @@
+/* ── Competentietabel — rij-hoogte aanpassen voor invoer ── */
+.doc_students_tbl td {
+  padding-top: 14px;
+  padding-bottom: 14px;
+}
+
+/* ── Detail header: naam links, tabs rechts ── */
+.doc_eval_detail_header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.doc_eval_detail_title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--dark);
+  margin: 0;
+  letter-spacing: -0.3px;
+}
+
+/* Gesegmenteerde tabs: Tussentijds / Finaal */
+.doc_eval_tabs {
+  display: flex;
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--muted);
+}
+
+.doc_eval_tab {
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font);
+  color: var(--gray);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.doc_eval_tab.actief {
+  background: var(--white);
+  color: var(--dark);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+
+/* ── Motivering textarea ── */
+.doc_mot_wrap {
+  margin-top: 8px;
+}
+
+.doc_mot_input {
+  width: 100%;
+  min-width: 180px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-family: var(--font);
+  color: var(--dark);
+  background: var(--white);
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+  resize: vertical;
+  outline: none;
+  line-height: 1.5;
+  transition: border-color 0.12s;
+  box-sizing: border-box;
+}
+
+.doc_mot_input::placeholder {
+  color: var(--faint);
+}
+
+.doc_mot_input:focus {
+  border-color: var(--red);
+}
+
+/* ── Score-knoppen (1-5) ── */
+.doc_scale {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.doc_scale_btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  border: 0.5px solid var(--border);
+  background: var(--white);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all .12s;
+  color: var(--gray);
+  font-family: var(--font);
+  flex-shrink: 0;
+}
+
+.doc_scale_btn:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+.doc_scale_btn.selected {
+  background: var(--red);
+  border-color: var(--red);
+  color: var(--white);
+}
+
+.doc_scale_btn:disabled {
+  cursor: default;
+}
