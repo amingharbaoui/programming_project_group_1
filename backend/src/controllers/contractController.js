@@ -103,16 +103,21 @@ async function signContract(req, res) {
 
     const now = new Date();
 
-    await connection.query(
+    // Conditioneel zodat een dubbelklik/tweede tab niet alsnog "tekent" o.b.v. een oude status (387).
+    const [tekenResult] = await connection.query(
       `
       UPDATE stageovereenkomsten
       SET student_getekend_op = ?,
           status = 'getekend_door_student',
           aangepast_op = NOW()
-      WHERE id = ?
+      WHERE id = ? AND status = 'klaar_voor_student' AND student_getekend_op IS NULL
       `,
       [now, contract.id]
     );
+    if (tekenResult.affectedRows === 0) {
+      await connection.rollback();
+      return fail(res, 409, "Deze overeenkomst is ondertussen al gewijzigd; vernieuw de pagina");
+    }
 
     await connection.query(
       "UPDATE stagedossiers SET status = 'wacht_op_bedrijf', aangepast_op = NOW() WHERE id = ? AND status = 'wacht_op_student'",
@@ -198,16 +203,21 @@ async function registerOvereenkomst(req, res) {
       return fail(res, 400, `Dossier nog niet startklaar: ${docs[0].openstaand} verplichte document(en) nog niet goedgekeurd`);
     }
 
-    await conn.query(
+    // Conditioneel zodat twee admins/dubbelklik niet allebei registreren o.b.v. een oude status (387).
+    const [regResult] = await conn.query(
       `UPDATE stageovereenkomsten
        SET status = 'geregistreerd',
            opleiding_getekend_op = COALESCE(opleiding_getekend_op, NOW()),
            gecontroleerd_door_id = ?, gecontroleerd_op = NOW(),
            geregistreerd_door_id = ?, geregistreerd_op = NOW(),
            aangepast_op = NOW()
-       WHERE id = ?`,
+       WHERE id = ? AND status = 'volledig_ondertekend'`,
       [adminId, adminId, o.id]
     );
+    if (regResult.affectedRows === 0) {
+      await conn.rollback();
+      return fail(res, 409, "Deze overeenkomst is ondertussen al geregistreerd of gewijzigd; vernieuw de pagina");
+    }
 
     // Verzekering in orde + dossier startklaar registreren.
     await conn.query(

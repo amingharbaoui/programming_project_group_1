@@ -115,12 +115,17 @@ async function tekenContract(req, res) {
     // Student tekende al, dus na de mentor is de overeenkomst volledig ondertekend.
     const nieuweStatus = "volledig_ondertekend";
 
-    await conn.query(
+    // Conditioneel zodat een dubbelklik/tweede tab niet alsnog tekent o.b.v. een oude status (387).
+    const [tekenResult] = await conn.query(
       `UPDATE stageovereenkomsten
        SET bedrijf_getekend_op = NOW(), status = ?
-       WHERE stagedossier_id = ?`,
+       WHERE stagedossier_id = ? AND status = 'getekend_door_student' AND bedrijf_getekend_op IS NULL`,
       [nieuweStatus, dossierId]
     );
+    if (tekenResult.affectedRows === 0) {
+      await conn.rollback();
+      return fail(res, 409, "Deze overeenkomst is ondertussen al gewijzigd; vernieuw de pagina");
+    }
 
     await conn.query(
       "UPDATE stagedossiers SET status = 'in_controle_bij_administratie', aangepast_op = NOW() WHERE id = ? AND status IN ('wacht_op_student','wacht_op_bedrijf')",
