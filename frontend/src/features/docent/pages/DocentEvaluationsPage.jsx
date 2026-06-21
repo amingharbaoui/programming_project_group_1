@@ -81,7 +81,6 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId })
   const [verslag, setVerslag] = useState(evaluatie?.verslag ?? "");
   const [eindpresentatieScore, setEindpresentatieScore] = useState(evaluatie?.eindpresentatie_score ?? null);
   const [bezig, setBezig]   = useState(false);
-  const [openBezig, setOpenBezig] = useState(false);
   const [melding, setMelding] = useState({ tekst: "", type: "" });
   const [vrijgaveMelding, setVrijgaveMelding] = useState({ tekst: "", type: "" });
   const [foutModal, setFoutModal] = useState("");
@@ -193,50 +192,11 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId })
 
   if (!evaluatie || evaluatie.status === "niet_open") {
     return (
-      <>
-        <div className="card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
-          <p className="muted" style={{ margin: 0 }}>
-            {activeType === "tussentijds" ? "Tussentijdse" : "Finale"} evaluatie is nog niet beschikbaar.
-          </p>
-          {stagedossierId && (
-            <button
-              className="btn primary"
-              disabled={openBezig}
-              style={{ flexShrink: 0 }}
-              onClick={async () => {
-                setOpenBezig(true);
-                try {
-                  await api.post("/evaluations/open", { stagedossierId, type: activeType });
-                  onRefresh?.();
-                } catch (e) {
-                  setFoutModal(e.response?.data?.message || "Openen mislukt");
-                } finally {
-                  setOpenBezig(false);
-                }
-              }}
-            >
-              {openBezig ? "Bezig…" : `${activeType === "tussentijds" ? "Tussentijdse" : "Finale"} evaluatie openen`}
-            </button>
-          )}
-        </div>
-
-        {foutModal && (
-          <div className="modal_overlay" onClick={() => setFoutModal("")}>
-            <div className="modal_box" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
-              <div className="modal_header">
-                <span className="modal_title">Actie vereist</span>
-                <button className="icon_btn" onClick={() => setFoutModal("")}><IconX size={16} stroke={1.8} /></button>
-              </div>
-              <div className="modal_body">
-                <p style={{ margin: 0, fontSize: 13, color: "var(--sub)" }}>{foutModal}</p>
-                <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-                  <button className="btn primary" onClick={() => setFoutModal("")}>Sluiten</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </>
+      <div className="card">
+        <p className="muted" style={{ margin: 0 }}>
+          {activeType === "tussentijds" ? "Tussentijdse" : "Finale"} evaluatie is nog niet beschikbaar.
+        </p>
+      </div>
     );
   }
 
