@@ -224,7 +224,8 @@ async function getEvaluationsForStudent(req, res) {
 
     const [evaluaties] = await db.query(
       `SELECT id, type, status, verslag, mentor_algemene_feedback, eindpresentatie_score, competentie_score, eindcijfer,
-              student_ingediend_op, mentor_ingediend_op, docent_geregistreerd_op, vrijgegeven_op
+              student_ingediend_op, mentor_ingediend_op, docent_geregistreerd_op, vrijgegeven_op,
+              DATE_FORMAT(deadline_student, '%Y-%m-%d') AS deadline_student
        FROM evaluaties
        WHERE stagedossier_id = ?
        ORDER BY FIELD(type, 'tussentijds', 'finaal')`,
@@ -366,7 +367,10 @@ async function saveScores(req, res) {
       }
     }
 
-    if (ingediend) {
+    // 494: student/mentor mogen gedeeltelijk indienen — niet-ingevulde competenties tellen als niet
+    // ingevuld/0 (zoals het prototype belooft: "niet ingevuld telt als 0"). Enkel de docent moet alles
+    // gescoord hebben voor hij registreert (dat wordt bovendien in calculateResult nogmaals afgedwongen).
+    if (ingediend && role === "docent") {
       const ingevuld = scores
         .filter((s) => s.score !== null && s.score !== undefined && s.score !== "")
         .map((s) => Number(s.competentieId || s.competentie_id));

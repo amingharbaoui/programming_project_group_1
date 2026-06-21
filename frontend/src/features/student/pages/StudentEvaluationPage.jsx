@@ -351,11 +351,21 @@ export default function StudentEvaluationPage() {
   async function handleIndienen() {
     const actief = huidigeEval();
     if (!actief) return;
-    // Indienen vereist per competentie zowel een score als een motivering (zoals de UI met * aangeeft).
+    // 494: gedeeltelijk indienen mag — niet-ingevulde competenties tellen als 0/niet ingevuld (prototype).
+    // Wat je wél scoort, moet een motivering hebben, en je moet minstens één competentie invullen.
     const comps = data?.competenties || [];
-    const onvolledig = comps.find((c) => !scores[c.id]?.score || !String(scores[c.id]?.motivering || "").trim());
-    if (onvolledig) {
-      setMelding({ type: "fout", tekst: "Vul voor elke competentie een score én een motivering in voor je indient." });
+    const ingevuldeComps = comps.filter((c) => scores[c.id]?.score);
+    if (ingevuldeComps.length === 0) {
+      setMelding({ type: "fout", tekst: "Vul minstens één competentie in voor je indient." });
+      return;
+    }
+    const zonderMotivering = ingevuldeComps.find((c) => !String(scores[c.id]?.motivering || "").trim());
+    if (zonderMotivering) {
+      setMelding({ type: "fout", tekst: "Geef bij elke ingevulde competentie ook een motivering voor je indient." });
+      return;
+    }
+    const aantalLeeg = comps.length - ingevuldeComps.length;
+    if (aantalLeeg > 0 && !window.confirm(`${aantalLeeg} competentie(s) zijn niet ingevuld en tellen als 0. Toch indienen?`)) {
       return;
     }
     setBezig(true);
@@ -539,6 +549,9 @@ export default function StudentEvaluationPage() {
           <div className="card" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
             <span style={{ fontSize: 12.5, color: "var(--sub)" }}>
               <strong>{ingevuld}/{totaal}</strong> competenties ingevuld
+              {actief.deadline_student && (
+                <> · deadline <strong>{formatDatum(actief.deadline_student)}</strong></>
+              )}
             </span>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button
@@ -550,8 +563,8 @@ export default function StudentEvaluationPage() {
               </button>
               <button
                 className="btn primary sm"
-                disabled={!allesIn || bezig}
-                title={!allesIn ? "Vul eerst alle competenties in" : ""}
+                disabled={bezig}
+                title={allesIn ? "" : "Niet-ingevulde competenties tellen als 0"}
                 onClick={handleIndienen}
               >
                 <IconSend size={14} />
