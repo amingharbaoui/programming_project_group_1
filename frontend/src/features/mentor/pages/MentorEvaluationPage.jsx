@@ -137,7 +137,7 @@ export default function MentorEvaluationPage() {
     try {
       setBezig(true);
       setMelding({ tekst: "", type: "" });
-      await api.post(`/evaluations/${huidigeEval.id}/scores`, { scores: scoresArr, ingediend });
+      await api.post(`/evaluations/${huidigeEval.id}/scores`, { scores: scoresArr, ingediend, algemeneFeedback: motiv[activeTab]?.algemeen || "" });
       setMelding({ tekst: ingediend ? "Mentorinput ingediend!" : "Opgeslagen als concept.", type: "s_ok" });
       cacheDelete(`mentor_evaluation_${detailId}`);
       const res = await api.get(`/evaluations/${detailId}`);

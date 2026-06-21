@@ -491,6 +491,8 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
                   onChange={handleDagChange}
                   placeholder="8"
                   min="0"
+                  max="12"
+                  step="0.25"
                 />
               </div>
             </div>

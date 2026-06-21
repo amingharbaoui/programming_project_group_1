@@ -304,7 +304,10 @@ export default function MentorDossierPage() {
                 <div className="kv"><span className="k">Student getekend</span><span className="v">{dat(contract.student_getekend_op)}</span></div>
                 <div className="kv"><span className="k">Bedrijf/mentor getekend</span><span className="v">{dat(contract.bedrijf_getekend_op)}</span></div>
                 <div className="kv"><span className="k">Versie</span><span className="v">{contract.versie_nummer || 1}</span></div>
-                {!contract.bedrijf_getekend_op && (
+                {!contract.student_getekend_op && (
+                  <div style={{ marginTop: 12, fontSize: 12.5, color: "var(--sub)" }}>Wacht op de handtekening van de student voor je kan tekenen.</div>
+                )}
+                {!contract.bedrijf_getekend_op && contract.student_getekend_op && (
                   <div style={{ marginTop: 12 }}>
                     <div style={{ fontSize: 12.5, color: "var(--sub)", lineHeight: 1.6, marginBottom: 10 }}>
                       Lees de overeenkomst na en onderteken digitaal namens het stagebedrijf. Na jouw handtekening controleert en registreert de administratie ze.
@@ -354,7 +357,7 @@ export default function MentorDossierPage() {
             {/* Bedrijfsbezoek / planning */}
             {momenten.map((m) => {
               const bb = bezoekBadge(m.status);
-              const teBevestigen = ["voorgesteld", "gepland"].includes(m.status);
+              const teBevestigen = m.type === "bedrijfsbezoek" && ["voorgesteld", "gepland"].includes(m.status);
               return (
                 <div className="card" key={m.id} style={teBevestigen ? { borderLeft: "3px solid var(--red)" } : {}}>
                   <div className="card_title">

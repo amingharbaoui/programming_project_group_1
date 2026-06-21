@@ -220,7 +220,11 @@ export default function MentorContractPage() {
             </div>
           )}
 
-          {!contract.bedrijf_getekend_op && (
+          {!contract.bedrijf_getekend_op && !contract.student_getekend_op && (
+            <div style={{ marginTop: "16px", fontSize: 13, color: "var(--sub)" }}>De student moet de stageovereenkomst eerst ondertekenen.</div>
+          )}
+
+          {!contract.bedrijf_getekend_op && contract.student_getekend_op && (
             <div className="actions" style={{ marginTop: "16px" }}>
               <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
                 <input

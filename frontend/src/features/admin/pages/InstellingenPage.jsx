@@ -328,7 +328,7 @@ export default function InstellingenPage() {
             disabled={nieuweVersieSaving}
           >
             <IconCopyPlus size={16} stroke={1.8} />
-            {nieuweVersieSaving ? "Bezig..." : "Nieuwe versie maken"}
+            {nieuweVersieSaving ? "Bezig..." : "Reset naar standaardwaarden"}
           </button>
         </div>
         <p className="inst_sub">Stel in welke documenten studenten verplicht moeten indienen bij hun stagedossier.</p>
@@ -416,7 +416,7 @@ export default function InstellingenPage() {
             disabled={resetChecklistSaving}
           >
             <IconCopyPlus size={16} stroke={1.8} />
-            {resetChecklistSaving ? "Bezig..." : "Nieuwe versie maken"}
+            {resetChecklistSaving ? "Bezig..." : "Reset naar standaardwaarden"}
           </button>
         </div>
         <p className="inst_sub">Deze criteria worden getoond aan studenten bij het indienen van een stagevoorstel.</p>
@@ -563,7 +563,7 @@ export default function InstellingenPage() {
         <div className="modal_overlay" onClick={() => setNieuweVersieOpen(false)}>
           <div className="modal_box" onClick={(e) => e.stopPropagation()}>
             <div className="modal_header">
-              <span className="modal_title">Nieuwe versie maken</span>
+              <span className="modal_title">Reset naar standaardwaarden</span>
               <button className="icon_btn" onClick={() => setNieuweVersieOpen(false)} type="button">
                 <IconX size={16} stroke={1.8} />
               </button>
@@ -625,7 +625,7 @@ export default function InstellingenPage() {
         <div className="modal_overlay" onClick={() => setResetChecklistOpen(false)}>
           <div className="modal_box" onClick={(e) => e.stopPropagation()}>
             <div className="modal_header">
-              <span className="modal_title">Nieuwe versie maken</span>
+              <span className="modal_title">Reset naar standaardwaarden</span>
               <button className="icon_btn" onClick={() => setResetChecklistOpen(false)} type="button">
                 <IconX size={16} stroke={1.8} />
               </button>

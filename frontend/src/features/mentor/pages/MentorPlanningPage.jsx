@@ -185,7 +185,7 @@ export default function MentorPlanningPage() {
       )}
 
       {!planningLoading && momenten.map((moment) => {
-        const teBevestigen = ["voorgesteld", "gepland"].includes(moment.status);
+        const teBevestigen = moment.type === "bedrijfsbezoek" && ["voorgesteld", "gepland"].includes(moment.status);
         const isAlternatifOpen = alternatifOpen === moment.id;
 
         return (

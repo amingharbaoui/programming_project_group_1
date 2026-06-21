@@ -187,7 +187,7 @@ export default function DocentPlanningPage() {
                     </span>
                   </td>
                   <td className="right">
-                    {p.status !== "gegeven" && p.status !== "afgerond" && (
+                    {((p.type === "bedrijfsbezoek" && p.status === "bevestigd") || (p.type === "eindpresentatie" && p.status === "gepland")) && (
                       <button className="btn sm" disabled={gegevenId === p.id}
                         onClick={() => markeerGegeven(p.id, p.type)}>
                         <i className="ti ti-check" /> {p.type === "bedrijfsbezoek" ? "Markeer als geweest" : "Markeer als gegeven"}
