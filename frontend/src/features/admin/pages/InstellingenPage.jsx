@@ -288,10 +288,11 @@ export default function InstellingenPage() {
   async function bewaarRubriek() {
     const titel = (bewerkRubriek?.titel || "").trim();
     if (!titel) return;
-    setRubriekCriteria((prev) => prev.map((i) => i.id === bewerkRubriek.id ? { ...i, titel } : i));
+    const maxScore = Number(bewerkRubriek.max_score) || 5;
+    setRubriekCriteria((prev) => prev.map((i) => i.id === bewerkRubriek.id ? { ...i, titel, max_score: maxScore } : i));
     setBewerkRubriek(null);
     try {
-      await api.patch(`/admin/rubriek-criteria/${bewerkRubriek.id}`, { titel });
+      await api.patch(`/admin/rubriek-criteria/${bewerkRubriek.id}`, { titel, maxScore });
       showToast("Rubriekcriterium opgeslagen.");
       cacheDelete("admin_settings");
     } catch (err) {
@@ -616,13 +617,14 @@ export default function InstellingenPage() {
           <thead>
             <tr>
               <th>Criterium</th>
+              <th style={{ textAlign: "center", width: 70 }}>Max</th>
               <th style={{ textAlign: "center", width: 90 }}>Actief</th>
               <th style={{ textAlign: "right", width: 140 }}>Actie</th>
             </tr>
           </thead>
           <tbody>
             {rubriekCriteria.length === 0 && (
-              <tr><td colSpan="3" style={{ color: "var(--faint)", fontSize: 13, padding: "16px 8px" }}>Nog geen rubriekcriteria — voeg er hieronder een toe.</td></tr>
+              <tr><td colSpan="4" style={{ color: "var(--faint)", fontSize: 13, padding: "16px 8px" }}>Nog geen rubriekcriteria — voeg er hieronder een toe.</td></tr>
             )}
             {rubriekCriteria.map((item) => {
               const isBewerken = bewerkRubriek?.id === item.id;
@@ -645,6 +647,18 @@ export default function InstellingenPage() {
                     )}
                   </td>
                   <td style={{ textAlign: "center" }}>
+                    {isBewerken ? (
+                      <input
+                        type="number" min="1" max="100"
+                        value={bewerkRubriek.max_score}
+                        onChange={(e) => setBewerkRubriek({ ...bewerkRubriek, max_score: e.target.value })}
+                        style={{ width: 56, fontSize: 13, textAlign: "center", border: "0.5px solid var(--border)", borderRadius: 7, padding: "6px 4px", outline: "none", background: "var(--white)" }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: 13, color: "var(--sub)" }}>/ {item.max_score ?? 5}</span>
+                    )}
+                  </td>
+                  <td style={{ textAlign: "center" }}>
                     {!isBewerken && (
                       <label className="inst_toggle" style={{ gap: 4 }}>
                         <input type="checkbox" checked={!!item.actief} onChange={() => toggleRubriekActief(item)} />
@@ -663,7 +677,7 @@ export default function InstellingenPage() {
                         </>
                       ) : (
                         <>
-                          <button className="btn sm" onClick={() => setBewerkRubriek({ id: item.id, titel: item.titel })}>
+                          <button className="btn sm" onClick={() => setBewerkRubriek({ id: item.id, titel: item.titel, max_score: item.max_score ?? 5 })}>
                             <IconPencil size={14} stroke={1.8} /> Bewerken
                           </button>
                           <button className="btn sm" style={{ color: "var(--red)" }} onClick={() => setVerwijderRubriek(item)}>
