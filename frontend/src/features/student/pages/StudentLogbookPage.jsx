@@ -631,7 +631,7 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
               </button>
             </div>
             <p style={{ fontSize: 11.5, color: "var(--sub)", marginTop: 8 }}>
-              Een dag wordt pas definitief bewaard wanneer je onderaan <strong>Week indienen</strong> klikt.
+              Een opgeslagen dag wordt als concept bewaard. Klik onderaan <strong>Week indienen</strong> wanneer alle dagen klaar zijn om de week officieel in te dienen.
             </p>
           </div>
         )}
