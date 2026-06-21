@@ -48,6 +48,7 @@ export default function MentorPlanningPage() {
   const [momenten, setMomenten] = useState([]);
   const [loading, setLoading] = useState(true);
   const [planningLoading, setPlanningLoading] = useState(false);
+  const [laadFout, setLaadFout] = useState("");
 
   const [bezig, setBezig] = useState(null); // momentId dat actief is
   const [alternatifOpen, setAlternatifOpen] = useState(null); // momentId waarvan modal open is
@@ -68,13 +69,15 @@ export default function MentorPlanningPage() {
       }
       try {
         setLoading(true);
+        setLaadFout("");
         const res = await api.get("/mentor/students");
         const data = res.data.data || [];
         cacheSet("mentor_students", data);
         setStudenten(data);
         if (data.length > 0) setGeselecteerdDossier(kiesMentorStagiair(data, searchParams)?.dossier_id);
       } catch (err) {
-        console.error(err);
+        // 513: een laadfout niet als "geen stagiairs" tonen, maar als echte fout met retry.
+        setLaadFout(err.response?.data?.message || "Je stagiairs konden niet geladen worden. Probeer het opnieuw.");
       } finally {
         setLoading(false);
       }
@@ -96,12 +99,14 @@ export default function MentorPlanningPage() {
       setPlanningLoading(true);
       setMomenten([]);
       setMelding({ id: null, tekst: "", type: "" });
+      setLaadFout("");
       const res = await api.get(`/mentor/planning/${dossierId}`);
       const data = res.data.data || [];
       cacheSet(`mentor_planning_${dossierId}`, data);
       setMomenten(data);
-    } catch {
+    } catch (err) {
       setMomenten([]);
+      setLaadFout(err.response?.data?.message || "De planning kon niet geladen worden. Probeer het opnieuw.");
     } finally {
       setPlanningLoading(false);
     }
@@ -187,7 +192,16 @@ export default function MentorPlanningPage() {
 
       {loading && <div className="card"><p className="muted">Laden...</p></div>}
 
-      {!loading && studenten.length === 0 && (
+      {laadFout && (
+        <div className="card" style={{ marginBottom: 12 }}>
+          <span className="status s_rood">{laadFout}</span>
+          <div style={{ marginTop: 10 }}>
+            <button className="btn sm primary" onClick={() => (geselecteerdDossier ? loadPlanning(geselecteerdDossier, true) : window.location.reload())}>Opnieuw proberen</button>
+          </div>
+        </div>
+      )}
+
+      {!loading && !laadFout && studenten.length === 0 && (
         <div className="empty_state">Geen gekoppelde stagiairs gevonden.</div>
       )}
 
