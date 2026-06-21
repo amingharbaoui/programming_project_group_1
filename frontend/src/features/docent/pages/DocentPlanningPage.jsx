@@ -34,12 +34,6 @@ function getStatusLabel(status) {
   return labels[status] || status || "-";
 }
 
-const TYPE_OPTIES = [
-  { key: "alle", label: "Alle types" },
-  { key: "bedrijfsbezoek", label: "Bedrijfsbezoek" },
-  { key: "eindpresentatie", label: "Eindpresentatie" },
-];
-
 export default function DocentPlanningPage() {
   const { user } = useAuth();
   const [planning, setPlanning] = useState([]);
@@ -51,7 +45,6 @@ export default function DocentPlanningPage() {
   const [foutModal, setFoutModal] = useState("");
 
   const [zoek, setZoek] = useState("");
-  const [typeFilter, setTypeFilter] = useState("alle");
 
   const [nieuwModal, setNieuwModal] = useState(false);
   const [nieuwDossierId, setNieuwDossierId] = useState("");
@@ -101,31 +94,30 @@ export default function DocentPlanningPage() {
 
   useEffect(() => { loadPlanning(); }, []);
 
-  const gefilterd = planning.filter((p) => {
-    if (typeFilter !== "alle" && p.type !== typeFilter) return false;
-    if (zoek) {
-      const q = zoek.toLowerCase();
-      if (!(p.student_naam || "").toLowerCase().includes(q) &&
-          !(p.locatie || "").toLowerCase().includes(q)) return false;
-    }
-    return true;
-  });
-
   // Planning kan enkel voor dossiers die geregistreerd zijn of lopen (backend blokkeert de rest).
   const planbareStudenten = studenten.filter((s) =>
     ["geregistreerd", "stage_loopt", "actief"].includes(s.dossier_status)
   );
 
-  function openModal() {
+  function openModal(type = "Bedrijfsbezoek") {
     setNieuwModal(true);
     setFout("");
     setNieuwDatum("");
     setNieuwUur("10:00");
     setNieuwLocatie("");
     setNieuwDeelnemers("");
-    setNieuwType("Bedrijfsbezoek");
+    setNieuwType(type);
     setNieuwDossierId(planbareStudenten[0]?.dossier_id ? String(planbareStudenten[0].dossier_id) : "");
   }
+
+  // 521: per type een aparte lijst (twee secties zoals het docentprototype), met de zoekfilter erop.
+  const matchZoek = (p) => {
+    if (!zoek) return true;
+    const q = zoek.toLowerCase();
+    return (p.student_naam || "").toLowerCase().includes(q) || (p.locatie || "").toLowerCase().includes(q);
+  };
+  const bezoeken = planning.filter((p) => p.type === "bedrijfsbezoek" && matchZoek(p));
+  const presentaties = planning.filter((p) => p.type === "eindpresentatie" && matchZoek(p));
 
   async function planNieuw() {
     if (!nieuwDatum || !nieuwDossierId) {
@@ -226,7 +218,49 @@ export default function DocentPlanningPage() {
     setAltModal(p);
   }
 
-  const heeftFilters = typeFilter !== "alle" || zoek;
+  function planningRij(p) {
+    const initialen = (p.student_naam || "?").split(" ").filter(Boolean).map((n) => n[0]).join("").toUpperCase().slice(0, 2);
+    return (
+      <tr key={p.id}>
+        <td>
+          <div className="doc_student_cell">
+            <div className="doc_avatar">{initialen}</div>
+            <div className="doc_student_info"><div className="doc_naam">{p.student_naam || "-"}</div></div>
+          </div>
+        </td>
+        <td className="doc_sub">{formatDateTime(p.gepland_op)}</td>
+        <td className="doc_sub">{p.locatie || "-"}</td>
+        <td><span className={"status " + getStatusClass(p.status)}>{getStatusLabel(p.status)}</span></td>
+        <td style={{ textAlign: "right" }}>
+          {["bevestigd", "gepland"].includes(p.status) && (
+            <button className="btn sm" disabled={gegevenId === p.id} onClick={() => markeerGegeven(p.id, p.type)}>
+              <IconCheck size={14} stroke={2} /> {p.type === "bedrijfsbezoek" ? "Markeer als geweest" : "Markeer als gegeven"}
+            </button>
+          )}
+          {p.status === "alternatief_gevraagd" && (
+            <button className="btn sm primary" disabled={gegevenId === p.id} onClick={() => openAltModal(p)}>
+              <IconCheck size={14} stroke={2} /> Voorstel bekijken
+            </button>
+          )}
+        </td>
+      </tr>
+    );
+  }
+
+  function planningTabel(lijst, leegTekst) {
+    if (lijst.length === 0) return <p className="muted" style={{ padding: "6px 2px", margin: 0 }}>{leegTekst}</p>;
+    return (
+      <table className="doc_students_tbl">
+        <thead>
+          <tr><th>Student</th><th>Datum</th><th>Locatie</th><th>Status</th><th style={{ textAlign: "right" }}>Acties</th></tr>
+        </thead>
+        <tbody>{lijst.map(planningRij)}</tbody>
+      </table>
+    );
+  }
+
+  // De eindpresentatie-flow is pas "aan de beurt" zodra er een bezoek geweest is (de tussentijdse fase loopt).
+  const bezoekGeweest = bezoeken.some((p) => ["geweest", "gegeven"].includes(p.status));
 
   return (
     <div className="page-inner">
@@ -237,13 +271,10 @@ export default function DocentPlanningPage() {
         </div>
         <div className="actions">
           <button className="btn" onClick={() => loadPlanning(true)}><IconRefresh size={14} stroke={1.8} /> Vernieuwen</button>
-          <button className="btn primary" onClick={openModal}>
-            <IconPlus size={14} stroke={2} /> Inplannen
-          </button>
         </div>
       </div>
 
-      {/* Filter bar */}
+      {/* Zoekbalk */}
       <div className="doc_filters" style={{ marginBottom: 16 }}>
         <input
           className="doc_zoek"
@@ -251,18 +282,9 @@ export default function DocentPlanningPage() {
           value={zoek}
           onChange={(e) => setZoek(e.target.value)}
         />
-        <select
-          className="doc_select"
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-        >
-          {TYPE_OPTIES.map((o) => (
-            <option key={o.key} value={o.key}>{o.label}</option>
-          ))}
-        </select>
-        {heeftFilters && (
-          <button className="btn sm primary" onClick={() => { setZoek(""); setTypeFilter("alle"); }}>
-            <IconX size={16} stroke={1.8} /> Wis filters
+        {zoek && (
+          <button className="btn sm primary" onClick={() => setZoek("")}>
+            <IconX size={16} stroke={1.8} /> Wis zoekopdracht
           </button>
         )}
       </div>
@@ -270,70 +292,35 @@ export default function DocentPlanningPage() {
       {loading && <div className="card"><p className="muted">Planning laden...</p></div>}
       {error && <div className="card"><span className="status s_rood">{error}</span></div>}
 
-      {!loading && !error && gefilterd.length === 0 && (
-        <div className="card"><p className="muted">Geen planning gevonden.</p></div>
-      )}
+      {!loading && !error && (
+        <>
+          {/* 521 — Sectie 1: bedrijfsbezoek + tussentijdse evaluatie */}
+          <div className="card doc_students_card" style={{ marginBottom: 16 }}>
+            <div className="card_title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <span><i className="ti ti-building" style={{ color: "var(--red)", marginRight: 6 }} />Bedrijfsbezoek + tussentijdse evaluatie</span>
+              <button className="btn primary sm" onClick={() => openModal("Bedrijfsbezoek")}>
+                <IconPlus size={14} stroke={2} /> Inplannen
+              </button>
+            </div>
+            {planningTabel(bezoeken, "Nog geen bedrijfsbezoek ingepland.")}
+          </div>
 
-      {!loading && !error && gefilterd.length > 0 && (
-        <div className="card doc_students_card">
-          <table className="doc_students_tbl">
-            <thead>
-              <tr>
-                <th>Student</th>
-                <th>Type</th>
-                <th>Datum</th>
-                <th>Locatie</th>
-                <th>Status</th>
-                <th style={{ textAlign: "right" }}>Acties</th>
-              </tr>
-            </thead>
-            <tbody>
-              {gefilterd.map((p) => {
-                const initialen = (p.student_naam || "?").split(" ").filter(Boolean).map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-                return (
-                  <tr key={p.id}>
-                    <td>
-                      <div className="doc_student_cell">
-                        <div className="doc_avatar">{initialen}</div>
-                        <div className="doc_student_info">
-                          <div className="doc_naam">{p.student_naam || "-"}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="doc_sub" style={{ textTransform: "capitalize" }}>
-                      {p.type === "bedrijfsbezoek" ? "Bedrijfsbezoek" : "Eindpresentatie"}
-                    </td>
-                    <td className="doc_sub">{formatDateTime(p.gepland_op)}</td>
-                    <td className="doc_sub">{p.locatie || "-"}</td>
-                    <td>
-                      <span className={"status " + getStatusClass(p.status)}>
-                        {getStatusLabel(p.status)}
-                      </span>
-                    </td>
-                    <td style={{ textAlign: "right" }}>
-                      {["bevestigd", "gepland"].includes(p.status) && (
-                        <button
-                          className="btn sm"
-                          disabled={gegevenId === p.id}
-                          onClick={() => markeerGegeven(p.id, p.type)}
-                        >
-                          <IconCheck size={14} stroke={2} /> {p.type === "bedrijfsbezoek" ? "Markeer als geweest" : "Markeer als gegeven"}
-                        </button>
-                      )}
-                      {/* 480: de mentor stelde een ander moment voor — open de pop-up om te bekijken,
-                          accepteren of een tegenvoorstel te sturen. */}
-                      {p.status === "alternatief_gevraagd" && (
-                        <button className="btn sm primary" disabled={gegevenId === p.id} onClick={() => openAltModal(p)}>
-                          <IconCheck size={14} stroke={2} /> Voorstel bekijken
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+          {/* 521 — Sectie 2: eindpresentatie (pas aan de beurt na het bezoek) */}
+          <div className="card doc_students_card">
+            <div className="card_title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <span><i className="ti ti-presentation" style={{ color: "var(--red)", marginRight: 6 }} />Eindpresentatie</span>
+              <button className="btn primary sm" disabled={!bezoekGeweest} title={bezoekGeweest ? "" : "Eerst het bedrijfsbezoek + tussentijdse evaluatie"} onClick={() => openModal("Eindpresentatie")}>
+                <IconPlus size={14} stroke={2} /> Inplannen
+              </button>
+            </div>
+            {!bezoekGeweest && (
+              <p className="muted" style={{ fontSize: 12.5, marginTop: 0 }}>
+                <i className="ti ti-info-circle" /> Nog niet aan de beurt — plan eerst het bedrijfsbezoek en registreer de tussentijdse evaluatie.
+              </p>
+            )}
+            {planningTabel(presentaties, "Nog geen eindpresentatie ingepland.")}
+          </div>
+        </>
       )}
 
       {/* Nieuw modal — admin stijl */}
