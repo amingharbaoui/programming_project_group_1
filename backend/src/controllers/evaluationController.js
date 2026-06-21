@@ -131,6 +131,24 @@ async function openEvaluation(req, res) {
     if (!["geregistreerd", "stage_loopt"].includes(dossier[0].status)) {
       return fail(res, 409, "Een evaluatie kan enkel geopend worden zolang het stagedossier geregistreerd is of loopt");
     }
+    // 500: een finale evaluatie kan pas geopend worden nadat de tussentijdse evaluatie geregistreerd is én er
+    // een (minstens bevestigde) eindpresentatie ingepland is — finaal volgt op de tussentijdse fase.
+    if (finalType === "finaal") {
+      const [[tussentijds]] = await db.query(
+        "SELECT COUNT(*) AS aantal FROM evaluaties WHERE stagedossier_id = ? AND type = 'tussentijds' AND status IN ('geregistreerd', 'vrijgegeven')",
+        [dossierId]
+      );
+      if (tussentijds.aantal === 0) {
+        return fail(res, 409, "Registreer eerst de tussentijdse evaluatie voor je de finale evaluatie opent");
+      }
+      const [[presentatie]] = await db.query(
+        "SELECT COUNT(*) AS aantal FROM planning_momenten WHERE stagedossier_id = ? AND type = 'eindpresentatie' AND status IN ('bevestigd', 'gegeven', 'geweest')",
+        [dossierId]
+      );
+      if (presentatie.aantal === 0) {
+        return fail(res, 409, "Plan en bevestig eerst de eindpresentatie voor je de finale evaluatie opent");
+      }
+    }
 
     // 448: de zelfevaluatie-deadline = 1 week vóór het relevante bevestigde moment (bezoek/presentatie).
     // Zo is de "tot 1 week ervoor"-regel echte data in de DB en niet enkel een UI-tekst.

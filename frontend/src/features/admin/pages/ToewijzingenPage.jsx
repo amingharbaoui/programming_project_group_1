@@ -117,7 +117,17 @@ export default function ToewijzingenPage() {
     }
   }
 
-  const heeftBegeleider = (d) => !!(d.docent_voornaam || d.docent_achternaam || d.stagebegeleider_id);
+  const heeftDocent = (d) => !!(d.docent_voornaam || d.docent_achternaam || d.stagebegeleider_id);
+  const heeftMentor = (d) => !!(d.mentor_voornaam || d.mentor_achternaam || d.mentor_id);
+  // 489: een dossier is pas "volledig toegewezen" als zowel docent als mentor gekoppeld zijn.
+  const volledig = (d) => heeftDocent(d) && heeftMentor(d);
+  const heeftBegeleider = volledig;
+  const ontbreekt = (d) => {
+    const m = [];
+    if (!heeftDocent(d)) m.push("docent");
+    if (!heeftMentor(d)) m.push("mentor");
+    return m.join(" en ");
+  };
 
   const matchZoekFilter = (d) => {
     const z = zoek.toLowerCase();
@@ -188,7 +198,7 @@ export default function ToewijzingenPage() {
         <div className="card tw_card">
           <div className="tw_section_title">
             <IconAlertTriangle size={16} stroke={1.8} />
-            Nog geen stagebegeleider toegewezen
+            Nog niet volledig toegewezen (docent en/of mentor ontbreekt)
           </div>
           <table className="tbl tw_tbl">
             <thead>
@@ -209,6 +219,9 @@ export default function ToewijzingenPage() {
                       <div className="tw_student_info">
                         <div className="tw_naam">{volledigeNaam(d.student_voornaam, d.student_achternaam)}</div>
                         <div className="tw_sub">{d.opleiding || d.academiejaar || "-"}</div>
+                        <div className="tw_sub" style={{ color: "var(--red)", fontWeight: 600 }}>
+                          <i className="ti ti-alert-triangle" /> {ontbreekt(d)} koppelen
+                        </div>
                       </div>
                     </div>
                   </td>

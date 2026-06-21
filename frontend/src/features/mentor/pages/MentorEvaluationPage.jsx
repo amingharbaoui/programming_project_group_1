@@ -169,14 +169,22 @@ export default function MentorEvaluationPage() {
     return { type: "—", wachtOp: "—" };
   }
   function evalStatusBadge(s) {
+    // 495: gebruik de échte evaluatiestatus uit /mentor/students wanneer die er is, niet enkel de dossierstatus.
+    const es = s.evaluatie_status;
+    if (es && es !== "niet_open") {
+      if (es === "vrijgegeven") return { cls: "s_ok", icon: "ti-award", txt: "Vrijgegeven" };
+      if (["geregistreerd", "klaar_voor_vrijgave"].includes(es)) return { cls: "s_ok", icon: "ti-check", txt: "Geregistreerd" };
+      if (es === "klaar_voor_docent") return { cls: "s_info", icon: "ti-clock", txt: "Bij de docent" };
+      if (es === "mentor_ingediend") return { cls: "s_info", icon: "ti-check", txt: "Jouw input ingediend" };
+      if (es === "student_ingediend") return { cls: "s_amber", icon: "ti-pencil", txt: "Jouw input nodig" };
+      if (es === "open") return { cls: "s_amber", icon: "ti-pencil", txt: "Open — in te vullen" };
+    }
     const ds = s.dossier_status;
-    if (["wacht_op_student","wacht_op_bedrijf","in_controle_bij_administratie","geregistreerd","actief","stage_loopt"].includes(ds))
-      return { cls: "s_grijs", icon: "ti-lock", txt: "Nog niet open" };
     if (["afgerond","voltooid"].includes(ds))
       return { cls: "s_ok", icon: "ti-check", txt: "Input ingediend" };
     if (ds === "resultaat_vrijgegeven")
       return { cls: "s_ok", icon: "ti-award", txt: "Afgerond" };
-    return { cls: "s_grijs", icon: "", txt: "—" };
+    return { cls: "s_grijs", icon: "ti-lock", txt: "Nog niet open" };
   }
 
   // ─── TABEL ───

@@ -91,12 +91,14 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, d
 
   const studentScoresMap = {};
   const mentorScoresMap = {};
+  const studentMotMap = {};
+  const mentorMotMap = {};
   const docentScoresBestaand = {};
   const docentMotiveringenBestaand = {};
   if (evaluatie) {
     for (const s of evaluatie.scores || []) {
-      if (s.rol === "student") studentScoresMap[s.competentie_id] = s.score;
-      if (s.rol === "mentor") mentorScoresMap[s.competentie_id] = s.score;
+      if (s.rol === "student") { studentScoresMap[s.competentie_id] = s.score; if (s.motivering) studentMotMap[s.competentie_id] = s.motivering; }
+      if (s.rol === "mentor") { mentorScoresMap[s.competentie_id] = s.score; if (s.motivering || s.feedback) mentorMotMap[s.competentie_id] = s.motivering || s.feedback; }
       if (s.rol === "docent") {
         docentScoresBestaand[s.competentie_id] = s.score;
         if (s.motivering) docentMotiveringenBestaand[s.competentie_id] = s.motivering;
@@ -284,6 +286,14 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, d
 
   return (
     <>
+    {/* 496: algemene praktijkfeedback van de mentor, zodat de docent ze meeneemt bij het registreren. */}
+    {evaluatie?.mentor_algemene_feedback && (
+      <div className="card" style={{ marginBottom: 12 }}>
+        <div className="card_title" style={{ marginBottom: 6 }}>Algemene feedback van de mentor</div>
+        <div style={{ fontSize: 13, color: "var(--dark)", whiteSpace: "pre-wrap" }}>{evaluatie.mentor_algemene_feedback}</div>
+      </div>
+    )}
+
     {/* Matrix — Student · Mentor · Docent scores in één tabel */}
     <div className="card doc_students_card" style={{ marginBottom: "12px" }}>
       <div className="card_title" style={{ marginBottom: 0, paddingBottom: 14 }}>
@@ -306,9 +316,19 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, d
               <td>{c.naam}</td>
               <td style={{ textAlign: "center" }}>
                 <ScoreDisplay waarde={studentScoresMap[c.id]} />
+                {studentMotMap[c.id] && (
+                  <div className="doc_sub" title={studentMotMap[c.id]} style={{ fontStyle: "italic", fontSize: 11, marginTop: 3, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    "{studentMotMap[c.id]}"
+                  </div>
+                )}
               </td>
               <td style={{ textAlign: "center" }}>
                 <ScoreDisplay waarde={mentorScoresMap[c.id]} />
+                {mentorMotMap[c.id] && (
+                  <div className="doc_sub" title={mentorMotMap[c.id]} style={{ fontStyle: "italic", fontSize: 11, marginTop: 3, maxWidth: 150, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    "{mentorMotMap[c.id]}"
+                  </div>
+                )}
               </td>
               <td style={{ textAlign: kanInvullen ? "left" : "center" }}>
                 {kanInvullen ? (

@@ -116,6 +116,21 @@ async function createPlanningMoment(req, res, type) {
       const label = type === "bedrijfsbezoek" ? "bedrijfsbezoek" : "eindpresentatie";
       return fail(res, 409, `Er is al een actief ${label} ingepland; pas dat moment aan of annuleer het eerst.`);
     }
+    // 499: een eindpresentatie kan pas gepland worden nadat het bedrijfsbezoek heeft plaatsgevonden én de
+    // tussentijdse evaluatie geregistreerd is — eerst de tussentijdse fase, dan pas de eindfase.
+    if (type === "eindpresentatie") {
+      const [[bezoek]] = await db.query(
+        "SELECT COUNT(*) AS aantal FROM planning_momenten WHERE stagedossier_id = ? AND type = 'bedrijfsbezoek' AND status = 'geweest'",
+        [dossierIdFinal]
+      );
+      const [[tussentijds]] = await db.query(
+        "SELECT COUNT(*) AS aantal FROM evaluaties WHERE stagedossier_id = ? AND type = 'tussentijds' AND status IN ('geregistreerd', 'vrijgegeven')",
+        [dossierIdFinal]
+      );
+      if (bezoek.aantal === 0 || tussentijds.aantal === 0) {
+        return fail(res, 409, "Plan eerst het bedrijfsbezoek en registreer de tussentijdse evaluatie voor je een eindpresentatie inplant");
+      }
+    }
 
     // 477: ook een eindpresentatie start als 'voorgesteld' (niet 'gepland'), zodat de student ze pas ziet
     // nadat de mentor bevestigd heeft — net als het bedrijfsbezoek.
