@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 import "./DocentLogbooksPage.css";
-import { IconAlertTriangle, IconBell, IconCheck, IconX, IconRefresh, IconChevronDown } from "@tabler/icons-react";
+import { IconAlertTriangle, IconBell, IconCheck, IconX, IconRefresh, IconArrowLeft } from "@tabler/icons-react";
 import { cacheGet, cacheSet, cacheDelete } from "../docentCache";
 
 // Alle mogelijke statussen van logboek_weken:
@@ -63,8 +63,6 @@ export default function DocentLogbooksPage() {
   const [actionLoadingId, setActionLoadingId] = useState(null);
   const [remindLoading, setRemindLoading] = useState(false);
   const [remindModal, setRemindModal] = useState({ open: false, succes: true, tekst: "" });
-  const [dropOpen, setDropOpen] = useState(false);
-  const dropRef = useRef(null);
 
   // Laad studenten van API
   useEffect(() => {
@@ -160,15 +158,6 @@ export default function DocentLogbooksPage() {
     }
   }
 
-  // Sluit dropdown bij klik buiten
-  useEffect(() => {
-    function handleOutside(e) {
-      if (dropRef.current && !dropRef.current.contains(e.target)) setDropOpen(false);
-    }
-    document.addEventListener("mousedown", handleOutside);
-    return () => document.removeEventListener("mousedown", handleOutside);
-  }, []);
-
   const geselecteerdeStudent = studenten.find(
     (s) => (s.student_id || s.id) === studentId
   );
@@ -215,55 +204,65 @@ export default function DocentLogbooksPage() {
       <div className="page-header">
         <div>
           <h1>Logboeken</h1>
-          <p>Bekijk logboeken, mentorfeedback en geef docentfeedback.</p>
+          <p>Een week komt hier binnen nadat de mentor hem afgecheckt heeft — jij leest na en keurt goed of stuurt terug.</p>
         </div>
-        <button className="btn primary" onClick={() => studentId && loadLogbooks(studentId, true)}>
-          <IconRefresh size={14} stroke={1.8} /> Vernieuwen
-        </button>
+        {studentId && (
+          <button className="btn primary" onClick={() => loadLogbooks(studentId, true)}>
+            <IconRefresh size={14} stroke={1.8} /> Vernieuwen
+          </button>
+        )}
       </div>
 
-      {/* Student selector */}
-      {studenten.length > 0 && (
-        <div className="card" style={{ marginBottom: "12px" }}>
-          <div className="card_title">Student kiezen</div>
-          <div className="form_group" style={{ marginBottom: 0 }}>
-            <label className="form_label">Student</label>
-            <div className="lb_drop_wrap" ref={dropRef}>
-              <button
-                type="button"
-                className="lb_drop_trigger"
-                onClick={() => setDropOpen((o) => !o)}
-              >
-                <span>
-                  {geselecteerdeStudent
-                    ? `${geselecteerdeStudent.voornaam} ${geselecteerdeStudent.achternaam}${geselecteerdeStudent.bedrijf ? ` — ${geselecteerdeStudent.bedrijf}` : ""}`
-                    : "Kies een student"}
-                </span>
-                <IconChevronDown size={15} stroke={1.8} className={`lb_drop_chevron${dropOpen ? " open" : ""}`} />
-              </button>
-              {dropOpen && (
-                <div className="lb_drop_menu">
-                  {studenten.map((s) => {
-                    const sid = s.student_id || s.id;
-                    const label = `${s.voornaam} ${s.achternaam}${s.bedrijf ? ` — ${s.bedrijf}` : ""}`;
-                    return (
-                      <button
-                        key={s.dossier_id}
-                        type="button"
-                        className={`lb_drop_item${sid === studentId ? " actief" : ""}`}
-                        onClick={() => {
-                          setDropOpen(false);
-                          handleStudentChange({ target: { value: sid } });
-                        }}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
+      {/* Overzicht: zolang er geen student gekozen is, een tabel met alle stagiairs (zoals het prototype). */}
+      {!studentId && studenten.length > 0 && (
+        <div className="card doc_students_card">
+          <table className="doc_students_tbl">
+            <thead>
+              <tr><th>Student</th><th>Bedrijf</th><th>Status</th><th></th></tr>
+            </thead>
+            <tbody>
+              {studenten.map((s) => {
+                const sid = s.student_id || s.id;
+                const initialen = [s.voornaam, s.achternaam].filter(Boolean).map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?";
+                const teLezen = s.actie_type === "logboek";
+                return (
+                  <tr key={s.dossier_id}>
+                    <td>
+                      <div className="doc_student_cell">
+                        <div className="doc_avatar">{initialen}</div>
+                        <div className="doc_student_info"><div className="doc_naam">{s.voornaam} {s.achternaam}</div></div>
+                      </div>
+                    </td>
+                    <td className="doc_sub">{s.bedrijf || "-"}</td>
+                    <td>
+                      {teLezen
+                        ? <span className="status s_rood"><IconAlertTriangle size={13} stroke={1.8} /> Na te lezen</span>
+                        : <span className="status s_grijs">Bijgewerkt</span>}
+                    </td>
+                    <td style={{ textAlign: "right" }}>
+                      <button className="btn sm" onClick={() => handleStudentChange({ target: { value: sid } })}>Openen</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {!studentId && studenten.length === 0 && (
+        <div className="card"><p className="muted">Geen stagiairs gevonden.</p></div>
+      )}
+
+      {/* Detail: terugknop naar het overzicht. */}
+      {studentId && (
+        <div style={{ marginBottom: 12 }}>
+          <button className="btn" onClick={() => { setStudentId(null); setWeeks([]); }}>
+            <IconArrowLeft size={14} stroke={1.8} /> Alle logboeken
+          </button>
+          {geselecteerdeStudent && (
+            <span style={{ marginLeft: 10, fontWeight: 600 }}>{geselecteerdeStudent.voornaam} {geselecteerdeStudent.achternaam}</span>
+          )}
         </div>
       )}
 
@@ -279,7 +278,7 @@ export default function DocentLogbooksPage() {
         </div>
       )}
 
-      {!loading && !error && alleWeken.length === 0 && (
+      {studentId && !loading && !error && alleWeken.length === 0 && (
         <div className="card"><p className="muted">Geen logboeken gevonden voor deze student.</p></div>
       )}
 
