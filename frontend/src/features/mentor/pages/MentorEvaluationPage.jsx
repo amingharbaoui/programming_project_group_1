@@ -156,35 +156,70 @@ export default function MentorEvaluationPage() {
     }
   }
 
+  function evalRegelM(s) {
+    const ds = s.dossier_status;
+    if (["wacht_op_student","wacht_op_bedrijf","in_controle_bij_administratie","geregistreerd"].includes(ds))
+      return { type: "—", wachtOp: "Zelfevaluatie van de student" };
+    if (["actief","stage_loopt"].includes(ds))
+      return { type: "Tussentijds", wachtOp: "Zelfevaluatie van de student" };
+    if (["afgerond","voltooid"].includes(ds))
+      return { type: "Finale", wachtOp: "Eindpresentatie + docent" };
+    if (ds === "resultaat_vrijgegeven")
+      return { type: "Finale", wachtOp: "—" };
+    return { type: "—", wachtOp: "—" };
+  }
+  function evalStatusBadge(s) {
+    const ds = s.dossier_status;
+    if (["wacht_op_student","wacht_op_bedrijf","in_controle_bij_administratie","geregistreerd","actief","stage_loopt"].includes(ds))
+      return { cls: "s_grijs", icon: "ti-lock", txt: "Nog niet open" };
+    if (["afgerond","voltooid"].includes(ds))
+      return { cls: "s_ok", icon: "ti-check", txt: "Input ingediend" };
+    if (ds === "resultaat_vrijgegeven")
+      return { cls: "s_ok", icon: "ti-award", txt: "Afgerond" };
+    return { cls: "s_grijs", icon: "", txt: "—" };
+  }
+
   // ─── TABEL ───
   if (!detailId) {
     return (
       <div className="page-inner">
           <div className="page-header">
             <h1>Evaluaties</h1>
-            <p>Actief competentieprofiel — de student motiveert, jij scoort als advies</p>
+            <p>Competentieprofiel: Toegepaste Informatica 2025–2026 · versie 1.0 — de student motiveert, jij scoort als advies</p>
           </div>
           {error && <div className="card"><span className="status s_rood">{error}</span></div>}
           {!error && studenten.length === 0 && <div className="card"><p style={{ color: "var(--sub)", fontSize: 13 }}>Geen stagiairs gevonden.</p></div>}
           {studenten.length > 0 && (
             <div className="card" style={{ padding: "6px 14px" }}>
               <table className="tbl">
-                <thead><tr><th>Student</th><th>Bedrijf</th><th></th></tr></thead>
+                <thead><tr><th>Student</th><th>Type</th><th>Wacht op</th><th>Status</th><th></th></tr></thead>
                 <tbody>
-                  {studenten.map((s) => (
-                    <tr key={s.dossier_id ?? s.id}>
-                      <td>
-                        <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-                          <div className="prof-av" style={{ width: 30, height: 30, fontSize: 11 }}>{initialen(s)}</div>
-                          <div style={{ fontSize: 13.5, fontWeight: 600 }}>{s.voornaam} {s.achternaam}</div>
-                        </div>
-                      </td>
-                      <td style={{ fontSize: 12.5, color: "var(--sub)" }}>{s.bedrijf || "-"}</td>
-                      <td style={{ textAlign: "right" }}>
-                        <button className="btn sm" onClick={() => setDetailId(s.id)}><i className="ti ti-eye" />Open</button>
-                      </td>
-                    </tr>
-                  ))}
+                  {studenten.map((s) => {
+                    const inf = evalRegelM(s);
+                    const eb = evalStatusBadge(s);
+                    return (
+                      <tr key={s.dossier_id ?? s.id}>
+                        <td>
+                          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                            <div className="prof-av" style={{ width: 30, height: 30, fontSize: 11 }}>{initialen(s)}</div>
+                            <div style={{ fontSize: 13.5, fontWeight: 600, cursor: "pointer" }} onClick={() => setDetailId(s.id)}>
+                              {s.voornaam} {s.achternaam}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ fontSize: 12.5, color: "var(--sub)" }}>{inf.type}</td>
+                        <td style={{ fontSize: 12.5, color: "var(--sub)" }}>{inf.wachtOp}</td>
+                        <td>
+                          <span className={`status ${eb.cls}`}>
+                            {eb.icon && <i className={`ti ${eb.icon}`} />}{eb.txt}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: "right" }}>
+                          <button className="btn sm" onClick={() => setDetailId(s.id)}><i className="ti ti-eye" />Open</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -233,18 +268,33 @@ export default function MentorEvaluationPage() {
           </div>
         </div>
 
-        {/* Resultaatkaart — enkel zichtbaar nadat de docent het eindresultaat heeft vrijgegeven (story 34) */}
+        {/* Resultaatkaart — enkel zichtbaar nadat de docent het eindresultaat heeft vrijgegeven */}
         {finaalEval?.status === "vrijgegeven" && (
           <div className="card" style={{ marginTop: 14, borderLeft: "3px solid var(--green, #16a34a)" }}>
-            <div className="card_title"><i className="ti ti-trophy" /> Eindresultaat vrijgegeven</div>
-            <div className="kv"><span className="k">Eindcijfer</span><span className="v"><b>{finaalEval.eindcijfer != null ? `${Number(finaalEval.eindcijfer).toFixed(1)}/20` : "-"}</b></span></div>
+            <div className="card_title" style={{ color: "var(--green, #16a34a)" }}>
+              <i className="ti ti-award" />Stage afgerond
+              <span className="status s_ok" style={{ marginLeft: "auto" }}><i className="ti ti-star" />Resultaat vrijgegeven</span>
+            </div>
+            <div className="kv">
+              <span className="k">Eindcijfer</span>
+              <span className="v"><b style={{ fontSize: 16 }}>{finaalEval.eindcijfer != null ? `${Number(finaalEval.eindcijfer).toFixed(1)}/20` : "—"}</b></span>
+            </div>
             {finaalEval.competentie_score != null && (
-              <div className="kv"><span className="k">Competentiescore</span><span className="v">{Number(finaalEval.competentie_score).toFixed(1)}/5</span></div>
+              <div className="kv">
+                <span className="k">Competentiescore</span>
+                <span className="v">{Number(finaalEval.competentie_score).toFixed(1)}/5</span>
+              </div>
             )}
             {finaalEval.verslag && (
-              <div className="kv"><span className="k">Eindfeedback</span><span className="v">{finaalEval.verslag}</span></div>
+              <div className="kv">
+                <span className="k">Eindfeedback van de docent</span>
+                <span className="v" style={{ lineHeight: 1.6, fontStyle: "italic", color: "var(--sub)" }}>"{finaalEval.verslag}"</span>
+              </div>
             )}
-            <div className="kv"><span className="k">Open acties</span><span className="v">Geen</span></div>
+            <div className="kv">
+              <span className="k">Open acties</span>
+              <span className="v"><span className="status s_ok"><i className="ti ti-check" />Geen — stage volledig afgerond</span></span>
+            </div>
           </div>
         )}
 
@@ -261,6 +311,17 @@ export default function MentorEvaluationPage() {
               <div className="zone-act leeg"><i className="ti ti-lock" style={{ color: "var(--sub)" }} /><span>Deze evaluatie is nog niet beschikbaar — je krijgt een melding zodra de student zijn zelfevaluatie indient.</span></div>
             ) : (
               <>
+                {/* Sectietitel */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 14, marginBottom: 4 }}>
+                  <span style={{ fontWeight: 700, fontSize: 14.5 }}>
+                    {activeTab === "tussentijds" ? "Evaluatie 1 · Tussentijdse mentorinput" : "Evaluatie 2 · Finale mentorinput"}
+                  </span>
+                  {KLAAR.includes(huidigeEval.status) ? (
+                    <span className="status s_ok"><i className="ti ti-check" />Ingediend</span>
+                  ) : (
+                    <span className="status s_amber"><i className="ti ti-pencil" />Jouw input gevraagd</span>
+                  )}
+                </div>
                 <div className="mtx mtx2">
                   <div className="mtx-row mtx-head">
                     <span />
