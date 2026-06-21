@@ -670,11 +670,13 @@ async function getMyInternship(req, res) {
         d.id AS dossier_id,
         d.status AS dossier_status,
         d.praktische_afspraken,
-        d.praktische_afspraken_gedeeld_op
+        d.praktische_afspraken_gedeeld_op,
+        st.academiejaar
       FROM stagevoorstellen sp
       JOIN stagevoorstel_versies v
         ON v.stagevoorstel_id = sp.id
        AND v.versie_nummer = sp.huidige_versie_nummer
+      LEFT JOIN studenten st ON st.gebruiker_id = sp.student_id
       LEFT JOIN voorstel_beslissingen b
         ON b.id = (
           SELECT vb.id
