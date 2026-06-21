@@ -17,7 +17,7 @@ function loadStoredUser() {
 function clearRoleCaches() {
   try {
     for (const key of Object.keys(localStorage)) {
-      if (/^(admin|committee|mentor|student|docent)_/.test(key)) localStorage.removeItem(key);
+      if (/^(admin|committee|mentor|student|docent)_|^logboek_draft_/.test(key)) localStorage.removeItem(key);
     }
   } catch { /* ignore */ }
 }

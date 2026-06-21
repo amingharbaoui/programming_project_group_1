@@ -34,7 +34,7 @@ api.interceptors.response.use(
         // Ook alle rolgebonden caches wissen — anders kan na opnieuw inloggen (of snel van gebruiker
         // wisselen) oude localStorage-data van de vorige sessie blijven hangen.
         Object.keys(localStorage)
-          .filter((k) => /^(admin|committee|mentor|student|docent)_/.test(k))
+          .filter((k) => /^(admin|committee|mentor|student|docent)_|^logboek_draft_/.test(k))
           .forEach((k) => localStorage.removeItem(k));
         sessionStorage.removeItem("mentor_dossier");
       } catch { /* ignore */ }
