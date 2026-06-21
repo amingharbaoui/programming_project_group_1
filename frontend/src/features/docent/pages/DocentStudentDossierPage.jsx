@@ -11,11 +11,59 @@ function formatDate(val) {
   return new Date(val).toLocaleDateString("nl-BE");
 }
 
+const STATUS_LABELS = {
+  // Stagedossier
+  wacht_op_student:               "Wacht op student",
+  wacht_op_bedrijf:               "Wacht op bedrijf",
+  in_controle_bij_administratie:  "In controle bij administratie",
+  document_afgekeurd:             "Document afgekeurd",
+  geregistreerd:                  "Geregistreerd",
+  stage_loopt:                    "Stage loopt",
+  resultaat_vrijgegeven:          "Resultaat vrijgegeven",
+  afgerond:                       "Afgerond",
+  // Stageovereenkomst
+  klaar_voor_student:             "Klaar voor student",
+  getekend_door_student:          "Getekend door student",
+  volledig_ondertekend:           "Volledig ondertekend",
+  // Documenten
+  ontbreekt:                      "Ontbreekt",
+  ingediend:                      "Ingediend",
+  in_controle:                    "In controle",
+  goedgekeurd:                    "Goedgekeurd",
+  // Evaluaties
+  niet_open:                      "Nog niet beschikbaar",
+  open:                           "Geopend",
+  student_ingediend:              "Student ingediend",
+  mentor_ingediend:               "Mentor ingediend",
+  klaar_voor_docent:              "Klaar om in te vullen",
+  klaar_voor_vrijgave:            "Klaar om vrij te geven",
+  vrijgegeven:                    "Vrijgegeven",
+  // Logboek weken
+  niet_gestart:                   "Nog niet gestart",
+  in_opbouw:                      "In opbouw",
+  afgecheckt_door_mentor:         "Nagekeken door mentor",
+  teruggestuurd_door_mentor:      "Teruggestuurd door mentor",
+  teruggestuurd_door_docent:      "Teruggestuurd door jou",
+  goedgekeurd_door_docent:        "Goedgekeurd door jou",
+  afgesloten:                     "Afgesloten",
+  afgekeurd:                      "Afgekeurd",
+};
+
+function statusLabel(status) {
+  return STATUS_LABELS[status] || status || "-";
+}
+
 function getStatusClass(status) {
   if (!status) return "s_grijs";
-  if (status === "goedgekeurd" || status === "actief" || status === "getekend_door_student" || status === "volledig_ondertekend" || status === "geregistreerd" || status === "goedgekeurd_door_docent" || status === "stage_loopt" || status === "afgerond") return "s_ok";
-  if (status === "ingediend" || status === "in_behandeling" || status === "afgecheckt_door_mentor") return "s_info";
-  if (status === "afgekeurd" || (status && status.includes("teruggestuurd"))) return "s_rood";
+  const ok = ["goedgekeurd", "volledig_ondertekend", "geregistreerd", "goedgekeurd_door_docent",
+               "stage_loopt", "afgerond", "resultaat_vrijgegeven", "vrijgegeven", "afgesloten", "klaar_voor_vrijgave"];
+  const info = ["ingediend", "afgecheckt_door_mentor", "getekend_door_student", "student_ingediend",
+                 "mentor_ingediend", "in_opbouw"];
+  const rood = ["afgekeurd", "document_afgekeurd", "ontbreekt"];
+  if (ok.includes(status)) return "s_ok";
+  if (info.includes(status)) return "s_info";
+  if (rood.includes(status) || status.includes("teruggestuurd")) return "s_rood";
+  // amber: klaar_voor_docent, wacht_op_*, in_controle*, klaar_voor_student, niet_open, open
   return "s_amber";
 }
 
@@ -135,7 +183,7 @@ export default function DocentStudentDossierPage() {
             <div className="kv"><span className="k">Studentnummer</span><span className="v">{d.studentennummer || "-"}</span></div>
             <div className="kv"><span className="k">Opleiding</span><span className="v">{d.opleiding || "-"}</span></div>
             <div className="kv"><span className="k">Academiejaar</span><span className="v">{d.academiejaar || "-"}</span></div>
-            <div className="kv"><span className="k">Dossierstatus</span><span className={"status " + getStatusClass(d.status)}>{d.status || "-"}</span></div>
+            <div className="kv"><span className="k">Dossierstatus</span><span className={"status " + getStatusClass(d.status)}>{statusLabel(d.status)}</span></div>
           </div>
 
           {/* Bedrijf + Mentor */}
@@ -150,7 +198,7 @@ export default function DocentStudentDossierPage() {
           {/* Contract */}
           <div className="card">
             <div className="card_title">Stageovereenkomst</div>
-            <div className="kv"><span className="k">Status</span><span className={"status " + getStatusClass(overeenkomst?.status)}>{overeenkomst?.status || "Niet beschikbaar"}</span></div>
+            <div className="kv"><span className="k">Status</span><span className={"status " + getStatusClass(overeenkomst?.status)}>{overeenkomst ? statusLabel(overeenkomst.status) : "Niet beschikbaar"}</span></div>
             <div className="kv"><span className="k">Student getekend</span><span className="v">{formatDate(overeenkomst?.student_getekend_op)}</span></div>
             <div className="kv"><span className="k">Bedrijf getekend</span><span className="v">{formatDate(overeenkomst?.bedrijf_getekend_op)}</span></div>
           </div>
@@ -168,7 +216,7 @@ export default function DocentStudentDossierPage() {
                     <tr key={doc.id}>
                       <td>{doc.documenttype || doc.bestand_naam || "-"}</td>
                       <td>{doc.versie_nummer || 1}</td>
-                      <td><span className={"status " + getStatusClass(doc.status)}>{doc.status || "-"}</span></td>
+                      <td><span className={"status " + getStatusClass(doc.status)}>{statusLabel(doc.status)}</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -190,7 +238,7 @@ export default function DocentStudentDossierPage() {
                       <td>Week {w.week_nummer}</td>
                       <td>{formatDate(w.week_start)} - {formatDate(w.week_einde)}</td>
                       <td>{w.totaal_uren || 0}</td>
-                      <td><span className={"status " + getStatusClass(w.status)}>{w.status || "-"}</span></td>
+                      <td><span className={"status " + getStatusClass(w.status)}>{statusLabel(w.status)}</span></td>
                     </tr>
                   ))}
                 </tbody>
@@ -209,8 +257,8 @@ export default function DocentStudentDossierPage() {
                 <tbody>
                   {evaluaties.map((e, i) => (
                     <tr key={i}>
-                      <td>{e.type || "-"}</td>
-                      <td><span className={"status " + getStatusClass(e.status)}>{e.status || "-"}</span></td>
+                      <td style={{ textTransform: "capitalize" }}>{e.type === "tussentijds" ? "Tussentijds" : e.type === "finaal" ? "Finaal" : e.type || "-"}</td>
+                      <td><span className={"status " + getStatusClass(e.status)}>{statusLabel(e.status)}</span></td>
                       <td>{formatDate(e.aangemaakt_op)}</td>
                     </tr>
                   ))}
