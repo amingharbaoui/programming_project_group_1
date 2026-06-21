@@ -548,7 +548,8 @@ async function getLogbooksByStudent(req, res) {
         competenties,
         aantal_uren,
         mentor_bevestigd_op,
-        mentor_opmerking
+        mentor_opmerking,
+        student_reactie
       FROM logboek_dagen
       WHERE logboek_week_id IN (?)
       ORDER BY datum ASC
@@ -1396,6 +1397,37 @@ async function updateLogbookEntry(req, res) {
   }
 }
 
+// PATCH /api/logbooks/days/:dayId/reactie — student reageert op mentor-opmerking van een dag.
+async function studentReactieDag(req, res) {
+  const dayId = Number(req.params.dayId);
+  const studentId = getUserId(req, 1);
+  const { reactie } = req.body || {};
+  if (!dayId) return fail(res, 400, "Ongeldig dag-id");
+  if (!reactie || !String(reactie).trim()) return fail(res, 400, "Reactie mag niet leeg zijn");
+
+  try {
+    const [rows] = await db.query(
+      `SELECT ld.id, ld.mentor_opmerking, d.student_id
+       FROM logboek_dagen ld
+       JOIN logboek_weken lw ON lw.id = ld.logboek_week_id
+       JOIN stagedossiers d ON d.id = lw.stagedossier_id
+       WHERE ld.id = ? LIMIT 1`,
+      [dayId]
+    );
+    if (rows.length === 0) return fail(res, 404, "Logboekdag niet gevonden");
+    if (Number(rows[0].student_id) !== studentId) return fail(res, 403, "Dit is niet jouw logboekdag");
+    if (!rows[0].mentor_opmerking) return fail(res, 409, "Er is nog geen mentor-opmerking om op te reageren");
+
+    await db.query(
+      "UPDATE logboek_dagen SET student_reactie = ?, aangepast_op = NOW() WHERE id = ?",
+      [reactie.trim(), dayId]
+    );
+    return ok(res, { id: dayId }, "Reactie opgeslagen");
+  } catch (error) {
+    return fail(res, 500, "Reactie opslaan mislukt", error.message);
+  }
+}
+
 module.exports = {
   createLogbook,
   saveLogbookDay,
@@ -1405,6 +1437,7 @@ module.exports = {
   mentorCheckLogbookWeek,
   docentReviewLogbookWeek,
   studentAntwoordFeedback,
+  studentReactieDag,
   getMissingLogbooksForDocent,
   getMissingLogbooksForMentor,
   sendMissingLogbookReminder
