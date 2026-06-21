@@ -20,6 +20,8 @@ import {
 
 const DAG_NAMEN = ["Maandag", "Dinsdag", "Woensdag", "Donderdag", "Vrijdag"];
 
+const DRAFT_KEY = (uid) => `logboek_draft_${uid}`;
+
 const TERUGGESTUURD_STATUSSEN = [
   "teruggestuurd_door_mentor",
   "teruggestuurd_door_docent",
@@ -350,7 +352,7 @@ function weekNaarFormulier(week) {
 function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aantalWeken, competentieLijst = LO_COMPETENTIES }) {
   // Bereken per dag of hij al ingevuld is (status="geen_stagedag" of expliciete vlag)
   const [ingediendeDagen, setIngediendeDagen] = useState(
-    logbook.dagen.map((d) => !!(d.status === "geen_stagedag"))
+    logbook.dagen.map((d) => !!(d._bevestigd || d.status === "geen_stagedag"))
   );
   const [dagFout, setDagFout] = useState("");
 
@@ -399,8 +401,7 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
   }
 
   function handleDagOpslaan() {
-    // Een gewone stagedag moet minstens uitgevoerde taken én reflectie bevatten — niet leeg als
-    // "ingevuld" markeren. Wie niet werkte, gebruikt 'Geen stagedag'.
+    // Validatie: gewone stagedag vereist minstens taken + reflectie
     const dag = logbook.dagen[activeDag] || {};
     if (dag.status !== "geen_stagedag") {
       if (!String(dag.uitgevoerdeTaken || "").trim() || !String(dag.reflectie || "").trim()) {
@@ -409,6 +410,11 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
       }
     }
     setDagFout("");
+    // Sla _bevestigd in de dag zelf op — zo overleeft de staat een page-navigatie
+    const updatedDagen = [...logbook.dagen];
+    updatedDagen[activeDag] = { ...updatedDagen[activeDag], _bevestigd: true };
+    setLogbook({ ...logbook, dagen: updatedDagen });
+
     const updated = [...ingediendeDagen];
     updated[activeDag] = true;
     setIngediendeDagen(updated);
@@ -422,7 +428,7 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
     updatedDagen[activeDag] = {
       ...updatedDagen[activeDag],
       aantalUren: 0, titel: "", uitgevoerdeTaken: "", reflectie: "", problemen: "",
-      competenties: [], status: "geen_stagedag",
+      competenties: [], status: "geen_stagedag", _bevestigd: true,
     };
     setLogbook({ ...logbook, dagen: updatedDagen });
     const updated = [...ingediendeDagen];
@@ -716,7 +722,27 @@ export default function StudentLogbookPage() {
 
       if (!editWeek) {
         const maxWeek = resolved.length > 0 ? Math.max(...resolved.map((w) => w.week_nummer)) : 0;
-        setLogbook(defaultLogbook(maxWeek + 1, sd));
+        const verwachtWeekNr = maxWeek + 1;
+
+        // Herstel concept-week als de draft in localStorage past bij de verwachte week
+        let herstellenGelukt = false;
+        try {
+          const opgeslagen = localStorage.getItem(DRAFT_KEY(user.id));
+          if (opgeslagen) {
+            const draft = JSON.parse(opgeslagen);
+            if (draft.weekNummer === verwachtWeekNr) {
+              setLogbook(draft);
+              herstellenGelukt = true;
+            } else {
+              // Draft hoort bij een andere week (al ingediend) — verwijder
+              localStorage.removeItem(DRAFT_KEY(user.id));
+            }
+          }
+        } catch { /* ongeldige JSON — negeren */ }
+
+        if (!herstellenGelukt) {
+          setLogbook(defaultLogbook(verwachtWeekNr, sd));
+        }
       }
     } catch (err) {
       console.error("Kan logboeken niet ophalen:", err);
@@ -782,6 +808,18 @@ export default function StudentLogbookPage() {
 
     init();
   }, [user.id]);
+
+  // Sla de huidige concept-week op in localStorage zodra minstens één dag bevestigd is.
+  // Zo blijft de voortgang bewaard als de student wegnavigiert.
+  useEffect(() => {
+    if (editWeek || submitted) return; // alleen voor nieuwe weken
+    const eenBevestigd = logbook.dagen.some((d) => d._bevestigd || d.status === "geen_stagedag");
+    if (eenBevestigd) {
+      try {
+        localStorage.setItem(DRAFT_KEY(user.id), JSON.stringify(logbook));
+      } catch { /* quota overschreden — stil negeren */ }
+    }
+  }, [logbook, editWeek, submitted, user.id]);
 
   /* Beschikbaarheidslogica */
   const vandaag = new Date();
@@ -858,6 +896,8 @@ export default function StudentLogbookPage() {
       });
 
       const weekNrIngediend = Number(logbook.weekNummer);
+      // Draft verwijderen — week is succesvol ingediend
+      try { localStorage.removeItem(DRAFT_KEY(user.id)); } catch { /* stil */ }
       setEditWeek(null);
       await fetchWeken(startDatum);
       setSubmitted(true);
@@ -904,7 +944,19 @@ export default function StudentLogbookPage() {
     setError(null);
     const maxWeek =
       weken.length > 0 ? Math.max(...weken.map((w) => w.week_nummer)) : 0;
-    setLogbook(defaultLogbook(maxWeek + 1, startDatum));
+    const verwachtWeekNr = maxWeek + 1;
+    // Herstel draft als die er nog is voor de volgende week
+    try {
+      const opgeslagen = localStorage.getItem(DRAFT_KEY(user.id));
+      if (opgeslagen) {
+        const draft = JSON.parse(opgeslagen);
+        if (draft.weekNummer === verwachtWeekNr) {
+          setLogbook(draft);
+          return;
+        }
+      }
+    } catch { /* ongeldige JSON */ }
+    setLogbook(defaultLogbook(verwachtWeekNr, startDatum));
   }
 
   /* ---------- Render ---------- */
@@ -1007,9 +1059,17 @@ export default function StudentLogbookPage() {
     (sum, w) => sum + (BEVESTIGD_STATUSSEN.includes(w.status) ? (Number(w.totaal_uren) || 0) : 0),
     0
   );
+  // Uren van de lopende (nog niet ingediende) week — telt mee zodra een dag bevestigd is
+  const urenHuidigWeek = (!editWeek && !submitted)
+    ? logbook.dagen.reduce(
+        (s, d) => s + ((d._bevestigd || d.status === "geen_stagedag") ? (Number(d.aantalUren) || 0) : 0),
+        0
+      )
+    : 0;
+  const totaalUrenTonen = totaalUrenIngediend + urenHuidigWeek;
   const MIN_UREN = minUren;
-  const urenPct = Math.min(100, Math.round((totaalUrenBevestigd / MIN_UREN) * 100));
-  const urenResterend = Math.max(0, MIN_UREN - totaalUrenBevestigd);
+  const urenPct = Math.min(100, Math.round((totaalUrenTonen / MIN_UREN) * 100));
+  const urenResterend = Math.max(0, MIN_UREN - totaalUrenTonen);
   const urenNogTeBevestigen = Math.max(0, totaalUrenIngediend - totaalUrenBevestigd);
 
   return (
@@ -1030,7 +1090,12 @@ export default function StudentLogbookPage() {
         <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap" }}>
           <div style={{ flex: 1, minWidth: 180 }}>
             <div style={{ fontSize: 12, color: "var(--sub)" }}>
-              Gepresteerde uren — bevestigd door je mentor
+              Gepresteerde uren
+              {urenHuidigWeek > 0 && (
+                <span style={{ marginLeft: 6, color: "var(--red)" }}>
+                  (inclusief {urenHuidigWeek}u huidige week)
+                </span>
+              )}
             </div>
             <div className="prog-wrap" style={{ marginTop: 7 }}>
               <div className="prog-fill" style={{ width: `${urenPct}%` }} />
@@ -1038,7 +1103,7 @@ export default function StudentLogbookPage() {
           </div>
           <div style={{ textAlign: "right" }}>
             <span style={{ fontSize: 20, fontWeight: 700, color: "var(--red)" }}>
-              {totaalUrenBevestigd}
+              {totaalUrenTonen}
             </span>
             <span style={{ fontSize: 12, color: "var(--sub)" }}> / min. {MIN_UREN}u</span>
             <div style={{ fontSize: 11, color: "var(--sub)" }}>
