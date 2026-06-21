@@ -46,7 +46,7 @@ function getUserId(req) {
 async function getSoorten(req, res) {
   try {
     const [rows] = await db.query(
-      `SELECT id, naam, type FROM document_soorten ORDER BY naam ASC`
+      `SELECT id, naam, type, is_verplicht FROM document_soorten WHERE status = 'actief' ORDER BY naam ASC`
     );
     return ok(res, rows, "Document soorten opgehaald");
   } catch (error) {
@@ -146,7 +146,7 @@ async function uploadDocument(req, res) {
       await connection.query(
         `UPDATE documenten
          SET status = 'ingediend', versie_nummer = ?, bestand_url = ?, bestand_naam = ?,
-             opgeladen_door_id = ?, afkeurreden = NULL, aangepast_op = NOW()
+             opgeladen_door_id = ?, afkeurreden = NULL, opgeladen_op = NOW(), aangepast_op = NOW()
          WHERE id = ?`,
         [nieuw_versie, bestandUrl, req.file.originalname, studentId, resultId]
       );
@@ -155,8 +155,8 @@ async function uploadDocument(req, res) {
       nieuw_versie = 1;
       const [ins] = await connection.query(
         `INSERT INTO documenten
-           (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam, opgeladen_door_id, aangemaakt_op, aangepast_op)
-         VALUES (?, ?, 'ingediend', 1, ?, ?, ?, NOW(), NOW())`,
+           (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam, opgeladen_door_id, opgeladen_op, aangemaakt_op, aangepast_op)
+         VALUES (?, ?, 'ingediend', 1, ?, ?, ?, NOW(), NOW(), NOW())`,
         [dossier_id, document_soort_id, bestandUrl, req.file.originalname, studentId]
       );
       resultId = ins.insertId;
@@ -223,8 +223,8 @@ async function uploadEigenDocument(req, res) {
     const [result] = await connection.query(
       `
       INSERT INTO documenten
-        (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam, opgeladen_door_id, aangemaakt_op, aangepast_op)
-      VALUES (?, NULL, 'ingediend', 1, ?, ?, ?, NOW(), NOW())
+        (stagedossier_id, document_soort_id, status, versie_nummer, bestand_url, bestand_naam, opgeladen_door_id, opgeladen_op, aangemaakt_op, aangepast_op)
+      VALUES (?, NULL, 'ingediend', 1, ?, ?, ?, NOW(), NOW(), NOW())
       `,
       [dossier_id, bestandUrl, req.file.originalname, studentId]
     );
