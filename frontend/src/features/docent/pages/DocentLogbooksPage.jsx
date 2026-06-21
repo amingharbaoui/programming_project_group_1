@@ -75,9 +75,11 @@ export default function DocentLogbooksPage() {
           cacheSet("docent_students", data);
         }
         setStudenten(data);
-        if (data.length > 0) {
-          const param = Number(searchParams.get("student"));
-          const gekozen = data.find((s) => (s.student_id || s.id) === param) || data[0];
+        // Alleen meteen een student openen als die expliciet via ?student= meegegeven is (bv. vanuit
+        // het studentenoverzicht); anders het overzicht tonen (master-detail, zoals het prototype).
+        const param = Number(searchParams.get("student"));
+        const gekozen = param ? data.find((s) => (s.student_id || s.id) === param) : null;
+        if (gekozen) {
           const sid = gekozen.student_id || gekozen.id;
           setStudentId(sid);
           loadLogbooks(sid);
@@ -165,8 +167,8 @@ export default function DocentLogbooksPage() {
   // Bereken ontbrekende weeknummers: weken 1..aantal_weken die nog niet bestaan EN al voorbij zijn.
   // Zelfde logica als de backend (getMissingLogbooksForDocent) — geen toekomstige weken of eindfase markeren.
   function getOntbrekendeWeken(weeks) {
-    // In de eindfase of vóór de start zijn er geen ontbrekende weken om op te volgen.
-    if (["resultaat_vrijgegeven", "afgerond", "voltooid"].includes(geselecteerdeStudent?.dossier_status)) {
+    // Alleen tijdens een startklare/lopende stage zijn er ontbrekende weken; in contract- of eindfase niet.
+    if (!["geregistreerd", "actief", "stage_loopt"].includes(geselecteerdeStudent?.dossier_status)) {
       return [];
     }
     const ingevuld = new Set(
@@ -225,6 +227,8 @@ export default function DocentLogbooksPage() {
                 const sid = s.student_id || s.id;
                 const initialen = [s.voornaam, s.achternaam].filter(Boolean).map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "?";
                 const teLezen = s.actie_type === "logboek";
+                const logboekFase = ["geregistreerd", "actief", "stage_loopt"].includes(s.dossier_status);
+                const afgerondFase = ["resultaat_vrijgegeven", "afgerond", "voltooid"].includes(s.dossier_status);
                 return (
                   <tr key={s.dossier_id}>
                     <td>
@@ -235,7 +239,11 @@ export default function DocentLogbooksPage() {
                     </td>
                     <td className="doc_sub">{s.bedrijf || "-"}</td>
                     <td>
-                      {teLezen
+                      {afgerondFase
+                        ? <span className="status s_grijs">Afgerond</span>
+                        : !logboekFase
+                        ? <span className="status s_grijs">Nog niet gestart</span>
+                        : teLezen
                         ? <span className="status s_rood"><IconAlertTriangle size={13} stroke={1.8} /> Na te lezen</span>
                         : <span className="status s_grijs">Bijgewerkt</span>}
                     </td>
