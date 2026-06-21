@@ -252,27 +252,45 @@ export default function MentorLogbooksPage() {
               </div>
               <div className={`logweek-body ${open ? "open" : ""}`}>
                 {dagen.length === 0 && <p style={{ color: "var(--faint)", fontSize: 12.5 }}>Geen dagen ingevuld.</p>}
-                {dagen.map((d) => (
-                  <div className="entry" key={d.id}>
-                    <div className="e-dag">
-                      {weekdagLang(d.datum)}{d.titel ? <span style={{ fontWeight: 400, color: "var(--sub)" }}>&nbsp;— {d.titel}</span> : null}
-                      <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--sub)" }}>{d.aantal_uren || 0}u</span>
-                    </div>
-                    {d.uitgevoerde_taken && <div className="e-veld"><b>Taken</b><span style={{ flex: 1 }}>{d.uitgevoerde_taken}</span></div>}
-                    {d.reflectie && <div className="e-veld"><b>Reflectie</b><span style={{ flex: 1 }}>{d.reflectie}</span></div>}
-                    {d.status !== "geen_stagedag" && (
-                      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
-                        {d.mentor_bevestigd_op ? (
-                          <span className="status s_ok"><i className="ti ti-check" />Dag bevestigd</span>
-                        ) : (
-                          <button className="btn sm" disabled={actionLoadingId === `dag-${d.id}`} onClick={() => confirmDag(d.id)}>
-                            <i className="ti ti-check" />Dag bevestigen
-                          </button>
-                        )}
+                {dagen.map((d) => {
+                  const comps = Array.isArray(d.competenties)
+                    ? d.competenties
+                    : (d.competenties ? JSON.parse(d.competenties) : []);
+                  const geenStage = d.status === "geen_stagedag";
+                  return (
+                    <div className="entry" key={d.id}>
+                      <div className="e-dag">
+                        {weekdagLang(d.datum)}
+                        {d.titel && <span style={{ fontWeight: 400, color: "var(--sub)" }}>&nbsp;— {d.titel}</span>}
+                        {geenStage && <span className="status s_grijs" style={{ fontSize: 10, marginLeft: 6 }}>Geen stagedag</span>}
+                        <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--sub)" }}>
+                          {d.aantal_uren || 0}u
+                        </span>
                       </div>
-                    )}
-                  </div>
-                ))}
+                      {!geenStage && (
+                        <>
+                          {d.uitgevoerde_taken && <div className="e-veld"><b>Taken</b><span style={{ flex: 1 }}>{d.uitgevoerde_taken}</span></div>}
+                          {d.reflectie      && <div className="e-veld"><b>Reflectie</b><span style={{ flex: 1 }}>{d.reflectie}</span></div>}
+                          {d.problemen      && <div className="e-veld"><b>Problemen</b><span style={{ flex: 1 }}>{d.problemen}</span></div>}
+                          {comps.length > 0 && (
+                            <div className="e-chips">
+                              {comps.map((c) => <span key={c} className="e-chip">{c}</span>)}
+                            </div>
+                          )}
+                          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6 }}>
+                            {d.mentor_bevestigd_op ? (
+                              <span className="status s_ok"><i className="ti ti-check" />Dag bevestigd</span>
+                            ) : (
+                              <button className="btn sm" disabled={actionLoadingId === `dag-${d.id}`} onClick={() => confirmDag(d.id)}>
+                                <i className="ti ti-check" />Dag bevestigen
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
 
                 {(week.mentor_feedback || week.student_antwoord) && (
                   <div className="comment-thread">

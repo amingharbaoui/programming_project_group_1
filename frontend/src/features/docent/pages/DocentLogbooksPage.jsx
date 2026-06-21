@@ -43,6 +43,12 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString("nl-BE");
 }
 
+function formatDagNaam(datum) {
+  if (!datum) return "Dag";
+  const t = new Date(datum).toLocaleDateString("nl-BE", { weekday: "long", day: "numeric", month: "long" });
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 export default function DocentLogbooksPage() {
   const { user } = useAuth();
 
@@ -333,26 +339,63 @@ export default function DocentLogbooksPage() {
             )}
 
             {(week.dagen || []).length > 0 && (
-              <table className="tbl" style={{ marginTop: "12px" }}>
-                <thead>
-                  <tr>
-                    <th>Datum</th>
-                    <th>Taken</th>
-                    <th>Reflectie</th>
-                    <th>Uren</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {week.dagen.map((day) => (
-                    <tr key={day.id}>
-                      <td>{formatDate(day.datum)}</td>
-                      <td>{day.uitgevoerde_taken || "-"}</td>
-                      <td>{day.reflectie || "-"}</td>
-                      <td>{day.aantal_uren || 0}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="lb_dagen" style={{ marginTop: 12 }}>
+                {week.dagen.map((dag) => {
+                  const comps = Array.isArray(dag.competenties)
+                    ? dag.competenties
+                    : (dag.competenties ? JSON.parse(dag.competenties) : []);
+                  const geenStage = dag.status === "geen_stagedag";
+                  return (
+                    <div className="lb_dag" key={dag.id}>
+                      <div className="lb_dag_hoofd">
+                        <span className="lb_dag_naam">
+                          {formatDagNaam(dag.datum)}
+                          {dag.titel && <span className="lb_dag_titel"> — {dag.titel}</span>}
+                        </span>
+                        <div className="lb_dag_rechts">
+                          <span className="lb_dag_uren">{dag.aantal_uren || 0}u</span>
+                          {geenStage && <span className="status s_grijs" style={{ fontSize: 10 }}>Geen stagedag</span>}
+                          {!geenStage && dag.mentor_bevestigd_op && (
+                            <span className="status s_ok" style={{ fontSize: 10 }}>
+                              <IconCheck size={10} stroke={2} /> Mentor bevestigd
+                            </span>
+                          )}
+                          {!geenStage && !dag.mentor_bevestigd_op && (
+                            <span className="status s_grijs" style={{ fontSize: 10 }}>Niet bevestigd</span>
+                          )}
+                        </div>
+                      </div>
+                      {!geenStage && (
+                        <div className="lb_dag_body">
+                          {dag.uitgevoerde_taken && (
+                            <div className="lb_dag_veld">
+                              <span className="lb_veld_k">Taken</span>
+                              <span>{dag.uitgevoerde_taken}</span>
+                            </div>
+                          )}
+                          {dag.reflectie && (
+                            <div className="lb_dag_veld">
+                              <span className="lb_veld_k">Reflectie</span>
+                              <span>{dag.reflectie}</span>
+                            </div>
+                          )}
+                          {dag.problemen && (
+                            <div className="lb_dag_veld">
+                              <span className="lb_veld_k">Problemen</span>
+                              <span>{dag.problemen}</span>
+                            </div>
+                          )}
+                          {comps.length > 0 && (
+                            <div className="lb_dag_chips">
+                              {comps.map((c) => <span key={c} className="lb_dag_chip">{c}</span>)}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
 
             {KAN_REVIEWEN.includes(week.status) && (

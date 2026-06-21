@@ -136,3 +136,88 @@
   font-size: 12px;
   color: var(--sub);
 }
+
+/* ── Dag-kaartjes binnen een week ── */
+.lb_dagen { display: flex; flex-direction: column; gap: 8px; }
+
+.lb_dag {
+  background: var(--muted);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.lb_dag_hoofd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  flex-wrap: wrap;
+}
+
+.lb_dag_naam {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--dark);
+}
+
+.lb_dag_titel {
+  font-weight: 400;
+  color: var(--sub);
+}
+
+.lb_dag_rechts {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.lb_dag_uren {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sub);
+}
+
+.lb_dag_body {
+  border-top: 0.5px solid var(--border);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.lb_dag_veld {
+  display: flex;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--gray);
+}
+
+.lb_veld_k {
+  flex: 0 0 80px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--faint);
+  padding-top: 2px;
+}
+
+.lb_dag_chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.lb_dag_chip {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+  border: 0.5px solid var(--border);
+  background: var(--white);
+  color: var(--sub);
+}
