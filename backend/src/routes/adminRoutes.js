@@ -8,7 +8,7 @@ const {
   sendContractReminder
 } = require("../controllers/internshipController");
 const { getSettings, updateStageRule, updateDocumentType, createDocumentType, resetDocumentTypes, deleteDocumentType, createChecklistItem, updateChecklistItem, deleteChecklistItem, resetChecklistItems } = require("../controllers/settingsController");
-const { inviteMentor, inviteUser, resendInvitation } = require("../controllers/userController");
+const { inviteMentor, inviteUser, resendInvitation, resendUserInvitation } = require("../controllers/userController");
 const { approveDocument, rejectDocument } = require("../controllers/documentController");
 const { adminDownloadContractPdf, registerOvereenkomst } = require("../controllers/contractController");
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
@@ -49,6 +49,7 @@ router.delete("/checklist-items/:id", deleteChecklistItem);
 router.post("/invitations", inviteMentor);
 router.post("/invitations/:id/resend", resendInvitation);
 router.post("/users/invite", inviteUser);
+router.post("/users/:id/resend-invitation", resendUserInvitation);
 
 router.patch("/documents/:id/approve", approveDocument);
 router.patch("/documents/:id/reject", rejectDocument);

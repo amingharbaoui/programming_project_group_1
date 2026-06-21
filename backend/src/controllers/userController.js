@@ -436,6 +436,66 @@ async function resendInvitation(req, res) {
   }
 }
 
+// POST /api/admin/users/:id/resend-invitation — uitnodiging opnieuw versturen voor een NIET-mentor
+// (student/docent/administratie/stagecommissie). Hun token leeft op `gebruikers` (auditpunt 327);
+// mentors houden hun eigen flow via /admin/invitations/:id/resend.
+async function resendUserInvitation(req, res) {
+  const userId = Number(req.params.id);
+  if (!userId) return fail(res, 400, "Ongeldig gebruikers-id");
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+    const [rows] = await conn.query(
+      "SELECT id, email, status, hoofdrol FROM gebruikers WHERE id = ? LIMIT 1",
+      [userId]
+    );
+    if (rows.length === 0) { await conn.rollback(); return fail(res, 404, "Gebruiker niet gevonden"); }
+    const u = rows[0];
+    if (u.hoofdrol === "mentor") { await conn.rollback(); return fail(res, 400, "Gebruik de mentor-uitnodigingsroute voor mentors"); }
+    if (u.status === "actief") { await conn.rollback(); return fail(res, 409, "Deze gebruiker heeft het account al geactiveerd"); }
+    if (u.status !== "uitgenodigd") { await conn.rollback(); return fail(res, 409, "Alleen een uitgenodigde gebruiker kan een nieuwe uitnodiging krijgen"); }
+
+    const token = crypto.randomBytes(24).toString("hex");
+    await conn.query(
+      `UPDATE gebruikers
+       SET uitnodiging_token = ?, uitnodiging_status = 'verstuurd', uitnodiging_vervalt_op = DATE_ADD(NOW(), INTERVAL 14 DAY), aangepast_op = NOW()
+       WHERE id = ?`,
+      [token, userId]
+    );
+    await conn.commit();
+
+    const activatielink = `/activeren?token=${token}`;
+    await emailMelding(userId, {
+      titel: "Uitnodiging stageplatform (opnieuw verstuurd)",
+      bericht: `Hier is je nieuwe activatielink: ${activatielink}`,
+      type: "herinnering",
+      ernst: "medium",
+      aangemaaktDoorId: Number(req.user?.id) || null
+    });
+    const volledigeLink = `${process.env.APP_URL || "http://localhost:5173"}${activatielink}`;
+    const mailResultaat = await sendMail({
+      to: u.email,
+      subject: "Nieuwe activatielink — Stagify",
+      text: `Hier is je nieuwe activatielink voor Stagify:\n${volledigeLink}\n\nDeze link is 14 dagen geldig.`,
+      html: buildMailHtml({
+        title: "Nieuwe activatielink",
+        body: `<p>Hallo,</p>
+               <p>Hier is je nieuwe activatielink voor <strong>Stagify</strong>.</p>
+               <p>Klik op de knop hieronder om je account te activeren. Deze link is <strong>14 dagen</strong> geldig.</p>`,
+        buttonText: "Account activeren",
+        buttonUrl: volledigeLink,
+      })
+    });
+    return ok(res, { id: userId, activatielink, emailStatus: mailResultaat.sent ? "verzonden" : "geregistreerd" }, "Uitnodiging opnieuw verstuurd");
+  } catch (error) {
+    await conn.rollback();
+    return fail(res, 500, "Uitnodiging opnieuw versturen mislukt", error.message);
+  } finally {
+    conn.release();
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Generieke onboarding: admin nodigt student/docent/administratie/stagecommissie uit.
 // Zelfde patroon als de mentor (uitnodiging -> activatielink -> wachtwoord), maar de
@@ -580,6 +640,7 @@ module.exports = {
   reactivateUser,
   inviteMentor,
   resendInvitation,
+  resendUserInvitation,
   getMentorInvitation,
   activateMentor,
   inviteUser,

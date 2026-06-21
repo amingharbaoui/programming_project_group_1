@@ -61,9 +61,9 @@ function WijzigenModal({ rawUser, koppeling, onClose, onSaved, onDeactiveerClick
   const [err, setErr] = useState("");
   const [resendMsg, setResendMsg] = useState("");
   const isActief = rawUser.status === "actief";
-  // Uitgenodigde mentoren kunnen we opnieuw uitnodigen via de bestaande endpoint (heractiveren werkt niet
-  // op status 'uitgenodigd'). Zo is er een herstelpad als de mail niet aankwam.
-  const isUitgenodigdeMentor = rawUser.status === "uitgenodigd" && rawUser.hoofdrol === "mentor";
+  // Elke uitgenodigde gebruiker kan een nieuwe uitnodiging krijgen (heractiveren werkt niet op status
+  // 'uitgenodigd'). Zo is er een herstelpad als de mail niet aankwam — voor mentors én niet-mentors (327).
+  const isUitgenodigd = rawUser.status === "uitgenodigd";
   // De backend weigert rolwissels tussen families (student / mentor / medewerker). Toon daarom enkel
   // de rollen binnen de huidige familie; voor een andere rol hoort een nieuwe uitnodiging.
   const ROL_FAMILIES = {
@@ -82,12 +82,16 @@ function WijzigenModal({ rawUser, koppeling, onClose, onSaved, onDeactiveerClick
   async function handleResend() {
     setSaving(true); setErr(""); setResendMsg("");
     try {
-      const res = await api.post(`/admin/invitations/${rawUser.id}/resend`);
+      // Mentors houden hun eigen endpoint (token op mentoren); andere rollen via de generieke route (327).
+      const url = rawUser.hoofdrol === "mentor"
+        ? `/admin/invitations/${rawUser.id}/resend`
+        : `/admin/users/${rawUser.id}/resend-invitation`;
+      const res = await api.post(url);
       const rel = res.data?.data?.activatielink;
       const link = rel ? `${window.location.origin}${rel}` : "";
       setResendMsg(res.data?.data?.emailStatus === "verzonden"
         ? "Uitnodiging opnieuw verzonden per e-mail."
-        : `Uitnodiging vernieuwd. Bezorg de mentor deze link: ${link}`);
+        : `Uitnodiging vernieuwd. Bezorg deze link: ${link}`);
     } catch (e) {
       setErr(e.response?.data?.message || "Opnieuw versturen mislukt");
     } finally {
@@ -165,7 +169,7 @@ function WijzigenModal({ rawUser, koppeling, onClose, onSaved, onDeactiveerClick
           {resendMsg && <p className="status s_ok" style={{ fontSize: 12, wordBreak: "break-all" }}>{resendMsg}</p>}
         </div>
         <div className="modal_footer" style={{ justifyContent: "space-between" }}>
-          {isUitgenodigdeMentor ? (
+          {isUitgenodigd ? (
             <button className="btn btn-success" onClick={handleResend} type="button" disabled={saving}>
               Uitnodiging opnieuw versturen
             </button>
