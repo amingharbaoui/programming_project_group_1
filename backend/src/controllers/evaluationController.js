@@ -294,10 +294,13 @@ async function saveScores(req, res) {
 
       if (role === "student") {
         nieuweStatus = Number(andereRolIngediend[0][0].aantal) > 0 ? "klaar_voor_docent" : "student_ingediend";
-        await conn.query("UPDATE evaluaties SET status = ?, student_ingediend_op = NOW(), aangepast_op = NOW() WHERE id = ?", [nieuweStatus, evaluationId]);
+        // Conditioneel zodat een tweede indien-klik niet opnieuw verwerkt (auditpunt 388).
+        const [r] = await conn.query("UPDATE evaluaties SET status = ?, student_ingediend_op = NOW(), aangepast_op = NOW() WHERE id = ? AND student_ingediend_op IS NULL", [nieuweStatus, evaluationId]);
+        if (r.affectedRows === 0) { await conn.rollback(); return fail(res, 409, "Je hebt deze evaluatie al ingediend; vernieuw de pagina"); }
       } else if (role === "mentor") {
         nieuweStatus = Number(andereRolIngediend[0][0].aantal) > 0 ? "klaar_voor_docent" : "mentor_ingediend";
-        await conn.query("UPDATE evaluaties SET status = ?, mentor_ingediend_op = NOW(), aangepast_op = NOW() WHERE id = ?", [nieuweStatus, evaluationId]);
+        const [r] = await conn.query("UPDATE evaluaties SET status = ?, mentor_ingediend_op = NOW(), aangepast_op = NOW() WHERE id = ? AND mentor_ingediend_op IS NULL", [nieuweStatus, evaluationId]);
+        if (r.affectedRows === 0) { await conn.rollback(); return fail(res, 409, "Deze evaluatie is al ingediend; vernieuw de pagina"); }
       }
     }
 
@@ -448,14 +451,16 @@ async function calculateResult(req, res) {
     }
     const nieuweStatus = isFinaal ? "klaar_voor_vrijgave" : "geregistreerd";
 
-    await conn.query(
+    // Conditioneel op klaar_voor_docent zodat een dubbelklik niet herberekent (auditpunt 388).
+    const [berekenResult] = await conn.query(
       `UPDATE evaluaties
        SET competentie_score = ?, eindcijfer = ?, eindpresentatie_score = COALESCE(?, eindpresentatie_score),
            verslag = COALESCE(?, verslag),
            status = ?, docent_geregistreerd_op = NOW(), aangepast_op = NOW()
-       WHERE id = ?`,
+       WHERE id = ? AND status = 'klaar_voor_docent'`,
       [competentieScore, eindcijfer, eindpresentatieScore, verslag, nieuweStatus, evaluationId]
     );
+    if (berekenResult.affectedRows === 0) { await conn.rollback(); return fail(res, 409, "Deze evaluatie is ondertussen al verwerkt; vernieuw de pagina"); }
 
     await conn.commit();
 
@@ -535,10 +540,12 @@ async function releaseResult(req, res) {
       return fail(res, 409, "De eindpresentatie moet eerst gepland en gegeven zijn voor je het resultaat vrijgeeft.");
     }
 
-    await conn.query(
-      "UPDATE evaluaties SET status = 'vrijgegeven', vrijgegeven_door_id = ?, vrijgegeven_op = NOW(), aangepast_op = NOW() WHERE id = ?",
+    // Conditioneel zodat een dubbele vrijgave het eindresultaat niet twee keer (en mogelijk inconsistent) zet (388).
+    const [vrijgaveResult] = await conn.query(
+      "UPDATE evaluaties SET status = 'vrijgegeven', vrijgegeven_door_id = ?, vrijgegeven_op = NOW(), aangepast_op = NOW() WHERE id = ? AND status = 'klaar_voor_vrijgave'",
       [userId, evaluationId]
     );
+    if (vrijgaveResult.affectedRows === 0) { await conn.rollback(); return fail(res, 409, "Dit resultaat is ondertussen al vrijgegeven; vernieuw de pagina"); }
 
     await conn.query(
       "UPDATE stagedossiers SET eindresultaat = ?, eindresultaat_vrijgegeven_op = NOW(), status = 'resultaat_vrijgegeven', aangepast_op = NOW() WHERE id = ?",
