@@ -147,13 +147,21 @@ export default function StudentContractPage() {
   }
 
   if (!contract) {
+    // 441: een technische laadfout niet verbergen als "geen overeenkomst" — toon de echte fout + retry.
     return (
       <div className="page-inner">
         <div className="page-header"><h1>Stageovereenkomst</h1></div>
-        <div className="card" style={{ textAlign: "center", padding: "40px 24px" }}>
-          <IconFileCheck size={36} style={{ color: "var(--sub)", marginBottom: 12 }} />
-          <p style={{ color: "var(--sub)" }}>Er is nog geen stageovereenkomst beschikbaar.</p>
-        </div>
+        {fout ? (
+          <div className="card" style={{ textAlign: "center", padding: "40px 24px" }}>
+            <p style={{ color: "var(--red)", marginBottom: 12 }}>{fout}</p>
+            <button className="btn primary sm" onClick={() => laadContract(true)}>Opnieuw proberen</button>
+          </div>
+        ) : (
+          <div className="card" style={{ textAlign: "center", padding: "40px 24px" }}>
+            <IconFileCheck size={36} style={{ color: "var(--sub)", marginBottom: 12 }} />
+            <p style={{ color: "var(--sub)" }}>Er is nog geen stageovereenkomst beschikbaar.</p>
+          </div>
+        )}
       </div>
     );
   }

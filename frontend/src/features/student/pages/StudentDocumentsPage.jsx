@@ -201,6 +201,7 @@ export default function StudentDocumentsPage() {
   const [contractData, setContractData] = useState(null);
   const [dossierStatus, setDossierStatus] = useState(null);
   const [dossierFout, setDossierFout] = useState(false);
+  const [statusGeladen, setStatusGeladen] = useState(false);
   const [soortenFout, setSoortenFout] = useState(false);
   const [loading, setLoading]       = useState(true);
   const [fout, setFout]             = useState(null);
@@ -254,10 +255,14 @@ export default function StudentDocumentsPage() {
       // Status onbekend door een laadfout: conservatief read-only zodat we geen upload-UI tonen in een
       // mogelijk afgerond dossier (de backend zou de upload toch met 409 weigeren) — auditpunt 342.
       setDossierFout(true);
+    } finally {
+      setStatusGeladen(true);
     }
   }
 
-  const readOnlyDossier = dossierFout || ["resultaat_vrijgegeven", "afgerond"].includes(dossierStatus);
+  // 442: zolang de dossierstatus nog niet betrouwbaar geladen is, conservatief read-only — geen upload-UI
+  // laten flikkeren vóór we weten of het dossier al afgerond/vrijgegeven is.
+  const readOnlyDossier = !statusGeladen || dossierFout || ["resultaat_vrijgegeven", "afgerond"].includes(dossierStatus);
 
   function groeperPerSoort(soortId) {
     return documenten

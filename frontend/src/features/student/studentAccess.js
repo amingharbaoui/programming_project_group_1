@@ -222,6 +222,11 @@ export async function fetchStudentAccess() {
   // Faalt de voorstel-call (netwerk/500), dan is de berekende fase onbetrouwbaar: signaleer dat met een
   // laadFout-vlag i.p.v. de student onterecht in "geen toegang" te zetten (auditpunt 339).
   if (internshipRes.status === "rejected") return { ...access, laadFout: true };
+  // 456: een technische contract-laadfout (geen echte 404) mag de student niet onterecht naar de
+  // contractfase terugzetten en logboek/evaluatie sluiten — markeer als laadFout i.p.v. "geen contract".
+  if (contractRes.status === "rejected" && contractRes.reason?.response?.status !== 404) {
+    return { ...access, laadFout: true };
+  }
   return access;
 }
 
