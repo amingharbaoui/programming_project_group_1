@@ -405,23 +405,20 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
   async function submitDagNaarBackend(dagIndex, dagData) {
     const datum = dagDatum(dagIndex);
     if (!datum || !logbook.weekNummer) return; // geen datum/week → sla over (draft-modus)
-    try {
-      await apiRequest("POST", "/logbooks/day", {
-        weekNummer: Number(logbook.weekNummer),
-        datum,
-        status: dagData.status === "geen_stagedag" ? "geen_stagedag" : "ingevuld",
-        titel: dagData.titel || null,
-        uitgevoerdeTaken: dagData.uitgevoerdeTaken || null,
-        reflectie: dagData.reflectie || null,
-        problemen: dagData.problemen || null,
-        leerpunten: dagData.leerpunten || null,
-        aantalUren: Number(dagData.aantalUren) || 0,
-        competenties: dagData.competenties ?? [],
-      });
-    } catch (err) {
-      // Niet-fataal: lokale state al bijgewerkt, fout loggen maar UI niet blokkeren
-      console.warn("Dag opslaan naar backend mislukt:", err?.response?.data?.message || err.message);
-    }
+    // Fouten gooien bewust door: de aanroeper mag de dag NIET als bevestigd markeren als de backend-
+    // opslag faalt — anders denkt de student dat het bewaard is terwijl het weg is na refresh.
+    await apiRequest("POST", "/logbooks/day", {
+      weekNummer: Number(logbook.weekNummer),
+      datum,
+      status: dagData.status === "geen_stagedag" ? "geen_stagedag" : "ingevuld",
+      titel: dagData.titel || null,
+      uitgevoerdeTaken: dagData.uitgevoerdeTaken || null,
+      reflectie: dagData.reflectie || null,
+      problemen: dagData.problemen || null,
+      leerpunten: dagData.leerpunten || null,
+      aantalUren: Number(dagData.aantalUren) || 0,
+      competenties: dagData.competenties ?? [],
+    });
   }
 
   async function handleDagOpslaan() {
@@ -436,10 +433,17 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
     setDagFout("");
     setDagSaving(true);
 
-    // Sla dag op in backend → mentor wordt verwittigd
-    await submitDagNaarBackend(activeDag, dag);
+    // Sla dag op in backend → mentor wordt verwittigd. Faalt dit, dan tonen we de fout en markeren we
+    // de dag NIET als bevestigd (anders lijkt het bewaard terwijl het na refresh weg is).
+    try {
+      await submitDagNaarBackend(activeDag, dag);
+    } catch (err) {
+      setDagFout(err?.response?.data?.message || "Opslaan naar de server mislukt — probeer opnieuw.");
+      setDagSaving(false);
+      return;
+    }
 
-    // Lokale staat bijwerken
+    // Lokale staat bijwerken (alleen na succesvolle backendopslag)
     const updatedDagen = [...logbook.dagen];
     updatedDagen[activeDag] = { ...updatedDagen[activeDag], _bevestigd: true };
     setLogbook({ ...logbook, dagen: updatedDagen });
@@ -457,13 +461,19 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
       aantalUren: 0, titel: "", uitgevoerdeTaken: "", reflectie: "", problemen: "",
       leerpunten: "", competenties: [], status: "geen_stagedag", _bevestigd: true,
     };
+    setDagFout("");
+
+    // Eerst naar de backend; pas bij succes de dag lokaal als bevestigd markeren.
+    try {
+      await submitDagNaarBackend(activeDag, dagData);
+    } catch (err) {
+      setDagFout(err?.response?.data?.message || "Opslaan naar de server mislukt — probeer opnieuw.");
+      return;
+    }
+
     const updatedDagen = [...logbook.dagen];
     updatedDagen[activeDag] = { ...updatedDagen[activeDag], ...dagData };
     setLogbook({ ...logbook, dagen: updatedDagen });
-
-    // Sla ook naar backend
-    await submitDagNaarBackend(activeDag, dagData);
-
     const updated = [...ingediendeDagen];
     updated[activeDag] = true;
     setIngediendeDagen(updated);
