@@ -67,8 +67,12 @@ function initials(naam) {
 function formatDossier(raw) {
   const naam = studentNaam(raw);
   const docent = `${raw.docent_voornaam || ""} ${raw.docent_achternaam || ""}`.trim();
+  const mentor = `${raw.mentor_voornaam || ""} ${raw.mentor_achternaam || ""}`.trim();
   const inOrde = Number(raw.documenten_in_orde || 0);
   const verplicht = Number(raw.verplichte_documenten || 0);
+  // Proactieve waarschuwing: zonder mentor kan de stage niet starten (koppel-gate bij registratie).
+  // Toon dit zolang het dossier nog niet afgerond/afgewezen is.
+  const mentorOntbreekt = !mentor && !["afgewezen", "afgerond", "voltooid", "concept"].includes(raw.status);
 
   return {
     id: raw.id,
@@ -78,6 +82,7 @@ function formatDossier(raw) {
     bedrijf: raw.bedrijf_naam || "-",
     begeleider: docent || "Nog niet gekoppeld",
     begeleiderSub: docent ? "Definitief gekoppeld" : "Geen koppeling",
+    mentorOntbreekt,
     dossiernr: raw.dossiernummer || "-",
     overeenkomst: OVEREENKOMST_LABELS[raw.overeenkomst_status] || raw.overeenkomst_status || "-",
     documenten: verplicht > 0 ? `${inOrde}/${verplicht} in orde` : "-",
@@ -206,6 +211,11 @@ export default function DossiersPage() {
                     <div className="student_info">
                       <div className="student_name">{d.student}</div>
                       <div className="student_meta">{d.opleiding}</div>
+                      {d.mentorOntbreekt && (
+                        <div className="student_meta" style={{ color: "var(--red)", fontWeight: 600 }}>
+                          <i className="ti ti-alert-triangle" /> Mentor koppelen vóór de stage start
+                        </div>
+                      )}
                     </div>
                   </div>
                 </td>
