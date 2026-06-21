@@ -352,17 +352,23 @@ async function activateMentor(req, res) {
       `,
       [wachtwoordHash, mentor.gebruiker_id]
     );
-    await conn.query(
+    // Conditioneel op de token: na een "opnieuw versturen" (nieuwe token) mag een oude open activatiepagina
+    // de mentor niet alsnog activeren en de nieuwe token wissen (auditpunt 415).
+    const [mentorActivatie] = await conn.query(
       `
       UPDATE mentoren
       SET uitnodiging_status = 'geactiveerd',
           uitnodiging_token = NULL,
           geactiveerd_op = NOW(),
           telefoon = COALESCE(?, telefoon)
-      WHERE gebruiker_id = ?
+      WHERE gebruiker_id = ? AND uitnodiging_token = ?
       `,
-      [telefoon || null, mentor.gebruiker_id]
+      [telefoon || null, mentor.gebruiker_id, token]
     );
+    if (mentorActivatie.affectedRows === 0) {
+      await conn.rollback();
+      return fail(res, 409, "Deze uitnodiging is intussen vernieuwd; gebruik de nieuwste activatielink");
+    }
 
     await conn.commit();
     return ok(res, { mentorId: mentor.gebruiker_id }, "Mentoraccount geactiveerd");
@@ -621,12 +627,17 @@ async function activateAccount(req, res) {
     if (u.uitnodiging_vervalt_op && new Date(u.uitnodiging_vervalt_op) < new Date()) {
       return fail(res, 410, "Uitnodiging is verlopen");
     }
-    await db.query(
+    // Conditioneel op de token: als de admin intussen "opnieuw versturen" deed (nieuwe token), mag een
+    // oude open activatiepagina het account niet alsnog activeren en de nieuwe token wissen (auditpunt 415).
+    const [r] = await db.query(
       `UPDATE gebruikers
        SET status='actief', wachtwoord_hash=?, uitnodiging_token=NULL, uitnodiging_status='geactiveerd', aangepast_op=NOW()
-       WHERE id = ?`,
-      [hashLocalPassword(wachtwoord), u.id]
+       WHERE id = ? AND uitnodiging_token = ? AND status = 'uitgenodigd'`,
+      [hashLocalPassword(wachtwoord), u.id, token]
     );
+    if (r.affectedRows === 0) {
+      return fail(res, 409, "Deze uitnodiging is intussen vernieuwd of al gebruikt; gebruik de nieuwste activatielink");
+    }
     return ok(res, { userId: u.id }, "Account geactiveerd");
   } catch (error) {
     return fail(res, 500, "Account activeren mislukt", error.message);
