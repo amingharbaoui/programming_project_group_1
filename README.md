@@ -100,10 +100,13 @@ node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
 
 ## Database
 
-Load the demo data (users for every phase plus their internship data):
+First import the schema (creates all tables), then load the demo data. The seed script only fills tables — it does not create them, so the schema import is required on a fresh database.
 
 ```bash
 cd backend
+# 1. Create the database and import the schema (tables)
+mysql -u <db_user> -p <db_name> < database/schema.sql
+# 2. Load the demo data (accounts for every phase + internship data; password Demo!2026 for all)
 node scripts/seed-demo.js
 ```
 
