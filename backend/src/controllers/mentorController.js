@@ -100,6 +100,9 @@ async function tekenContract(req, res) {
     if (!contract) return fail(res, 404, "Geen stageovereenkomst gevonden");
     if (contract.bedrijf_getekend_op) return fail(res, 409, "Contract is al getekend door mentor");
     if (!contract.student_getekend_op) return fail(res, 409, "De student moet de stageovereenkomst eerst tekenen");
+    if (contract.status && contract.status !== "getekend_door_student") {
+      return fail(res, 409, "Deze overeenkomst wacht niet op de handtekening van het bedrijf");
+    }
 
     // Student tekende al, dus na de mentor is de overeenkomst volledig ondertekend.
     const nieuweStatus = "volledig_ondertekend";
@@ -197,6 +200,12 @@ async function updateAfspraken(req, res) {
   }
 
   try {
+    const [[dos]] = await db.query("SELECT status FROM stagedossiers WHERE id = ? AND mentor_id = ? LIMIT 1", [dossierId, mentorId]);
+    if (!dos) return fail(res, 403, "Geen toegang tot dit dossier");
+    if (["resultaat_vrijgegeven", "afgerond"].includes(dos.status)) {
+      return fail(res, 409, "Het dossier is afgerond; praktische afspraken kunnen niet meer gewijzigd worden");
+    }
+
     const [result] = await db.query(
       `UPDATE stagedossiers
        SET praktische_afspraken = ?,

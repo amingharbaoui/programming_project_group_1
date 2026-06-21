@@ -25,7 +25,7 @@ function normalizeDateTime(value) {
 async function getDocentDossier(dossierId, docentId) {
   const [rows] = await db.query(
     `
-    SELECT id, student_id, mentor_id, stagebegeleider_id
+    SELECT id, student_id, mentor_id, stagebegeleider_id, status
     FROM stagedossiers
     WHERE id = ? AND stagebegeleider_id = ?
     LIMIT 1
@@ -95,6 +95,10 @@ async function createPlanningMoment(req, res, type) {
   try {
     const dossier = await getDocentDossier(dossierIdFinal, docentId);
     if (!dossier) return fail(res, 403, "Geen toegang tot dit dossier");
+    // Planning is pas zinvol zodra de stage geregistreerd is (niet in de contract-/controlefase).
+    if (!["geregistreerd", "stage_loopt", "resultaat_vrijgegeven"].includes(dossier.status)) {
+      return fail(res, 409, "Planning kan pas zodra de stage geregistreerd is");
+    }
 
     const status = type === "bedrijfsbezoek" ? "voorgesteld" : "gepland";
     const [result] = await db.query(

@@ -126,9 +126,15 @@ async function uploadDocument(req, res) {
 
     /* Controleer of er al een rij bestaat voor deze soort in dit dossier */
     const [bestaand] = await connection.query(
-      `SELECT id, versie_nummer FROM documenten WHERE stagedossier_id = ? AND document_soort_id = ? LIMIT 1`,
+      `SELECT id, versie_nummer, status FROM documenten WHERE stagedossier_id = ? AND document_soort_id = ? LIMIT 1`,
       [dossier_id, document_soort_id]
     );
+
+    // Een al goedgekeurd/geregistreerd document mag niet zomaar opnieuw geüpload worden.
+    if (bestaand.length > 0 && ["goedgekeurd", "geregistreerd"].includes(bestaand[0].status)) {
+      await connection.rollback();
+      return fail(res, 409, "Dit document is al goedgekeurd en kan niet meer vervangen worden");
+    }
 
     let resultId;
     let nieuw_versie;

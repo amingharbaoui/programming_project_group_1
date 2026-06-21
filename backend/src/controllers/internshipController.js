@@ -1433,8 +1433,12 @@ async function assignDossier(req, res) {
   if (docentId == null && mentorId == null) return fail(res, 400, "Geef minstens een docent of mentor op");
 
   try {
-    const [d] = await db.query("SELECT id, student_id FROM stagedossiers WHERE id = ? LIMIT 1", [dossierId]);
+    const [d] = await db.query("SELECT id, student_id, status FROM stagedossiers WHERE id = ? LIMIT 1", [dossierId]);
     if (d.length === 0) return fail(res, 404, "Dossier niet gevonden");
+    // Geen herassign meer nadat het resultaat vrijgegeven of het dossier afgerond is.
+    if (["resultaat_vrijgegeven", "afgerond"].includes(d[0].status)) {
+      return fail(res, 409, "Een afgerond dossier kan niet meer opnieuw toegewezen worden");
+    }
 
     if (docentId != null) {
       const [g] = await db.query("SELECT hoofdrol, status FROM gebruikers WHERE id = ? LIMIT 1", [Number(docentId)]);
@@ -1532,7 +1536,7 @@ async function generateEindoverzicht(req, res) {
     await conn.beginTransaction();
 
     const [d] = await conn.query(
-      `SELECT d.id, d.student_id, d.stagebegeleider_id, d.dossiernummer, d.eindresultaat, d.eindresultaat_vrijgegeven_op,
+      `SELECT d.id, d.student_id, d.stagebegeleider_id, d.dossiernummer, d.eindresultaat, d.eindresultaat_vrijgegeven_op, d.eindoverzicht_gegenereerd_op,
               d.startdatum, d.einddatum, d.opleiding, d.academiejaar, d.totaal_uren,
               sg.voornaam AS student_voornaam, sg.achternaam AS student_achternaam, s.studentennummer,
               b.naam AS bedrijf_naam,
@@ -1554,6 +1558,11 @@ async function generateEindoverzicht(req, res) {
     if (d[0].eindresultaat_vrijgegeven_op == null) {
       await conn.rollback();
       return fail(res, 400, "Eindresultaat is nog niet vrijgegeven");
+    }
+    // Al gegenereerd? Niet opnieuw aanmaken of de versie ophogen — de bestaande PDF blijft de officiële.
+    if (d[0].eindoverzicht_gegenereerd_op) {
+      await conn.rollback();
+      return ok(res, { dossierId, alGegenereerd: true }, "Eindoverzicht is al gegenereerd");
     }
 
     const dossier = d[0];
@@ -1765,6 +1774,14 @@ async function saveApplicationChecklist(req, res) {
     await conn.beginTransaction();
     const versieId = await resolveHuidigeVersieId(conn, voorstelId);
     if (!versieId) { await conn.rollback(); return fail(res, 404, "Voorstel of versie niet gevonden"); }
+
+    // De checklist kan enkel aangepast worden zolang het voorstel nog in beoordeling is.
+    const [vs] = await conn.query("SELECT status FROM stagevoorstellen WHERE id = ? LIMIT 1", [voorstelId]);
+    if (vs.length === 0) { await conn.rollback(); return fail(res, 404, "Voorstel niet gevonden"); }
+    if (!["ingediend", "heringediend"].includes(vs[0].status)) {
+      await conn.rollback();
+      return fail(res, 409, "De checklist kan enkel aangepast worden zolang het voorstel in beoordeling is");
+    }
 
     await conn.query("DELETE FROM voorstel_checklist WHERE stagevoorstel_versie_id = ?", [versieId]);
     for (const it of items) {

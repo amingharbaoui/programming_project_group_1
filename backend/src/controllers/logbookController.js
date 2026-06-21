@@ -248,6 +248,11 @@ async function createLogbook(req, res) {
       await connection.rollback();
       return fail(res, 409, "Je kan pas een logboek indienen zodra je stagedossier startklaar geregistreerd is");
     }
+    // En niet meer nadat het resultaat vrijgegeven of het dossier afgerond is.
+    if (["resultaat_vrijgegeven", "afgerond"].includes(dossier.status)) {
+      await connection.rollback();
+      return fail(res, 409, "Je stage is afgerond; je kan geen logboek meer indienen");
+    }
 
     // En pas vanaf de effectieve startdatum van de stage — zo blijft de backend gelijk met wat de student in de app ziet.
     if (dossier.startdatum) {
@@ -842,14 +847,22 @@ async function getMissingLogbooksForDocent(req, res) {
       weeksByDossier.get(week.stagedossier_id).set(Number(week.week_nummer), week);
     }
 
+    const vandaag = new Date(); vandaag.setHours(0, 0, 0, 0);
     const result = dossiers.map((dossier) => {
       const totalWeeks = Math.max(0, Number(dossier.aantal_weken || 0));
       const existing = weeksByDossier.get(dossier.stagedossier_id) || new Map();
+      const startD = dossier.startdatum ? new Date(dossier.startdatum) : null;
+      // Een week telt pas als 'ontbrekend' wanneer ze al voorbij is — geen toekomstige weken markeren.
+      const weekVoorbij = (n) => {
+        if (!startD || Number.isNaN(startD.getTime())) return true;
+        const einde = new Date(startD); einde.setDate(einde.getDate() + n * 7);
+        return einde <= vandaag;
+      };
       const ontbrekendeWeken = [];
 
       for (let weekNummer = 1; weekNummer <= totalWeeks; weekNummer += 1) {
         const week = existing.get(weekNummer);
-        if (!week || week.status === "ontbreekt") {
+        if ((!week || week.status === "ontbreekt") && weekVoorbij(weekNummer)) {
           ontbrekendeWeken.push({
             weekNummer,
             status: week?.status || "ontbreekt",
@@ -922,14 +935,22 @@ async function getMissingLogbooksForMentor(req, res) {
       weeksByDossier.get(week.stagedossier_id).set(Number(week.week_nummer), week);
     }
 
+    const vandaag = new Date(); vandaag.setHours(0, 0, 0, 0);
     const result = dossiers.map((dossier) => {
       const totalWeeks = Math.max(0, Number(dossier.aantal_weken || 0));
       const existing = weeksByDossier.get(dossier.stagedossier_id) || new Map();
+      const startD = dossier.startdatum ? new Date(dossier.startdatum) : null;
+      // Een week telt pas als 'ontbrekend' wanneer ze al voorbij is — geen toekomstige weken markeren.
+      const weekVoorbij = (n) => {
+        if (!startD || Number.isNaN(startD.getTime())) return true;
+        const einde = new Date(startD); einde.setDate(einde.getDate() + n * 7);
+        return einde <= vandaag;
+      };
       const ontbrekendeWeken = [];
 
       for (let weekNummer = 1; weekNummer <= totalWeeks; weekNummer += 1) {
         const week = existing.get(weekNummer);
-        if (!week || week.status === "ontbreekt") {
+        if ((!week || week.status === "ontbreekt") && weekVoorbij(weekNummer)) {
           ontbrekendeWeken.push({
             weekNummer,
             status: week?.status || "ontbreekt",
@@ -1051,6 +1072,10 @@ async function saveLogbookDay(req, res) {
     if (teVroeg.includes(dossiers[0].status)) {
       await conn.rollback();
       return fail(res, 409, "Je kan pas een logboek invullen zodra je stagedossier startklaar geregistreerd is");
+    }
+    if (["resultaat_vrijgegeven", "afgerond"].includes(dossiers[0].status)) {
+      await conn.rollback();
+      return fail(res, 409, "Je stage is afgerond; je kan geen logboek meer invullen");
     }
 
     // En pas vanaf de effectieve startdatum — gelijk met wat de student in de app ziet (logboek opent op de startdatum).

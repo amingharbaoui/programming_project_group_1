@@ -94,6 +94,11 @@ async function signContract(req, res) {
       await connection.rollback();
       return fail(res, 409, "Je hebt deze overeenkomst al ondertekend");
     }
+    // Enkel tekenen wanneer de overeenkomst effectief op de student wacht.
+    if (contract.status && contract.status !== "klaar_voor_student") {
+      await connection.rollback();
+      return fail(res, 409, "Deze overeenkomst kan op dit moment niet getekend worden");
+    }
 
     const now = new Date();
 
