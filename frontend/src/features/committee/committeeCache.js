@@ -1,13 +1,7 @@
-const TTL_MS = 5 * 60 * 1000; // 5 minuten
-
-export function cacheGet(key) {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    const { data, ts } = JSON.parse(raw);
-    if (Date.now() - ts > TTL_MS) { localStorage.removeItem(key); return null; }
-    return data;
-  } catch { return null; }
+// Cache uitgeschakeld als functionele bron van waarheid (auditpunt 270): paginas halen altijd live
+// uit de backend. cacheSet/cacheDelete blijven bestaan zodat bestaande aanroepen blijven werken.
+export function cacheGet() {
+  return null;
 }
 
 export function cacheSet(key, data) {
