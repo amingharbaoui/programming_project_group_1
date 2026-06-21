@@ -4,7 +4,7 @@ const crypto = require("crypto");
 const db = require("../config/db");
 const { ok, fail } = require("../utils/response");
 const { meld, emailMelding } = require("../utils/notify");
-const { sendMail } = require("../utils/mail");
+const { sendMail, buildMailHtml } = require("../utils/mail");
 const { buildSimplePdf } = require("../utils/pdf");
 
 function getUserId(req, fallbackId) {
@@ -711,6 +711,7 @@ async function getCommitteeApplications(req, res) {
         v.bedrijf_naam,
         v.mentor_naam,
         v.mentor_email,
+        v.mentor_functie,
         v.stagefunctie,
         v.opdrachtomschrijving,
         v.startdatum,
@@ -995,6 +996,42 @@ async function createDossierAfterApproval(connection, stagevoorstelId) {
   }
 
   let mentorId = await getMentorIdByEmail(connection, data.mentor_email);
+
+  // Mentor bestaat al maar account is nog niet actief → stuur opnieuw een uitnodiging
+  if (mentorId && data.mentor_email) {
+    const [mentorGebruiker] = await connection.query(
+      "SELECT status FROM gebruikers WHERE id = ? LIMIT 1",
+      [mentorId]
+    );
+    if (mentorGebruiker[0]?.status !== "actief") {
+      const nieuweToken = crypto.randomBytes(24).toString("hex");
+      await connection.query(
+        `UPDATE mentoren SET uitnodiging_token = ?, uitnodiging_status = 'verstuurd', uitnodiging_vervalt_op = DATE_ADD(NOW(), INTERVAL 14 DAY)
+         WHERE gebruiker_id = ?`,
+        [nieuweToken, mentorId]
+      );
+      const activatielink = `/mentor/activate?token=${nieuweToken}`;
+      try {
+        const volledigeLink = `${process.env.APP_URL || "http://localhost:5173"}${activatielink}`;
+        await sendMail({
+          to: data.mentor_email,
+          subject: "Uitnodiging als mentor — Stagify",
+          text: `Je bent uitgenodigd als mentor op Stagify.\n\nActiveer je account en kies een wachtwoord via:\n${volledigeLink}\n\nDeze link is 14 dagen geldig.`,
+          html: buildMailHtml({
+            title: "Uitnodiging als mentor",
+            body: `<p>Hallo,</p>
+                   <p>Je bent uitgenodigd als mentor op het stageplatform van <strong>Stagify</strong>.</p>
+                   <p>Klik op de knop hieronder om je account te activeren en een wachtwoord in te stellen. Deze link is <strong>14 dagen</strong> geldig.</p>`,
+            buttonText: "Account activeren",
+            buttonUrl: volledigeLink,
+          }),
+        });
+      } catch (mailError) {
+        console.error("Mentor-uitnodigingsmail (hernieuwd) mislukt:", mailError.message);
+      }
+    }
+  }
+
   if (!mentorId && data.mentor_email) {
     const [bestaand] = await connection.query("SELECT id, hoofdrol FROM gebruikers WHERE email = ? LIMIT 1", [data.mentor_email]);
     if (bestaand.length > 0) {
@@ -1035,10 +1072,19 @@ async function createDossierAfterApproval(connection, stagevoorstelId) {
         [mentorId, "Uitnodiging als mentor", `Je bent uitgenodigd als mentor. Activeer je account via ${activatielink}`]
       );
       try {
+        const volledigeLink = `${process.env.APP_URL || "http://localhost:5173"}${activatielink}`;
         await sendMail({
           to: data.mentor_email,
           subject: "Uitnodiging als mentor — Stagify",
-          text: `Je bent uitgenodigd als mentor op Stagify.\n\nActiveer je account en kies een wachtwoord via:\n${process.env.APP_URL || "http://localhost:5173"}${activatielink}\n\nDeze link is 14 dagen geldig.`,
+          text: `Je bent uitgenodigd als mentor op Stagify.\n\nActiveer je account en kies een wachtwoord via:\n${volledigeLink}\n\nDeze link is 14 dagen geldig.`,
+          html: buildMailHtml({
+            title: "Uitnodiging als mentor",
+            body: `<p>Hallo,</p>
+                   <p>Je bent uitgenodigd als mentor op het stageplatform van <strong>Stagify</strong>.</p>
+                   <p>Klik op de knop hieronder om je account te activeren en een wachtwoord in te stellen. Deze link is <strong>14 dagen</strong> geldig.</p>`,
+            buttonText: "Account activeren",
+            buttonUrl: volledigeLink,
+          }),
         });
       } catch (mailError) {
         console.error("Mentor-uitnodigingsmail mislukt:", mailError.message);
