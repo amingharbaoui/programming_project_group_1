@@ -212,8 +212,8 @@ export function berekenStudentAccess(voorstel, contract) {
 
 export async function fetchStudentAccess() {
   const [internshipRes, contractRes] = await Promise.allSettled([
-    apiRequest("GET", "/internships/my"),
-    apiRequest("GET", "/contracts/my"),
+    apiRequest("GET", "/internships/my", null, { skipAuthRedirect: true }),
+    apiRequest("GET", "/contracts/my", null, { skipAuthRedirect: true }),
   ]);
 
   const voorstel = internshipRes.status === "fulfilled" ? internshipRes.value?.data : null;

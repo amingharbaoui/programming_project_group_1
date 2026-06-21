@@ -93,8 +93,8 @@ export default function Sidebar({ collapsed }) {
       // In de eindfase (afgerond/resultaat vrijgegeven) is een document geen openstaande taak meer.
       if (access.open.includes("documenten") && access.key !== "afgerond") {
         const [docsRes, soortenRes] = await Promise.allSettled([
-          apiRequest("GET", "/documents/my"),
-          apiRequest("GET", "/documents/soorten"),
+          apiRequest("GET", "/documents/my", null, { skipAuthRedirect: true }),
+          apiRequest("GET", "/documents/soorten", null, { skipAuthRedirect: true }),
         ]);
 
         if (
@@ -110,7 +110,7 @@ export default function Sidebar({ collapsed }) {
       let showLogboekDot = !!(access.dot === "logboek");
       if (showLogboekDot) {
         try {
-          const logRes = await apiRequest("GET", `/logbooks/${user.id}`);
+          const logRes = await apiRequest("GET", `/logbooks/${user.id}`, null, { skipAuthRedirect: true });
           const weken = Array.isArray(logRes.data) ? logRes.data : [];
           // Bereken huidige weeknummer op basis van startdatum
           const startdatum = access.startdatum ? new Date(access.startdatum) : null;

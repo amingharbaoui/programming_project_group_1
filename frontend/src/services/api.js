@@ -22,7 +22,11 @@ api.interceptors.response.use(
   (error) => {
     const status = error.response?.status;
     const url = error.config?.url || "";
-    if (status === 401 && typeof window !== "undefined" && !url.includes("/auth/login")
+    // Achtergrond-polls (meldingen, sidebar-status) zetten skipAuthRedirect: een vluchtige 401 daar mag
+    // de gebruiker NIET uitloggen (auditpunt 333). Alleen expliciete acties + de opstart-/auth/me-check
+    // beëindigen de sessie. Zo wordt niemand zomaar uitgekickt door een achtergrondrequest.
+    if (status === 401 && !error.config?.skipAuthRedirect && typeof window !== "undefined"
+        && !url.includes("/auth/login")
         && !window.location.pathname.startsWith("/login")) {
       setAuthToken(null);
       try {
@@ -60,8 +64,8 @@ export function fileUrl(bestandUrl) {
   return `/api/documents/bestand/${filename}${suffix}`;
 }
 
-export async function apiRequest(method, url, data = null) {
-  const res = await api({ method, url, data });
+export async function apiRequest(method, url, data = null, config = {}) {
+  const res = await api({ method, url, data, ...config });
   return res.data;
 }
 

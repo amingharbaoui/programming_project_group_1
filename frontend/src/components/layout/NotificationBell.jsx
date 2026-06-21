@@ -41,7 +41,7 @@ export default function NotificationBell() {
 
   const load = useCallback(async () => {
     try {
-      const res = await apiRequest("get", "/notifications");
+      const res = await apiRequest("get", "/notifications", null, { skipAuthRedirect: true });
       if (res?.success && res.data) {
         setMeldingen(res.data.meldingen || []);
         setOngelezen(res.data.ongelezen || 0);
