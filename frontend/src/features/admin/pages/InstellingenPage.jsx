@@ -340,6 +340,7 @@ export default function InstellingenPage() {
               <th>Type</th>
               <th>Verplicht</th>
               <th>Status</th>
+              <th style={{ textAlign: "right", width: 90 }}>Actie</th>
             </tr>
           </thead>
           <tbody>
@@ -360,6 +361,14 @@ export default function InstellingenPage() {
                 </td>
                 <td>
                   <span style={{ color: doc.status === "actief" ? "var(--green)" : "var(--faint)" }}>{doc.status}</span>
+                </td>
+                <td style={{ textAlign: "right" }}>
+                  {/* Vaste documenttypes (is_vast=1) mogen niet verwijderd worden, enkel zelf toegevoegde */}
+                  {!doc.is_vast && (
+                    <button className="btn sm" style={{ color: "var(--red)" }} onClick={() => deleteDocType(doc)} title="Verwijderen">
+                      <IconTrash size={14} stroke={1.8} />
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
