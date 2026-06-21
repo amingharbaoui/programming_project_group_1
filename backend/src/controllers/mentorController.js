@@ -210,9 +210,11 @@ async function updateAfspraken(req, res) {
     const [result] = await db.query(
       `UPDATE stagedossiers
        SET praktische_afspraken = ?,
-           praktische_afspraken_velden = ?,
+           praktische_afspraken_velden = COALESCE(?, praktische_afspraken_velden),
            praktische_afspraken_gedeeld_op = NOW()
        WHERE id = ? AND mentor_id = ?`,
+      // Komt er enkel vrije tekst binnen (geen velden), dan blijft de bestaande gestructureerde data staan
+      // i.p.v. ze te wissen — de twee mentorschermen overschrijven elkaar zo niet meer.
       [tekst || null, veldenJson, dossierId, mentorId]
     );
 

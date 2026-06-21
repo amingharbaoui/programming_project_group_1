@@ -134,9 +134,11 @@ async function getEvaluationsForStudent(req, res) {
         ? { ...e, eindcijfer: null, competentie_score: null, eindpresentatie_score: null }
         : e;
       let eigenScores = scores.filter((s) => s.evaluatie_id === e.id);
-      // Vóór vrijgave ziet student/mentor enkel de eigen ingevulde scores, niet die van de andere partijen.
+      // Vóór vrijgave: de student ziet enkel de eigen scores. De mentor mag óók de studentscores zien
+      // (die moet hij kunnen beoordelen om advies te geven), maar nog niet de docentscores/het eindcijfer.
       if (verbergResultaat && nogNietVrijgegeven) {
-        eigenScores = eigenScores.filter((s) => s.rol === role);
+        const zichtbareRollen = role === "mentor" ? ["mentor", "student"] : [role];
+        eigenScores = eigenScores.filter((s) => zichtbareRollen.includes(s.rol));
       }
       return { ...basis, scores: eigenScores };
     });

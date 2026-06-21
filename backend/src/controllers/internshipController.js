@@ -381,7 +381,7 @@ async function saveDraft(req, res) {
 
       await conn.query(
         `UPDATE bedrijven SET
-          naam = COALESCE(?, naam), afdeling = COALESCE(?, afdeling), adres = COALESCE(?, adres),
+          naam = COALESCE(?, naam), afdeling = ?, adres = ?,
           aangepast_op = NOW()
          WHERE id = ?`,
         [finalBedrijfNaam, bedrijfsafdeling || null, bedrijfsadres || null, bedrijfId]
@@ -390,12 +390,12 @@ async function saveDraft(req, res) {
       await conn.query(
         `UPDATE stagevoorstel_versies SET
           bedrijf_naam       = COALESCE(?, bedrijf_naam),
-          bedrijfsafdeling   = COALESCE(?, bedrijfsafdeling),
-          bedrijfsadres      = COALESCE(?, bedrijfsadres),
+          bedrijfsafdeling   = ?,
+          bedrijfsadres      = ?,
           mentor_naam        = COALESCE(?, mentor_naam),
           mentor_email       = COALESCE(?, mentor_email),
-          mentor_telefoon    = COALESCE(?, mentor_telefoon),
-          mentor_functie     = COALESCE(?, mentor_functie),
+          mentor_telefoon    = ?,
+          mentor_functie     = ?,
           stagefunctie       = COALESCE(?, stagefunctie),
           opdrachtomschrijving = COALESCE(?, opdrachtomschrijving),
           startdatum         = COALESCE(?, startdatum),
@@ -1404,6 +1404,7 @@ async function getAdminDossierById(req, res) {
 async function updateAdminDossierStatus(req, res) {
   const dossierId = Number(req.params.id);
   const { status, verzekeringInOrde, praktischeAfspraken } = req.body || {};
+  const afkeurReden = (req.body?.afkeurReden ?? req.body?.afkeurreden ?? "").toString().trim();
 
   // Status gelijkgetrokken naar de NL-enum van het schema. Engelse waarden worden voor de
   // zekerheid nog vertaald, zodat een oudere frontend niet stuk gaat.
@@ -1468,6 +1469,28 @@ async function updateAdminDossierStatus(req, res) {
         dossierId
       ]
     );
+
+    // Bij "document afgekeurd": de opgegeven reden niet verloren laten gaan — markeer de nog openstaande
+    // documenten van dit dossier als afgekeurd mét reden en breng de student op de hoogte.
+    if (nieuweStatus === "document_afgekeurd" && afkeurReden) {
+      try {
+        await db.query(
+          `UPDATE documenten SET status = 'afgekeurd', afkeurreden = ?, aangepast_op = NOW()
+           WHERE stagedossier_id = ? AND status IN ('ingediend', 'in_controle')`,
+          [afkeurReden, dossierId]
+        );
+        const [[d]] = await db.query("SELECT student_id FROM stagedossiers WHERE id = ? LIMIT 1", [dossierId]);
+        if (d?.student_id) {
+          await meld(d.student_id, {
+            titel: "Document afgekeurd",
+            bericht: `Een document is afgekeurd: ${afkeurReden}. Laad een nieuwe versie op.`,
+            ernst: "medium",
+            aangemaaktDoorId: Number(req.user?.id),
+            stagedossierId: dossierId,
+          });
+        }
+      } catch (e) { console.error("Afkeurreden/melding document_afgekeurd mislukt:", e.message); }
+    }
 
     const [rows] = await db.query(
       "SELECT id, dossiernummer, status, verzekering_in_orde, praktische_afspraken FROM stagedossiers WHERE id = ?",
