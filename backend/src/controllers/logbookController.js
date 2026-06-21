@@ -889,7 +889,7 @@ async function getMissingLogbooksForDocent(req, res) {
 
       for (let weekNummer = 1; weekNummer <= totalWeeks; weekNummer += 1) {
         const week = existing.get(weekNummer);
-        if ((!week || week.status === "ontbreekt") && weekVoorbij(weekNummer)) {
+        if ((!week || ["ontbreekt", "in_opbouw"].includes(week.status)) && weekVoorbij(weekNummer)) {
           ontbrekendeWeken.push({
             weekNummer,
             status: week?.status || "ontbreekt",
@@ -977,7 +977,7 @@ async function getMissingLogbooksForMentor(req, res) {
 
       for (let weekNummer = 1; weekNummer <= totalWeeks; weekNummer += 1) {
         const week = existing.get(weekNummer);
-        if ((!week || week.status === "ontbreekt") && weekVoorbij(weekNummer)) {
+        if ((!week || ["ontbreekt", "in_opbouw"].includes(week.status)) && weekVoorbij(weekNummer)) {
           ontbrekendeWeken.push({
             weekNummer,
             status: week?.status || "ontbreekt",
@@ -1049,7 +1049,7 @@ async function sendMissingLogbookReminder(req, res) {
     const ontbrekend = [];
     for (let n = 1; n <= totaalWeken; n += 1) {
       const st = perWeek.get(n);
-      if ((st === undefined || st === "ontbreekt") && weekVoorbij(n)) ontbrekend.push(n);
+      if ((st === undefined || st === "ontbreekt" || st === "in_opbouw") && weekVoorbij(n)) ontbrekend.push(n);
     }
 
     // Specifiek gevraagde weken filteren op echt-ontbrekend; anders alle ontbrekende weken.
