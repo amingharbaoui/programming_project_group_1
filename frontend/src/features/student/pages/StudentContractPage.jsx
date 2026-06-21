@@ -234,8 +234,8 @@ export default function StudentContractPage() {
 
       {wachtOpBedrijf && (
         <button className="btn contract-reminder" onClick={() => setHerinneringOpen(true)}>
-          <i className="ti ti-bell-ringing"></i>
-          Herinnering sturen naar het bedrijf
+          <i className="ti ti-info-circle"></i>
+          Wat als het bedrijf nog niet tekent?
         </button>
       )}
 

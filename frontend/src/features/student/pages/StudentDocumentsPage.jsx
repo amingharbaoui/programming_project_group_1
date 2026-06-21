@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import api, { apiRequest, fileUrl } from "../../../services/api";
+import { cacheDelete } from "../studentCache";
 import "./StudentDocumentsPage.css";
 import Modal from "../../../components/ui/Modal";
 import {
@@ -212,6 +213,8 @@ export default function StudentDocumentsPage() {
   async function laadData() {
     setLoading(true);
     setFout(null);
+    // Dashboard ("Mijn stage") leest documenten uit cache — die invalideren zodat statuswijzigingen daar meekomen.
+    cacheDelete("student_documents", "student_document_soorten");
     try {
       const [docsRes, soortenRes] = await Promise.all([
         apiRequest("GET", "/documents/my"),

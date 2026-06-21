@@ -640,6 +640,10 @@ export default function DossierDetailPage() {
 
   /* ─── Beslissing card ─── */
   function BeslisKaart() {
+    // Registreren mag pas wanneer alle verplichte documenten goedgekeurd/geregistreerd zijn (zoals de backend afdwingt).
+    const verplichteDocs = (dossier.documenten || []).filter((d) => d.is_verplicht && d.type !== "stageovereenkomst" && d.type !== "eindoverzicht");
+    const nietKlaar = verplichteDocs.filter((d) => !["goedgekeurd", "geregistreerd"].includes(d.status));
+    const docsKlaar = nietKlaar.length === 0;
     return (
       <div className="card dd_card dd_card_featured">
         <div className="dd_card_title">
@@ -649,6 +653,11 @@ export default function DossierDetailPage() {
         <p className="dd_beslis_desc">
           Alle handtekeningen zijn binnen. Controleer de documenten en registreer de stageovereenkomst — pas daarna is de verzekering in orde.
         </p>
+        {!docsKlaar && (
+          <p className="dd_card_muted" style={{ color: "var(--amber, #b45309)" }}>
+            Nog niet alle verplichte documenten zijn goedgekeurd ({nietKlaar.length} open). Keur de documenten eerst goed.
+          </p>
+        )}
         <div className="dd_beslis_actions">
           <button
             className="btn"
@@ -658,7 +667,7 @@ export default function DossierDetailPage() {
             <IconX size={14} stroke={2.5} />
             Afkeuren
           </button>
-          <button className="btn primary" onClick={() => setModal("registreren")}>
+          <button className="btn primary" disabled={!docsKlaar} onClick={() => docsKlaar && setModal("registreren")}>
             <IconCheck size={14} stroke={2.5} />
             Goedkeuren &amp; registreren
           </button>

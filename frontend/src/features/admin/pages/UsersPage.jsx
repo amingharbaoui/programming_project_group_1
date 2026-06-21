@@ -149,6 +149,7 @@ function MentorUitnodigingModal({ onClose, onSaved }) {
   const [form, setForm] = useState({ voornaam: "", achternaam: "", email: "", bedrijfNaam: "", functie: "" });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  const [resultaat, setResultaat] = useState(null);
 
   function set(field, value) { setForm((f) => ({ ...f, [field]: value })); }
 
@@ -158,19 +159,52 @@ function MentorUitnodigingModal({ onClose, onSaved }) {
     }
     setSaving(true); setErr("");
     try {
-      await api.post("/admin/invitations", {
+      const res = await api.post("/admin/invitations", {
         voornaam: form.voornaam,
         achternaam: form.achternaam,
         email: form.email,
         bedrijfNaam: form.bedrijfNaam,
         functie: form.functie || "Mentor",
       });
-      onSaved();
+      cacheDelete("admin_users");
+      setResultaat(res.data?.data || {});
     } catch (e) {
       setErr(e.response?.data?.message || "Uitnodigen mislukt");
     } finally {
       setSaving(false);
     }
+  }
+
+  if (resultaat) {
+    const link = resultaat.activatielink || resultaat.activationLink;
+    const mailVerzonden = resultaat.emailStatus === "verzonden";
+    return (
+      <div className="modal_overlay" onClick={onClose}>
+        <div className="modal_box" onClick={(e) => e.stopPropagation()}>
+          <div className="modal_header">
+            <span className="modal_title">Mentor uitgenodigd</span>
+            <button className="icon_btn" onClick={onSaved} type="button"><IconX size={16} stroke={1.8} /></button>
+          </div>
+          <div className="modal_body">
+            <p style={{ fontSize: 13 }}>
+              {mailVerzonden
+                ? "De activatielink is per e-mail verstuurd. Je kan hem hieronder ook kopiëren als back-up."
+                : "E-mail kon niet verstuurd worden. Bezorg onderstaande activatielink aan de mentor."}
+            </p>
+            {link && (
+              <div className="modal_field">
+                <label className="modal_label">Activatielink</label>
+                <input className="modal_input" readOnly value={link} onFocus={(e) => e.target.select()} />
+                <button className="btn" type="button" style={{ marginTop: 8 }} onClick={() => navigator.clipboard?.writeText(link)}>Kopieer link</button>
+              </div>
+            )}
+          </div>
+          <div className="modal_footer">
+            <button className="btn primary" onClick={onSaved} type="button">Klaar</button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
