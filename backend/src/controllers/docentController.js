@@ -53,6 +53,8 @@ async function getDocentStudents(req, res) {
     );
 
     const actief = (status) => ["actief", "stage_loopt"].includes(status);
+    // Een stage is planbaar zodra ze geregistreerd is (startklaar) of loopt — zelfde regel als de planning-backend.
+    const planbaar = (status) => ["geregistreerd", "actief", "stage_loopt"].includes(status);
 
     // Volgende actie + type per student afleiden (prioriteit: vrijgeven > registreren > logboek nalezen > bezoek plannen).
     // Type bepaalt de filterchip (logboek/evaluatie/planning/geen) — zelfde indeling als het HTML-prototype.
@@ -60,7 +62,7 @@ async function getDocentStudents(req, res) {
       if (Number(r.eval_te_vrijgeven) > 0) return { titel: "Eindresultaat vrijgeven", type: "evaluatie" };
       if (Number(r.eval_te_registreren) > 0) return { titel: "Evaluatie registreren", type: "evaluatie" };
       if (Number(r.te_review_weken) > 0) return { titel: "Logboekweek nalezen", type: "logboek" };
-      if (actief(r.dossier_status) && Number(r.aantal_bezoeken) === 0) return { titel: "Bedrijfsbezoek plannen", type: "planning" };
+      if (planbaar(r.dossier_status) && Number(r.aantal_bezoeken) === 0) return { titel: "Bedrijfsbezoek plannen", type: "planning" };
       if (r.dossier_status === "resultaat_vrijgegeven" || r.dossier_status === "afgerond") return { titel: "Afgerond", type: "geen" };
       return { titel: "—", type: "geen" };
     };

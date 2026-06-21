@@ -333,6 +333,9 @@ function weekNaarFormulier(week) {
       reflectie: dag.reflectie ?? "",
       problemen: dag.problemen ?? "",
       aantalUren: Number(dag.aantal_uren) || 0,
+      // Dagstatus behouden, anders verliest een 'geen_stagedag' bij bewerken zijn markering
+      // en wordt hij bij opnieuw indienen als gewone stagedag verstuurd.
+      status: dag.status ?? "",
       competenties: Array.isArray(dag.competenties)
         ? dag.competenties
         : (dag.competenties ? JSON.parse(dag.competenties) : []),
@@ -346,6 +349,7 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
   const [ingediendeDagen, setIngediendeDagen] = useState(
     logbook.dagen.map((d) => !!(d._bevestigd || d.status === "geen_stagedag"))
   );
+  const [dagFout, setDagFout] = useState("");
 
   // Actieve dag = de eerste niet-ingevulde dag (standaard dag 0)
   const [activeDag, setActiveDag] = useState(() => {
@@ -392,6 +396,15 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
   }
 
   function handleDagOpslaan() {
+    // Validatie: gewone stagedag vereist minstens taken + reflectie
+    const dag = logbook.dagen[activeDag] || {};
+    if (dag.status !== "geen_stagedag") {
+      if (!String(dag.uitgevoerdeTaken || "").trim() || !String(dag.reflectie || "").trim()) {
+        setDagFout("Vul minstens je uitgevoerde taken en je reflectie in, of markeer de dag als 'Geen stagedag'.");
+        return;
+      }
+    }
+    setDagFout("");
     // Sla _bevestigd in de dag zelf op — zo overleeft de staat een page-navigatie
     const updatedDagen = [...logbook.dagen];
     updatedDagen[activeDag] = { ...updatedDagen[activeDag], _bevestigd: true };
@@ -557,14 +570,21 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
               </div>
             </div>
 
+            {dagFout && (
+              <p className="status s_rood" style={{ marginTop: 10 }}>{dagFout}</p>
+            )}
+
             <div className="vdag-actions">
               <button type="button" className="btn primary" onClick={handleDagOpslaan}>
-                <IconCircleCheck size={15} /> Dag invullen
+                <IconCircleCheck size={15} /> Dag toevoegen aan week
               </button>
               <button type="button" className="btn ghost" onClick={handleGeenStagedag}>
                 <IconCalendarOff size={15} /> Vandaag was geen stagedag
               </button>
             </div>
+            <p style={{ fontSize: 11.5, color: "var(--sub)", marginTop: 8 }}>
+              Een dag wordt pas definitief bewaard wanneer je onderaan <strong>Week indienen</strong> klikt.
+            </p>
           </div>
         )}
       </div>
@@ -674,9 +694,12 @@ export default function StudentLogbookPage() {
   // Gate: logboek alleen toegankelijk als voorstel goedgekeurd + contract getekend
   const [voorstelStatus, setVoorstelStatus] = useState(null);
   const [contractGetekend, setContractGetekend] = useState(false);
+  const [dossierStatus, setDossierStatus] = useState(null);
   const [loadingGate, setLoadingGate] = useState(true);
   // Competentiechips komen uit het actieve competentieprofiel (configureerbaar), met de vaste lijst als fallback.
   const [competentieLijst, setCompetentieLijst] = useState(LO_COMPETENTIES);
+  // Minimum aantal uren komt uit de actieve stageregel (configureerbaar in instellingen); 456 als fallback.
+  const [minUren, setMinUren] = useState(456);
 
   // null = nieuwe week invullen, week-object = bestaande week bewerken
   const [editWeek, setEditWeek] = useState(null);
@@ -741,6 +764,7 @@ export default function StudentLogbookPage() {
         const data = internRes.value.data;
         if (!cachedIntern) cacheSet("student_internship", data);
         setVoorstelStatus(data.status);
+        setDossierStatus(data.dossier_status ?? data.dossierStatus ?? null);
         const rawStart = data.startdatum ?? data.startDatum;
         const rawEind  = data.einddatum  ?? data.eindDatum;
         if (rawStart) {
@@ -762,6 +786,14 @@ export default function StudentLogbookPage() {
         const comps = compRes?.data?.competenties || [];
         if (comps.length > 0) setCompetentieLijst(comps.map((c) => ({ code: c.code, naam: c.naam })));
       } catch { /* valt terug op de vaste lijst */ }
+
+      // Minimum uren uit de actieve stageregel (configureerbaar in instellingen).
+      try {
+        const setRes = await apiRequest("GET", "/internships/settings");
+        const regel = setRes?.data?.stageRegels?.[0];
+        const mu = Number(regel?.minimum_uren);
+        if (Number.isFinite(mu) && mu > 0) setMinUren(mu);
+      } catch { /* valt terug op 456 */ }
 
       setLoadingGate(false);
 
@@ -984,8 +1016,42 @@ export default function StudentLogbookPage() {
     );
   }
 
+  // Gate: na vrijgave/afronding is het logboek read-only — net zoals de backend nieuwe inzendingen weigert.
+  if (["resultaat_vrijgegeven", "afgerond", "voltooid"].includes(dossierStatus)) {
+    return (
+      <div className="page-inner">
+        <div className="page-header">
+          <h1>Logboek</h1>
+        </div>
+        <div className="card">
+          <div className="card_title">
+            <IconCircleCheck size={16} />
+            Stage afgerond
+          </div>
+          <p style={{ fontSize: 13, color: "var(--sub)" }}>
+            Je stage is afgerond. Je logboek is bewaard maar kan niet meer aangepast worden. Bekijk je
+            ingediende weken hieronder.
+          </p>
+        </div>
+        {weken.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            {[...weken].sort((a, b) => b.week_nummer - a.week_nummer).map((week) => (
+              <LogboekWeek key={week.id} week={week} onBewerken={() => {}} onVernieuwen={() => {}} />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // "Bevestigd" telt enkel weken die de mentor aftekende of de docent goedkeurde — niet elke ingediende week.
+  const BEVESTIGD_STATUSSEN = ["afgecheckt_door_mentor", "goedgekeurd_door_docent"];
   const totaalUrenIngediend = weken.reduce(
     (sum, w) => sum + (Number(w.totaal_uren) || 0),
+    0
+  );
+  const totaalUrenBevestigd = weken.reduce(
+    (sum, w) => sum + (BEVESTIGD_STATUSSEN.includes(w.status) ? (Number(w.totaal_uren) || 0) : 0),
     0
   );
   // Uren van de lopende (nog niet ingediende) week — telt mee zodra een dag bevestigd is
@@ -996,9 +1062,10 @@ export default function StudentLogbookPage() {
       )
     : 0;
   const totaalUrenTonen = totaalUrenIngediend + urenHuidigWeek;
-  const MIN_UREN = 456;
+  const MIN_UREN = minUren;
   const urenPct = Math.min(100, Math.round((totaalUrenTonen / MIN_UREN) * 100));
   const urenResterend = Math.max(0, MIN_UREN - totaalUrenTonen);
+  const urenNogTeBevestigen = Math.max(0, totaalUrenIngediend - totaalUrenBevestigd);
 
   return (
     <div className="page-inner">
@@ -1036,6 +1103,7 @@ export default function StudentLogbookPage() {
             <span style={{ fontSize: 12, color: "var(--sub)" }}> / min. {MIN_UREN}u</span>
             <div style={{ fontSize: 11, color: "var(--sub)" }}>
               {urenResterend > 0 ? `nog ${urenResterend}u te gaan` : "minimum behaald ✓"}
+              {urenNogTeBevestigen > 0 && ` · ${urenNogTeBevestigen}u ingediend, wacht op bevestiging`}
             </div>
           </div>
         </div>

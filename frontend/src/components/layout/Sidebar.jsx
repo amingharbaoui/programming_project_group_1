@@ -34,7 +34,9 @@ function heeftDocumentActieNodig(soorten = [], documenten = []) {
   const verplichteUploadSoorten = soorten.filter((soort) => {
     const type = normaliseerDocumentType(soort.type);
     const naam = normaliseerDocumentType(soort.naam);
-    return type !== "stageovereenkomst" &&
+    // Enkel écht verplichte soorten meetellen — een optioneel documenttype mag geen rode waarschuwing geven.
+    return Number(soort.is_verplicht) !== 0 &&
+      type !== "stageovereenkomst" &&
       !VERBORGEN_DOCUMENT_TYPES.has(type) &&
       !VERBORGEN_DOCUMENT_TYPES.has(naam);
   });

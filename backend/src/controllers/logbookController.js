@@ -990,14 +990,14 @@ async function getMissingLogbooksForMentor(req, res) {
 async function sendMissingLogbookReminder(req, res) {
   const docentId = getUserId(req);
   const studentId = Number(req.params.studentId || req.body.studentId || req.body.student_id);
-  const weken = Array.isArray(req.body.weken) ? req.body.weken.map(Number).filter(Boolean) : [];
+  const gevraagdeWeken = Array.isArray(req.body.weken) ? req.body.weken.map(Number).filter(Boolean) : [];
 
   if (!studentId) return fail(res, 400, "studentId is verplicht");
 
   try {
     const [rows] = await db.query(
       `
-      SELECT d.id AS stagedossier_id, d.student_id, g.voornaam, g.achternaam
+      SELECT d.id AS stagedossier_id, d.student_id, d.status, d.aantal_weken, d.startdatum, g.voornaam, g.achternaam
       FROM stagedossiers d
       JOIN gebruikers g ON g.id = d.student_id
       WHERE d.student_id = ? AND d.stagebegeleider_id = ?
@@ -1010,8 +1010,44 @@ async function sendMissingLogbookReminder(req, res) {
     if (rows.length === 0) {
       return fail(res, 403, "Docent is niet gekoppeld aan deze student");
     }
+    const dossier = rows[0];
 
-    const weekTekst = weken.length > 0 ? ` voor week ${weken.join(", ")}` : "";
+    // Geen herinnering meer voor een vrijgegeven/afgerond dossier (eindfase = read-only).
+    if (["resultaat_vrijgegeven", "afgerond"].includes(dossier.status)) {
+      return fail(res, 409, "Het dossier is afgerond; er kan geen logboekherinnering meer verstuurd worden");
+    }
+
+    // Werkelijk ontbrekende, reeds voorbije weken berekenen (zelfde logica als het ontbrekende-logboekenoverzicht),
+    // zodat er geen herinnering uitgaat voor toekomstige of al ingediende weken.
+    const [bestaande] = await db.query(
+      "SELECT week_nummer, status FROM logboek_weken WHERE stagedossier_id = ?",
+      [dossier.stagedossier_id]
+    );
+    const perWeek = new Map(bestaande.map((w) => [Number(w.week_nummer), w.status]));
+    const totaalWeken = Math.max(0, Number(dossier.aantal_weken || 0));
+    const startD = dossier.startdatum ? new Date(dossier.startdatum) : null;
+    const vandaag = new Date(); vandaag.setHours(0, 0, 0, 0);
+    const weekVoorbij = (n) => {
+      if (!startD || Number.isNaN(startD.getTime())) return true;
+      const einde = new Date(startD); einde.setDate(einde.getDate() + n * 7);
+      return einde <= vandaag;
+    };
+    const ontbrekend = [];
+    for (let n = 1; n <= totaalWeken; n += 1) {
+      const st = perWeek.get(n);
+      if ((st === undefined || st === "ontbreekt") && weekVoorbij(n)) ontbrekend.push(n);
+    }
+
+    // Specifiek gevraagde weken filteren op echt-ontbrekend; anders alle ontbrekende weken.
+    const weken = gevraagdeWeken.length > 0
+      ? gevraagdeWeken.filter((w) => ontbrekend.includes(w))
+      : ontbrekend;
+
+    if (weken.length === 0) {
+      return fail(res, 409, "Er zijn geen ontbrekende (reeds voorbije) logboekweken om aan te herinneren");
+    }
+
+    const weekTekst = ` voor week ${weken.join(", ")}`;
     const bericht = `Gelieve je ontbrekende logboek${weekTekst} in te dienen.`;
 
     await meld(studentId, {

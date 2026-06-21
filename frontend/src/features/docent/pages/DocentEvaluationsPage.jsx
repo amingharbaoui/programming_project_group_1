@@ -34,6 +34,28 @@ function getEvalStatusLabel(status) {
   return labels[status] || status || "-";
 }
 
+// Korte fase-omschrijving van het dossier voor de evaluatielijst.
+function faseLabelKort(status) {
+  if (["afgerond", "voltooid", "resultaat_vrijgegeven"].includes(status)) return "Afgerond";
+  if (["actief", "stage_loopt"].includes(status)) return "Stage loopt";
+  if (status === "geregistreerd") return "Startklaar";
+  if (status === "document_afgekeurd") return "Document afgekeurd";
+  if (status === "in_controle_bij_administratie") return "In controle";
+  if (status === "wacht_op_bedrijf") return "Wacht op ondertekening";
+  if (status === "wacht_op_student") return "Wacht op student";
+  return status || "—";
+}
+
+// Evaluatie-actie/-status per student, afgeleid uit de velden van /docent/students.
+function evalActieBadge(s) {
+  if (["afgerond", "voltooid", "resultaat_vrijgegeven"].includes(s.dossier_status)) return { cls: "s_grijs", txt: "Afgerond" };
+  if (Number(s.eval_te_vrijgeven) > 0) return { cls: "s_rood", txt: "Vrij te geven" };
+  if (Number(s.eval_te_registreren) > 0) return { cls: "s_rood", txt: "Te registreren" };
+  if (s.actie_type === "evaluatie") return { cls: "s_amber", txt: s.volgende_actie || "Actie nodig" };
+  if (["geregistreerd", "stage_loopt", "actief"].includes(s.dossier_status)) return { cls: "s_grijs", txt: "Geen open actie" };
+  return { cls: "s_grijs", txt: "Nog niet van toepassing" };
+}
+
 function ScoreKnoppen({ waarde, onChange, leesOnly }) {
   return (
     <div className="doc_scale">
@@ -63,7 +85,7 @@ function ScoreDisplay({ waarde }) {
   );
 }
 
-function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId }) {
+function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, dossierStatus }) {
   const evaluatie = evalData?.evaluaties?.find((e) => e.type === activeType) || null;
   const competenties = evalData?.competenties || [];
 
@@ -196,12 +218,35 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId })
     }
   }
 
+  async function handleOpenEval() {
+    if (!stagedossierId) return;
+    try {
+      setBezig(true);
+      await api.post("/evaluations/open", { stagedossierId, type: activeType });
+      onRefresh && onRefresh();
+    } catch (err) {
+      setFoutModal(err.response?.data?.message || "Evaluatie openen mislukt");
+    } finally {
+      setBezig(false);
+    }
+  }
+
   if (!evaluatie || evaluatie.status === "niet_open") {
+    // De docent kan de evaluatie openen zodra de stage geregistreerd is of loopt (niet in contract-/eindfase).
+    const planbaar = ["geregistreerd", "stage_loopt", "actief"].includes(dossierStatus);
     return (
       <div className="card">
         <p className="muted" style={{ margin: 0 }}>
           {activeType === "tussentijds" ? "Tussentijdse" : "Finale"} evaluatie is nog niet beschikbaar.
         </p>
+        {planbaar && !evaluatie && (
+          <div style={{ marginTop: 10 }}>
+            <button className="btn primary sm" disabled={bezig} onClick={handleOpenEval}>
+              <IconCircleCheck size={14} stroke={1.8} /> {activeType === "tussentijds" ? "Tussentijdse" : "Finale"} evaluatie openen
+            </button>
+          </div>
+        )}
+        {foutModal && <p className="status s_rood" style={{ marginTop: 10 }}>{foutModal}</p>}
       </div>
     );
   }
@@ -575,6 +620,8 @@ export default function DocentEvaluationsPage() {
                 <th>Student</th>
                 <th>Bedrijf</th>
                 <th>Mentor</th>
+                <th>Fase</th>
+                <th>Evaluatie</th>
                 <th style={{ textAlign: "right" }}>Acties</th>
               </tr>
             </thead>
@@ -595,6 +642,10 @@ export default function DocentEvaluationsPage() {
                     <td className="doc_sub">{s.bedrijf || "-"}</td>
                               <td className="doc_sub">
                       {s.mentor_voornaam ? `${s.mentor_voornaam} ${s.mentor_achternaam || ""}`.trim() : "-"}
+                    </td>
+                    <td className="doc_sub">{faseLabelKort(s.dossier_status)}</td>
+                    <td>
+                      {(() => { const b = evalActieBadge(s); return <span className={`status ${b.cls}`}>{b.txt}</span>; })()}
                     </td>
                     <td style={{ textAlign: "right" }}>
                       <button
@@ -648,11 +699,9 @@ export default function DocentEvaluationsPage() {
               evalData={evalData}
               activeType={activeType}
               userId={geselecteerdId}
-              onRefresh={() => {
-                cacheDelete(`docent_eval_${geselecteerdId}`);
-                loadEval(geselecteerdId, true);
-              }}
-              stagedossierId={evalData.stagedossierId}
+              onRefresh={() => { cacheDelete(`docent_eval_${geselecteerdId}`); cacheDelete("docent_students"); loadEval(geselecteerdId, true); }}
+              stagedossierId={evalData.stagedossierId ?? geselecteerdeStudent?.dossier_id}
+              dossierStatus={geselecteerdeStudent?.dossier_status}
             />
           )}
         </>

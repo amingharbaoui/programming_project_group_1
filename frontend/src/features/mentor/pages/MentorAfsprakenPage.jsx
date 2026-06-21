@@ -154,6 +154,9 @@ export default function MentorAfsprakenPage() {
   const geselecteerdeStudent = studenten.find(
     (s) => s.dossier_id === geselecteerdDossier
   );
+  // In de eindfase zijn de afspraken historisch — bewerken wordt door de backend geblokkeerd.
+  const AFGEROND_FASES = ["afgerond", "voltooid", "resultaat_vrijgegeven"];
+  const dossierAfgerond = AFGEROND_FASES.includes(geselecteerdeStudent?.dossier_status);
 
   return (
     <div className="page_inner">
@@ -178,6 +181,7 @@ export default function MentorAfsprakenPage() {
               {studenten.map((s) => (
                 <option key={s.dossier_id} value={s.dossier_id}>
                   {s.voornaam} {s.achternaam} — {s.bedrijf}
+                  {AFGEROND_FASES.includes(s.dossier_status) ? " (afgerond)" : ""}
                 </option>
               ))}
             </select>
@@ -242,9 +246,15 @@ export default function MentorAfsprakenPage() {
               )}
 
               <div className="actions" style={{ marginTop: "16px" }}>
-                <button className="btn primary" onClick={startEdit}>
-                  <i className="ti ti-pencil" /> Bewerken
-                </button>
+                {dossierAfgerond ? (
+                  <span className="status s_grijs">
+                    <i className="ti ti-lock" /> Dossier afgerond — afspraken zijn read-only
+                  </span>
+                ) : (
+                  <button className="btn primary" onClick={startEdit}>
+                    <i className="ti ti-pencil" /> Bewerken
+                  </button>
+                )}
               </div>
             </>
           ) : (

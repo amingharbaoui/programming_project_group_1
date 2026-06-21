@@ -126,7 +126,7 @@ Open http://localhost:5173 and log in with an e-mail address and password.
 
 ## Demo accounts
 
-The seed script creates accounts for every role. **Password for everyone: `Demo!2026`.**
+The seed script creates accounts for every role. **All active accounts use the password `Demo!2026`.** (The account `mentor3@bedrijf.be` is intentionally left as an *invited* account without a password, to demonstrate the activation flow.)
 
 | Role | E-mail |
 |------|--------|

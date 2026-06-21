@@ -1,8 +1,6 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
-const path = require("path");
-const fs = require("fs");
 const db = require("./config/db");
 const { verifyToken } = require("./utils/token");
 const helmet = require("helmet");
@@ -40,18 +38,17 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization", "x-user-id"]
 }));
 app.use(express.json({ limit: "1mb" }));
-const UPLOADS_DIR = path.join(__dirname, "../uploads");
-app.use("/uploads", (req, res, next) => {
-  // Auth vereist: token via Authorization-header of ?t= query (een preview/iframe kan geen header sturen).
-  const headerToken = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
-  if (!verifyToken(headerToken || req.query.t)) {
-    return res.status(401).json({ success: false, message: "Authenticatie vereist" });
-  }
+app.use("/uploads", (req, res) => {
+  // Rechtstreeks serveren vanuit /uploads sloeg de eigenaarschapscontrole over (elk geldig token
+  // kon elk rootbestand openen). Alles loopt nu via /api/documents/bestand/..., dezelfde route die
+  // de frontend gebruikt — met dossier-eigenaarschapscontrole. We verwijzen door zodat oude links
+  // (mails, eerder gedeelde URLs) blijven werken én alsnog de toegangscontrole krijgen.
   const rel = req.path.replace(/^\/+/, "");
-  if (!rel || rel.includes("..") || rel.includes("/")) return next();
-  const filePath = path.join(UPLOADS_DIR, rel);
-  if (!fs.existsSync(filePath)) return next();
-  res.sendFile(filePath);
+  if (!rel || rel.includes("..")) {
+    return res.status(404).json({ success: false, message: "Niet gevonden" });
+  }
+  const suffix = req.query.t ? `?t=${encodeURIComponent(req.query.t)}` : "";
+  return res.redirect(307, `/api/documents/bestand/${rel}${suffix}`);
 });
 
 // Security headers op de API-responses. Bewust ná de upload-handler zodat geserveerde

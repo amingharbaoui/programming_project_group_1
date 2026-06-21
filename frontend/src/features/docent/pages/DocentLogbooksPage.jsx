@@ -129,6 +129,7 @@ export default function DocentLogbooksPage() {
         herindieningNodig,
       });
       cacheDelete(`docent_logbooks_${studentId}`);
+      cacheDelete("docent_students");
       await loadLogbooks(studentId, true);
     } catch (err) {
       alert(err.response?.data?.message || err.message || "Docentcontrole mislukt");
@@ -172,17 +173,31 @@ export default function DocentLogbooksPage() {
     (s) => (s.student_id || s.id) === studentId
   );
 
-  // Bereken ontbrekende weeknummers: alle weken 1..aantal_weken die nog niet (volledig) bestaan.
+  // Bereken ontbrekende weeknummers: weken 1..aantal_weken die nog niet bestaan EN al voorbij zijn.
+  // Zelfde logica als de backend (getMissingLogbooksForDocent) — geen toekomstige weken of eindfase markeren.
   function getOntbrekendeWeken(weeks) {
+    // In de eindfase of vóór de start zijn er geen ontbrekende weken om op te volgen.
+    if (["resultaat_vrijgegeven", "afgerond", "voltooid"].includes(geselecteerdeStudent?.dossier_status)) {
+      return [];
+    }
     const ingevuld = new Set(
       weeks.filter((w) => w.status && w.status !== "ontbreekt").map((w) => w.week_nummer)
     );
     // Totaal verwachte weken: uit de stage (aantal_weken), met fallback op de hoogste ingediende week.
     const totaal = Number(geselecteerdeStudent?.aantal_weken)
       || (weeks.length > 0 ? Math.max(...weeks.map((w) => w.week_nummer)) : 0);
+
+    const startD = geselecteerdeStudent?.startdatum ? new Date(geselecteerdeStudent.startdatum) : null;
+    const vandaag = new Date(); vandaag.setHours(0, 0, 0, 0);
+    const weekVoorbij = (n) => {
+      if (!startD || Number.isNaN(startD.getTime())) return true;
+      const einde = new Date(startD); einde.setDate(einde.getDate() + n * 7);
+      return einde <= vandaag;
+    };
+
     const ontbrekend = [];
     for (let n = 1; n <= totaal; n++) {
-      if (!ingevuld.has(n)) ontbrekend.push(n);
+      if (!ingevuld.has(n) && weekVoorbij(n)) ontbrekend.push(n);
     }
     return ontbrekend;
   }

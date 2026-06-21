@@ -281,15 +281,15 @@ function NieuweVersieModal({ onClose, onConfirm, loading }) {
         </div>
         <div className="modal_body">
           <p style={{ margin: 0, fontSize: 13.5, color: "var(--dark)", lineHeight: 1.6 }}>
-            Het profiel wordt volledig gereset:
+            Er wordt een nieuwe <strong>concept-versie</strong> gemaakt als kopie van het huidige profiel:
           </p>
           <ul style={{ margin: "10px 0 0", padding: "0 0 0 18px", fontSize: 13, color: "var(--sub)", lineHeight: 2 }}>
-            <li>De <strong>11 standaardcompetenties</strong> worden hersteld</li>
-            <li>Alle <strong>gewichten</strong> worden teruggezet naar de standaardwaarden</li>
-            <li>De status wordt teruggezet op <strong>concept</strong></li>
+            <li>De <strong>huidige competenties</strong> worden overgenomen</li>
+            <li>De <strong>gewichten</strong> blijven zoals ze nu zijn</li>
+            <li>De status van de kopie is <strong>concept</strong>, zodat je vrij kan aanpassen</li>
           </ul>
           <p style={{ margin: "12px 0 0", fontSize: 13, color: "var(--sub)", lineHeight: 1.6 }}>
-            Deze actie kan niet ongedaan worden gemaakt.
+            Het actieve profiel blijft ongewijzigd tot je de nieuwe versie publiceert.
           </p>
         </div>
         <div className="modal_footer">
@@ -303,7 +303,7 @@ function NieuweVersieModal({ onClose, onConfirm, loading }) {
             type="button"
           >
             {loading ? <IconLoader2 size={16} stroke={1.8} className="spin" /> : <IconCopyPlus size={16} stroke={1.8} />}
-            Ja, reset alles
+            Ja, kopie maken
           </button>
         </div>
       </div>
@@ -320,6 +320,7 @@ export default function CompetenciesPage() {
   const [loading, setLoading] = useState(true);
   const [resetKey, setResetKey] = useState(0);
   const [error, setError] = useState("");
+  const [gewichtError, setGewichtError] = useState("");
   const [gekoppeldeDossiers, setGekoppeldeDossiers] = useState(null);
 
   const [publishLoading, setPublishLoading] = useState(false);
@@ -382,7 +383,11 @@ export default function CompetenciesPage() {
 
   async function handleWeightBlur(id, value) {
     const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed < 0) return;
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      setGewichtError("Gewicht moet een getal ≥ 0 zijn.");
+      return;
+    }
+    setGewichtError("");
     try {
       await api.patch(`/competencies/${id}`, { gewichtPercentage: parsed });
       const res = await api.get("/competencies");
@@ -391,8 +396,15 @@ export default function CompetenciesPage() {
         weights[c.id] = Number(c.gewicht_percentage);
       });
       setLocalGewichten(weights);
-    } catch {
-      // silent
+    } catch (err) {
+      // Fout zichtbaar maken i.p.v. stil inslikken; en de lokale waarde terugzetten.
+      setGewichtError(err.response?.data?.message || "Gewicht aanpassen mislukt.");
+      const res = await api.get("/competencies").catch(() => null);
+      if (res) {
+        const weights = {};
+        res.data.data.competenties.forEach((c) => { weights[c.id] = Number(c.gewicht_percentage); });
+        setLocalGewichten(weights);
+      }
     }
   }
 
@@ -437,6 +449,9 @@ export default function CompetenciesPage() {
   }
 
   const aantalActief = competenties.filter((c) => c.is_actief).length;
+  // Een actief profiel is read-only: de backend blokkeert wijzigen/verwijderen/toevoegen.
+  // Maak eerst een nieuwe (concept-)versie om aan te passen.
+  const profielActief = profiel?.status === "actief";
 
   return (
     <>
@@ -488,7 +503,7 @@ export default function CompetenciesPage() {
       {nieuweVersieSuccesOpen && (
         <SuccesModal
           title="Nieuwe versie aangemaakt"
-          message="De 11 standaardcompetenties zijn hersteld en de gewichten zijn teruggezet naar de standaardwaarden."
+          message="Er is een nieuwe concept-versie gemaakt als kopie van het huidige profiel. Je kan ze nu aanpassen en daarna publiceren."
           onClose={() => setNieuweVersieSuccesOpen(false)}
         />
       )}
@@ -570,11 +585,22 @@ export default function CompetenciesPage() {
                 <IconListDetails size={16} stroke={1.8} />
                 Competenties
               </div>
-              <button className="btn" onClick={() => setToevoegenOpen(true)}>
-                <IconCopyPlus size={16} stroke={1.8} />
-                Competentie toevoegen
-              </button>
+              {!profielActief && (
+                <button className="btn" onClick={() => setToevoegenOpen(true)}>
+                  <IconCopyPlus size={16} stroke={1.8} />
+                  Competentie toevoegen
+                </button>
+              )}
             </div>
+
+            {profielActief && (
+              <p className="status s_grijs" style={{ margin: "0 0 8px" }}>
+                <IconCheck size={14} stroke={1.8} /> Actief profiel — read-only. Maak een nieuwe versie om aan te passen.
+              </p>
+            )}
+            {gewichtError && (
+              <p style={{ color: "var(--red)", margin: "0 0 8px", fontSize: 13 }}>{gewichtError}</p>
+            )}
 
             <div className="competency_table" key={resetKey}>
               <div className="competency_table_head">
@@ -601,6 +627,7 @@ export default function CompetenciesPage() {
                         value={localGewichten[c.id] ?? c.gewicht_percentage}
                         min="0"
                         max="100"
+                        disabled={profielActief}
                         onChange={(e) =>
                           setLocalGewichten((prev) => ({ ...prev, [c.id]: e.target.value }))
                         }
@@ -612,6 +639,7 @@ export default function CompetenciesPage() {
                         className="icon_btn"
                         type="button"
                         aria-label="Competentie bewerken"
+                        disabled={profielActief}
                         onClick={() => setBewerkTarget(c)}
                       >
                         <IconEdit size={16} stroke={1.8} />
@@ -620,6 +648,7 @@ export default function CompetenciesPage() {
                         className="icon_btn"
                         type="button"
                         aria-label="Competentie verwijderen"
+                        disabled={profielActief}
                         onClick={() => setVerwijderTarget(c)}
                       >
                         <IconTrash size={16} stroke={1.8} />

@@ -263,8 +263,16 @@ async function approveDocument(req, res) {
   if (!id) return fail(res, 400, "Ongeldig document-id");
 
   try {
-    const [docs] = await db.query("SELECT bestand_url, bestand_naam, status FROM documenten WHERE id = ? LIMIT 1", [id]);
+    const [docs] = await db.query(
+      `SELECT doc.bestand_url, doc.bestand_naam, doc.status, sd.status AS dossier_status
+       FROM documenten doc LEFT JOIN stagedossiers sd ON sd.id = doc.stagedossier_id
+       WHERE doc.id = ? LIMIT 1`,
+      [id]
+    );
     if (docs.length === 0) return fail(res, 404, "Document niet gevonden");
+    if (["resultaat_vrijgegeven", "afgerond"].includes(docs[0].dossier_status)) {
+      return fail(res, 409, "Het dossier is afgerond; documenten kunnen niet meer gecontroleerd worden");
+    }
     if (!docs[0].bestand_url && !docs[0].bestand_naam) {
       return fail(res, 400, "Een document zonder geupload bestand kan niet goedgekeurd worden");
     }
@@ -299,8 +307,16 @@ async function rejectDocument(req, res) {
   if (!reden) return fail(res, 400, "Een afkeuringsreden is verplicht");
 
   try {
-    const [docs] = await db.query("SELECT status FROM documenten WHERE id = ? LIMIT 1", [id]);
+    const [docs] = await db.query(
+      `SELECT doc.status, sd.status AS dossier_status
+       FROM documenten doc LEFT JOIN stagedossiers sd ON sd.id = doc.stagedossier_id
+       WHERE doc.id = ? LIMIT 1`,
+      [id]
+    );
     if (docs.length === 0) return fail(res, 404, "Document niet gevonden");
+    if (["resultaat_vrijgegeven", "afgerond"].includes(docs[0].dossier_status)) {
+      return fail(res, 409, "Het dossier is afgerond; documenten kunnen niet meer gecontroleerd worden");
+    }
     if (!["ingediend", "in_controle"].includes(docs[0].status)) {
       return fail(res, 409, "Dit document is niet meer in behandeling en kan niet afgekeurd worden");
     }

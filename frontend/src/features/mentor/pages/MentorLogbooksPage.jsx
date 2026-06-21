@@ -32,13 +32,22 @@ function dat(value) {
   return new Date(value).toLocaleDateString("nl-BE");
 }
 
-// Zelfde berekening als bij de docent: welke weken (1..aantal_weken) hebben nog geen rij in de DB.
-function getOntbrekendeWeken(weken, aantalWeken) {
+// Zelfde berekening als bij de docent: welke weken (1..aantal_weken) ontbreken EN al voorbij zijn.
+// Geen toekomstige weken of weken in de eindfase als "ontbrekend" tonen.
+function getOntbrekendeWeken(weken, aantalWeken, startdatum, dossierStatus) {
+  if (["resultaat_vrijgegeven", "afgerond", "voltooid"].includes(dossierStatus)) return [];
   const ingevuld = new Set(weken.map((w) => w.week_nummer));
   const totaal = Number(aantalWeken) || (weken.length > 0 ? Math.max(...weken.map((w) => w.week_nummer)) : 0);
+  const startD = startdatum ? new Date(startdatum) : null;
+  const vandaag = new Date(); vandaag.setHours(0, 0, 0, 0);
+  const weekVoorbij = (n) => {
+    if (!startD || Number.isNaN(startD.getTime())) return true;
+    const einde = new Date(startD); einde.setDate(einde.getDate() + n * 7);
+    return einde <= vandaag;
+  };
   const ontbrekend = [];
   for (let n = 1; n <= totaal; n++) {
-    if (!ingevuld.has(n)) ontbrekend.push(n);
+    if (!ingevuld.has(n) && weekVoorbij(n)) ontbrekend.push(n);
   }
   return ontbrekend;
 }
@@ -191,7 +200,7 @@ export default function MentorLogbooksPage() {
   }
 
   // ─── DETAIL ───
-  const ontbrekendeWeken = getOntbrekendeWeken(weeks, detailStudent?.aantal_weken);
+  const ontbrekendeWeken = getOntbrekendeWeken(weeks, detailStudent?.aantal_weken, detailStudent?.startdatum, detailStudent?.dossier_status);
 
   return (
     <div className="page-inner">

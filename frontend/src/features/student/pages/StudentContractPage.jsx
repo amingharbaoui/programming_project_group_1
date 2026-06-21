@@ -88,11 +88,12 @@ export default function StudentContractPage() {
 
   useEffect(() => { laadContract(); }, []);
 
-  async function laadContract() {
+  async function laadContract(force = false) {
     setLoading(true);
     setFout(null);
     try {
-      const cached = cacheGet("student_contract");
+      // Het contract wordt ook door mentor/administratie gewijzigd → met 'force' verse data ophalen.
+      const cached = force ? null : cacheGet("student_contract");
       const data = cached ?? (await apiRequest("GET", "/contracts/my")).data;
       if (!cached && data) cacheSet("student_contract", data);
       setContract(data);
@@ -164,8 +165,9 @@ export default function StudentContractPage() {
   return (
     <div className="page-inner">
 
-      <div className="page-header">
+      <div className="page-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h1>Stageovereenkomst</h1>
+        <button className="btn sm" onClick={() => laadContract(true)} disabled={loading}>Vernieuwen</button>
       </div>
 
       {fout && (

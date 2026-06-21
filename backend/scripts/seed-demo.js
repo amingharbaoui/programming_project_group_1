@@ -271,7 +271,7 @@ async function main() {
     const [[vv]] = await conn.query("SELECT COUNT(*) AS n FROM stagevoorstellen");
     console.log("\n✅ SEED KLAAR");
     console.log(`   gebruikers: ${gu.n} | voorstellen: ${vv.n} | dossiers: ${dd.n}`);
-    console.log(`   Wachtwoord voor iedereen: ${DEMO_WACHTWOORD}`);
+    console.log(`   Wachtwoord voor alle actieve accounts: ${DEMO_WACHTWOORD} (mentor3@bedrijf.be is bewust een uitgenodigde activatie-account zonder wachtwoord)`);
     console.log("   Voorbeelden: commissie@ehb.be · docent@ehb.be · admin@ehb.be · mentor@bedrijf.be · student.loopt@ehb.be");
     process.exit(0);
   } catch (e) {
