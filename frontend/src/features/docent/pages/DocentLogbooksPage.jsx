@@ -419,6 +419,3 @@ export default function DocentLogbooksPage() {
     </div>
   );
 }
-  </div>
-  );
-}
