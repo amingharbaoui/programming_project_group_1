@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import api, { apiRequest } from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 import { cacheGet, cacheSet, cacheDelete } from "../studentCache";
@@ -217,6 +218,7 @@ function CompModal({ competentie, huidigScore, huidigMot, onSave, onSluit }) {
 ══════════════════════════════════════ */
 export default function StudentEvaluationPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [data, setData]           = useState(null);
   const [loading, setLoading]     = useState(true);
   const [fout, setFout]           = useState(null);
@@ -509,6 +511,10 @@ export default function StudentEvaluationPage() {
                 <strong>Praktijkfeedback mentor:</strong> {actief.mentor_algemene_feedback}
               </div>
             )}
+            {/* 497: de volledige evaluatie (scores van iedereen) staat als document bij Documenten. */}
+            <button className="btn sm" style={{ marginTop: 8 }} onClick={() => navigate("/student/documents")}>
+              <IconClipboardCheck size={14} /> Open de volledige evaluatie bij Documenten
+            </button>
           </div>
         </div>
       )}
