@@ -128,7 +128,7 @@ async function openEvaluation(req, res) {
     }
     // Evaluatie enkel openen wanneer de stage geregistreerd is of loopt — niet in de contract-/controlefase
     // en ook niet meer nadat het resultaat vrijgegeven of het dossier afgerond is (eindfase = read-only).
-    if (!["geregistreerd", "stage_loopt"].includes(dossier[0].status)) {
+    if (!["geregistreerd", "actief", "stage_loopt"].includes(dossier[0].status)) {
       return fail(res, 409, "Een evaluatie kan enkel geopend worden zolang het stagedossier geregistreerd is of loopt");
     }
     // 500: een finale evaluatie kan pas geopend worden nadat de tussentijdse evaluatie geregistreerd is én er
@@ -142,11 +142,11 @@ async function openEvaluation(req, res) {
         return fail(res, 409, "Registreer eerst de tussentijdse evaluatie voor je de finale evaluatie opent");
       }
       const [[presentatie]] = await db.query(
-        "SELECT COUNT(*) AS aantal FROM planning_momenten WHERE stagedossier_id = ? AND type = 'eindpresentatie' AND status IN ('bevestigd', 'gegeven', 'geweest')",
+        "SELECT COUNT(*) AS aantal FROM planning_momenten WHERE stagedossier_id = ? AND type = 'eindpresentatie' AND status IN ('gegeven', 'geweest')",
         [dossierId]
       );
       if (presentatie.aantal === 0) {
-        return fail(res, 409, "Plan en bevestig eerst de eindpresentatie voor je de finale evaluatie opent");
+        return fail(res, 409, "Markeer eerst de eindpresentatie als gegeven voor je de finale evaluatie opent");
       }
     }
 

@@ -20,6 +20,7 @@ async function getDocentStudents(req, res) {
         gm.achternaam    AS mentor_achternaam,
         sd.id            AS dossier_id,
         sd.status        AS dossier_status,
+        sd.mentor_id,
         sd.startdatum,
         sd.einddatum,
         sd.aantal_weken,
@@ -48,7 +49,10 @@ async function getDocentStudents(req, res) {
         (SELECT COUNT(*) FROM planning_momenten pm
           WHERE pm.stagedossier_id = sd.id AND pm.type = 'bedrijfsbezoek' AND pm.status = 'geweest') AS bezoek_geweest,
         (SELECT COUNT(*) FROM evaluaties e
-          WHERE e.stagedossier_id = sd.id AND e.type = 'tussentijds' AND e.status IN ('geregistreerd', 'vrijgegeven')) AS tussentijds_geregistreerd
+          WHERE e.stagedossier_id = sd.id AND e.type = 'tussentijds' AND e.status IN ('geregistreerd', 'vrijgegeven')) AS tussentijds_geregistreerd,
+        (SELECT COUNT(*) FROM planning_momenten pm
+          WHERE pm.stagedossier_id = sd.id AND pm.type = 'eindpresentatie'
+            AND pm.status IN ('gegeven', 'geweest')) AS presentatie_gegeven
       FROM stagedossiers sd
       JOIN studenten   st ON st.gebruiker_id = sd.student_id
       JOIN gebruikers   g ON g.id             = st.gebruiker_id
@@ -71,8 +75,13 @@ async function getDocentStudents(req, res) {
       if (Number(r.eval_te_registreren) > 0) return { titel: "Evaluatie registreren", type: "evaluatie" };
       if (Number(r.te_review_weken) > 0) return { titel: "Logboekweek nalezen", type: "logboek" };
       if (planbaar(r.dossier_status) && Number(r.aantal_bezoeken) === 0) return { titel: "Bedrijfsbezoek plannen", type: "planning" };
-      // 454: bezoek is geweest en er is nog geen eindpresentatie ingepland → dat is de volgende planningsactie.
-      if (planbaar(r.dossier_status) && Number(r.bezoek_geweest) > 0 && Number(r.aantal_presentaties) === 0) return { titel: "Eindpresentatie plannen", type: "planning" };
+      // Eindpresentatie pas na bezoek én geregistreerde tussentijdse evaluatie.
+      if (
+        planbaar(r.dossier_status) &&
+        Number(r.bezoek_geweest) > 0 &&
+        Number(r.tussentijds_geregistreerd) > 0 &&
+        Number(r.aantal_presentaties) === 0
+      ) return { titel: "Eindpresentatie plannen", type: "planning" };
       if (r.dossier_status === "resultaat_vrijgegeven" || r.dossier_status === "afgerond") return { titel: "Afgerond", type: "geen" };
       return { titel: "—", type: "geen" };
     };

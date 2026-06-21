@@ -5,6 +5,7 @@ import { useAuth } from "../../../context/AuthContext";
 import "./MentorDossierPage.css";
 import { cacheGet, cacheSet, cacheDelete } from "../mentorCache";
 import { kiesMentorStagiair, onthoudMentorDossier } from "../mentorSelection";
+import { canMentorHandlePlanning, planningStatusClass, planningStatusLabel } from "../../../utils/stageFlow";
 
 function initialen(naam) {
   const p = (naam || "").trim().split(/\s+/);
@@ -36,17 +37,36 @@ function contractBadge(c) {
   return { cls: "s_info", icon: "ti-hourglass", txt: "Wacht op student" };
 }
 function bezoekBadge(status) {
-  if (status === "bevestigd") return { cls: "s_ok", icon: "ti-check", txt: "Bevestigd door jou" };
-  if (status === "alternatief_gevraagd") return { cls: "s_amber", icon: "ti-hourglass", txt: "Nieuw moment gevraagd" };
+  if (status === "bevestigd") return { cls: "s_ok", icon: "ti-check", txt: "Bevestigd door mentor" };
+  if (status === "alternatief_gevraagd") return { cls: "s_amber", icon: "ti-hourglass", txt: "Mentor stelt ander moment voor" };
   if (status === "gegeven" || status === "geweest") return { cls: "s_ok", icon: "ti-check", txt: "Heeft plaatsgevonden" };
   if (status === "geannuleerd") return { cls: "s_rood", icon: "ti-x", txt: "Geannuleerd" };
-  return { cls: "s_rood", icon: "ti-hourglass", txt: "Te bevestigen" };
+  return { cls: planningStatusClass(status), icon: "ti-hourglass", txt: planningStatusLabel({ status }) };
 }
 function typeLabel(type) {
   if (type === "bedrijfsbezoek") return "Bedrijfsbezoek";
   if (type === "tussentijdse_bespreking") return "Tussentijdse bespreking";
   if (type === "eindpresentatie") return "Eindpresentatie";
   return "Afspraak";
+}
+
+const AFSPRAAK_VELDEN = [
+  { key: "werkuren", label: "Werkuren" },
+  { key: "thuiswerk", label: "Thuiswerk" },
+  { key: "eersteDag", label: "Eerste werkdag" },
+  { key: "contactpersoon", label: "Contactpersoon" },
+  { key: "materiaal", label: "Benodigd materiaal" },
+  { key: "extra", label: "Extra info" },
+];
+
+function parseAfsprakenVelden(raw) {
+  if (!raw) return null;
+  if (typeof raw === "object") return raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 // Stepper: Contract / Voorbereiding (praktische afspraken) / Stage / Evaluatie.
@@ -94,6 +114,7 @@ export default function MentorDossierPage() {
   const [dossierId, setDossierId] = useState(vDos);
   const [contract, setContract] = useState(null);
   const [afspraken, setAfspraken] = useState("");
+  const [afsprakenVelden, setAfsprakenVelden] = useState(null);
   const [gedeeldOp, setGedeeldOp] = useState(null);
   const [momenten, setMomenten] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -106,6 +127,9 @@ export default function MentorDossierPage() {
   const [melding, setMelding] = useState({ tekst: "", type: "" });
   const [altOpen, setAltOpen] = useState(null);
   const [altTekst, setAltTekst] = useState("");
+  const [altDatum, setAltDatum] = useState("");
+  const [altUur, setAltUur] = useState("10:00");
+  const [altPlaats, setAltPlaats] = useState("");
   const [bezigMoment, setBezigMoment] = useState(null);
   const [dossierOpen, setDossierOpen] = useState(false);
   const [akkoord, setAkkoord] = useState(false);
@@ -148,6 +172,7 @@ export default function MentorDossierPage() {
       if (cachedC !== null && cachedA !== null && cachedP !== null) {
         setContract(cachedC);
         setAfspraken(cachedA.tekst || "");
+        setAfsprakenVelden(cachedA.velden || null);
         setGedeeldOp(cachedA.gedeeldOp || null);
         setMomenten(cachedP);
         setLoading(false);
@@ -167,8 +192,10 @@ export default function MentorDossierPage() {
           const row = a.value.data.data;
           const tekst = row?.praktische_afspraken || "";
           const gedeeld = row?.praktische_afspraken_gedeeld_op || null;
-          cacheSet(`mentor_afspraken_${dossierId}`, { tekst, gedeeldOp: gedeeld });
+          const velden = parseAfsprakenVelden(row?.praktische_afspraken_velden);
+          cacheSet(`mentor_afspraken_${dossierId}`, { tekst, gedeeldOp: gedeeld, velden });
           setAfspraken(tekst);
+          setAfsprakenVelden(velden);
           setGedeeldOp(gedeeld);
         }
         const momentenData = p.status === "fulfilled" ? (p.value.data.data || []) : [];
@@ -197,8 +224,10 @@ export default function MentorDossierPage() {
       const row = a.value.data.data;
       const tekst = row?.praktische_afspraken || "";
       const gedeeld = row?.praktische_afspraken_gedeeld_op || null;
-      cacheSet(`mentor_afspraken_${dossierId}`, { tekst, gedeeldOp: gedeeld });
+      const velden = parseAfsprakenVelden(row?.praktische_afspraken_velden);
+      cacheSet(`mentor_afspraken_${dossierId}`, { tekst, gedeeldOp: gedeeld, velden });
       setAfspraken(tekst);
+      setAfsprakenVelden(velden);
       setGedeeldOp(gedeeld);
     }
     const momentenData = p.status === "fulfilled" ? (p.value.data.data || []) : [];
@@ -257,6 +286,7 @@ export default function MentorDossierPage() {
       cacheDelete(`mentor_afspraken_${dossierId}`);
       const nu = new Date().toISOString();
       setAfspraken(afsprakenWaarde);
+      setAfsprakenVelden(null);
       setGedeeldOp(nu);
       setEditAfspraken(false);
       setMelding({ tekst: "Praktische afspraken gedeeld met de student.", type: "s_ok" });
@@ -282,9 +312,16 @@ export default function MentorDossierPage() {
     if (!altTekst.trim()) return;
     try {
       setBezigMoment(id);
-      await api.patch(`/mentor/planning/${id}/alternatief`, { bericht: altTekst });
+      await api.patch(`/mentor/planning/${id}/alternatief`, {
+        bericht: altTekst,
+        geplandOp: altDatum ? `${altDatum}T${altUur || "00:00"}` : null,
+        locatie: altPlaats || null,
+      });
       setAltOpen(null);
       setAltTekst("");
+      setAltDatum("");
+      setAltUur("10:00");
+      setAltPlaats("");
       await herlaad();
     } catch (err) {
       setMelding({ tekst: err.response?.data?.message || "Versturen mislukt", type: "s_rood" });
@@ -389,16 +426,32 @@ export default function MentorDossierPage() {
               {gedeeldOp && <div style={{ fontSize: 11.5, color: "var(--faint)", marginBottom: 8 }}>Laatst gedeeld op {dat(gedeeldOp)}</div>}
               {!editAfspraken ? (
                 <>
-                  <div style={{ fontSize: 13, color: afspraken ? "var(--gray)" : "var(--faint)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-                    {afspraken || "Nog geen afspraken gedeeld. De student ziet ze in zijn dashboard zodra je ze deelt."}
-                  </div>
+                  {afsprakenVelden && Object.values(afsprakenVelden).some(Boolean) ? (
+                    <div>
+                      {AFSPRAAK_VELDEN.filter((veld) => afsprakenVelden[veld.key]).map((veld) => (
+                        <div className="kv" key={veld.key}>
+                          <span className="k">{veld.label}</span>
+                          <span className="v">{afsprakenVelden[veld.key]}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 13, color: afspraken ? "var(--gray)" : "var(--faint)", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+                      {afspraken || "Nog geen afspraken gedeeld. De student ziet ze in zijn dashboard zodra je ze deelt."}
+                    </div>
+                  )}
                   <div style={{ marginTop: 12 }}>
                     {dossierAfgerond ? (
                       <span className="status s_grijs">Dossier afgerond — read-only</span>
                     ) : (
-                      <button className="btn primary sm" onClick={() => { setAfsprakenWaarde(afspraken); setEditAfspraken(true); }}>
-                        <i className="ti ti-pencil" />{afspraken ? "Bewerken" : "Afspraken delen"}
-                      </button>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <button className="btn primary sm" onClick={() => navigate(`/mentor/afspraken?dossier=${dossierId}`)}>
+                          <i className="ti ti-list-details" />Gestructureerd bewerken
+                        </button>
+                        <button className="btn sm" onClick={() => { setAfsprakenWaarde(afspraken); setEditAfspraken(true); }}>
+                          <i className="ti ti-pencil" />Snelle tekstnotitie
+                        </button>
+                      </div>
                     )}
                   </div>
                 </>
@@ -418,7 +471,7 @@ export default function MentorDossierPage() {
             {/* Bedrijfsbezoek / planning */}
             {momenten.map((m) => {
               const bb = bezoekBadge(m.status);
-              const teBevestigen = !dossierAfgerond && ["bedrijfsbezoek", "eindpresentatie"].includes(m.type) && ["voorgesteld", "gepland"].includes(m.status);
+              const teBevestigen = canMentorHandlePlanning(m, student?.dossier_status);
               return (
                 <div className="card" key={m.id} style={teBevestigen ? { borderLeft: "3px solid var(--red)" } : {}}>
                   <div className="card_title">
@@ -434,6 +487,11 @@ export default function MentorDossierPage() {
                     altOpen === m.id ? (
                       <div style={{ marginTop: 12 }}>
                         <label className="form_label">Bericht / alternatief moment</label>
+                        <div style={{ display: "flex", gap: 10, marginBottom: 8, flexWrap: "wrap" }}>
+                          <input className="form_input" type="date" style={{ flex: 1, minWidth: 150 }} value={altDatum} onChange={(e) => setAltDatum(e.target.value)} />
+                          <input className="form_input" type="time" style={{ width: 120 }} value={altUur} onChange={(e) => setAltUur(e.target.value)} />
+                        </div>
+                        <input className="form_input" style={{ marginBottom: 8 }} placeholder="Plaats, bv. bij het bedrijf of online" value={altPlaats} onChange={(e) => setAltPlaats(e.target.value)} />
                         <textarea className="form_input" style={{ minHeight: 60 }} value={altTekst} onChange={(e) => setAltTekst(e.target.value)}
                           placeholder="bv. Die voormiddag zit ik in een klantmeeting — kan het in de namiddag?" />
                         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
@@ -444,7 +502,17 @@ export default function MentorDossierPage() {
                     ) : (
                       <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
                         <button className="btn primary sm" disabled={bezigMoment === m.id} onClick={() => bevestigMoment(m.id)}><i className="ti ti-check" />Bevestigen</button>
-                        <button className="btn sm" onClick={() => { setAltOpen(m.id); setAltTekst(""); }}><i className="ti ti-calendar-x" />Ander moment voorstellen</button>
+                        <button
+                          className="btn sm"
+                          onClick={() => {
+                            const d = m.gepland_op ? new Date(m.gepland_op) : null;
+                            setAltOpen(m.id);
+                            setAltTekst("");
+                            setAltDatum(d && !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : "");
+                            setAltUur(d && !Number.isNaN(d.getTime()) ? d.toTimeString().slice(0, 5) : "10:00");
+                            setAltPlaats(m.locatie || "");
+                          }}
+                        ><i className="ti ti-calendar-x" />Ander moment voorstellen</button>
                       </div>
                     )
                   )}

@@ -38,7 +38,7 @@ export default function MentorEvaluationPage() {
   const [verslagOpen, setVerslagOpen] = useState(false);
   const [bezig, setBezig] = useState(false);
   const [melding, setMelding] = useState({ tekst: "", type: "" });
-  const [bevestigModal, setBevestigModal] = useState(null); // 524: { titel, tekst }
+  const [feedbackModal, setFeedbackModal] = useState(null);
 
   useEffect(() => {
     async function init() {
@@ -131,8 +131,10 @@ export default function MentorEvaluationPage() {
     if (ingediend) {
       const missing = competenties.filter((c) => !scores[activeTab][c.id]);
       if (missing.length > 0) {
-        // 524: incomplete submit als prototype-modal i.p.v. enkel een inline label.
-        setBevestigModal({ titel: "Nog niet volledig", tekst: `Vul eerst alle competenties in voor je indient — er ${missing.length === 1 ? "ontbreekt nog 1 score" : `ontbreken nog ${missing.length} scores`}.` });
+        setFeedbackModal({
+          titel: "Nog niet volledig",
+          tekst: `Vul eerst alle competenties in voor je indient — er ${missing.length === 1 ? "ontbreekt nog 1 score" : `ontbreken nog ${missing.length} scores`}.`,
+        });
         return;
       }
     }
@@ -146,10 +148,11 @@ export default function MentorEvaluationPage() {
       setMelding({ tekst: "", type: "" });
       await api.post(`/evaluations/${huidigeEval.id}/scores`, { scores: scoresArr, ingediend, algemeneFeedback: motiv[activeTab]?.algemeen || "" });
       if (ingediend) {
-        // 524: bevestiging via modal zoals het mentorprototype.
-        setBevestigModal({
+        setFeedbackModal({
           titel: activeTab === "finaal" ? "Finale mentorinput ingediend" : "Mentorinput ingediend",
-          tekst: "Je input is opgeslagen. De docent krijgt een melding en verwerkt de evaluatie verder.",
+          tekst: activeTab === "finaal"
+            ? "De docent gebruikt je input bij de finale beoordeling."
+            : "De docent kreeg een melding en verwerkt je input tijdens de tussentijdse bespreking.",
         });
       } else {
         setMelding({ tekst: "Opgeslagen als concept.", type: "s_ok" });
@@ -397,6 +400,27 @@ export default function MentorEvaluationPage() {
         )}
 
       {/* verslag-modal — net als toonVerslag() in de HTML-prototype */}
+      {feedbackModal && (
+        <div className="modal-overlay" onClick={() => setFeedbackModal(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <div className="mh-icon"><i className="ti ti-check" /></div>
+              <div>
+                <div className="mh-t">{feedbackModal.titel}</div>
+              </div>
+              <button className="icon-btn mh-x btn sm" onClick={() => setFeedbackModal(null)}><i className="ti ti-x" /></button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: 13, lineHeight: 1.7 }}>{feedbackModal.tekst}</p>
+            </div>
+            <div className="modal-foot">
+              <button className="btn primary" onClick={() => setFeedbackModal(null)}>OK</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* verslag-modal — net als toonVerslag() in de HTML-prototype */}
       {verslagOpen && (
         <div className="modal-overlay" onClick={() => setVerslagOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -463,24 +487,6 @@ export default function MentorEvaluationPage() {
             <div className="modal-foot">
               {/* "Bewaar" slaat de score nu echt op (als concept) i.p.v. enkel de modal te sluiten (auditpunt 413). */}
               <button className="btn primary" disabled={bezig} onClick={async () => { if (kanInvullen) await dienIn(false); setModalCompId(null); }}><i className="ti ti-check" />{kanInvullen ? "Bewaar" : "Sluiten"}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 524: mentor-bevestiging/incomplete als modal i.p.v. enkel een inline label */}
-      {bevestigModal && (
-        <div className="modal_overlay" onClick={() => setBevestigModal(null)}>
-          <div className="modal_box" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal_header">
-              <span className="modal_title">{bevestigModal.titel}</span>
-              <button className="icon_btn" onClick={() => setBevestigModal(null)}><i className="ti ti-x" /></button>
-            </div>
-            <div className="modal_body">
-              <p style={{ margin: 0, fontSize: 14, color: "var(--dark)" }}>{bevestigModal.tekst}</p>
-            </div>
-            <div className="modal_footer">
-              <button className="btn primary" onClick={() => setBevestigModal(null)}>Begrepen</button>
             </div>
           </div>
         </div>
