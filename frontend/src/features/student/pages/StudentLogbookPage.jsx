@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { apiRequest } from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 import { cacheGet, cacheSet, cacheDelete } from "../studentCache";
@@ -169,6 +169,11 @@ function LogboekWeek({ week, onBewerken, onVernieuwen }) {
                     {dagCompetenties.map((code) => (
                       <span key={code} className="dag-lo-badge">{code}</span>
                     ))}
+                  </div>
+                )}
+                {dag.mentor_opmerking && (
+                  <div style={{ fontSize: 12, color: "var(--sub)", marginTop: 4 }}>
+                    💬 Mentor: <em>{dag.mentor_opmerking}</em>
                   </div>
                 )}
               </div>
@@ -345,6 +350,9 @@ function weekNaarFormulier(week) {
       competenties: Array.isArray(dag.competenties)
         ? dag.competenties
         : (dag.competenties ? JSON.parse(dag.competenties) : []),
+      mentorOpmerking: dag.mentor_opmerking ?? null,
+      mentorBevestigdOp: dag.mentor_bevestigd_op ?? null,
+      studentReactie: dag.student_reactie ?? null,
     })),
   };
 }
@@ -356,6 +364,9 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
     logbook.dagen.map((d) => !!(d._bevestigd || d.status === "geen_stagedag"))
   );
   const [dagFout, setDagFout] = useState("");
+  const [openReactieDagIndex, setOpenReactieDagIndex] = useState(null); // welke dag heeft reactie-form open
+  const [reactieTekst, setReactieTekst] = useState("");
+  const [reactieSaving, setReactieSaving] = useState(false);
 
   // Actieve dag = de eerste niet-ingevulde dag (standaard dag 0)
   const [activeDag, setActiveDag] = useState(() => {
@@ -420,6 +431,26 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
       aantalUren: Number(dagData.aantalUren) || 0,
       competenties: dagData.competenties ?? [],
     });
+  }
+
+  async function handleReactieVersturen(dagIndex) {
+    if (!reactieTekst.trim()) return;
+    const dag = logbook.dagen[dagIndex];
+    if (!dag?.id) return;
+    setReactieSaving(true);
+    try {
+      await apiRequest("PATCH", `/logbooks/days/${dag.id}/reactie`, { reactie: reactieTekst.trim() });
+      // Lokaal bijwerken
+      const updatedDagen = [...logbook.dagen];
+      updatedDagen[dagIndex] = { ...updatedDagen[dagIndex], studentReactie: reactieTekst.trim() };
+      setLogbook({ ...logbook, dagen: updatedDagen });
+      setOpenReactieDagIndex(null);
+      setReactieTekst("");
+    } catch (err) {
+      setDagFout(err?.response?.data?.message || "Reactie versturen mislukt — probeer opnieuw.");
+    } finally {
+      setReactieSaving(false);
+    }
   }
 
   async function handleDagOpslaan() {
@@ -685,13 +716,14 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
           const geenStage = d.status === "geen_stagedag" && ingevuld;
           const actief = i === activeDag;
           const isHvandaag = dd === vandaagIso;
+          const dagToekomst = dd > vandaagIso;
 
           return (
+            <React.Fragment key={i}>
             <div
-              key={i}
               className={`week-dag-rij${actief ? " actief" : ""}${ingevuld && !geenStage ? " ingevuld" : ""}${geenStage ? " geen-stage" : ""}`}
             >
-              <span className="week-dag-naam">{DAG_NAMEN[i]}</span>
+              <span className="week-dag-naam" style={dagToekomst && !ingevuld ? { opacity: 0.5 } : {}}>{DAG_NAMEN[i]}</span>
               <span className="week-dag-info">
                 {actief && !ingevuld
                   ? (isHvandaag ? "Vandaag — formulier hierboven" : "Formulier hierboven")
@@ -699,8 +731,20 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
                   ? "Geen stagedag"
                   : ingevuld
                   ? (d.titel || "Ingevuld")
+                  : dagToekomst
+                  ? <span style={{ color: "var(--sub)" }}>Nog niet beschikbaar</span>
                   : <span style={{ color: "var(--red)" }}>Niet ingevuld — vul deze dag alsnog aan</span>
                 }
+                {ingevuld && !geenStage && d.mentorOpmerking && (
+                  <span style={{ display: "block", fontSize: 11.5, color: "var(--sub)", marginTop: 2 }}>
+                    💬 Mentor: <em>{d.mentorOpmerking}</em>
+                  </span>
+                )}
+                {ingevuld && !geenStage && d.studentReactie && (
+                  <span style={{ display: "block", fontSize: 11.5, color: "var(--sub)", marginTop: 1 }}>
+                    ↩ Jij: <em>{d.studentReactie}</em>
+                  </span>
+                )}
               </span>
               {ingevuld && !geenStage && (
                 <span className="status s_ok" style={{ fontSize: 11 }}>
@@ -710,7 +754,7 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
               {geenStage && (
                 <span className="status s_grijs" style={{ fontSize: 11 }}>Geen stagedag</span>
               )}
-              {!ingevuld && !actief && (
+              {!ingevuld && !actief && !dagToekomst && (
                 <button
                   type="button"
                   className="btn ghost sm week-dag-invullen"
@@ -722,7 +766,45 @@ function WeekFormulier({ logbook, setLogbook, onSubmit, saving, isBewerken, aant
               {actief && !ingevuld && (
                 <span className="status s_open" style={{ fontSize: 11 }}>Open</span>
               )}
+              {ingevuld && !geenStage && d.mentorOpmerking && (
+                <button
+                  type="button"
+                  className="btn ghost sm"
+                  style={{ fontSize: 11 }}
+                  onClick={() => {
+                    setOpenReactieDagIndex(openReactieDagIndex === i ? null : i);
+                    setReactieTekst(d.studentReactie || "");
+                  }}
+                >
+                  💬 Reageer
+                </button>
+              )}
             </div>
+            {openReactieDagIndex === i && (
+              <div style={{ padding: "10px 12px", background: "var(--surface, #f9fafb)", borderRadius: 8, border: "1px solid var(--border)", marginTop: 4 }}>
+                <label style={{ fontSize: 12, fontWeight: 600, display: "block", marginBottom: 4 }}>
+                  Jouw reactie op de mentor-opmerking
+                </label>
+                <textarea
+                  className="form_textarea"
+                  rows={2}
+                  value={reactieTekst}
+                  onChange={(e) => setReactieTekst(e.target.value)}
+                  placeholder="Schrijf hier je reactie..."
+                  style={{ resize: "vertical" }}
+                />
+                {dagFout && <p className="status s_rood" style={{ fontSize: 11.5, marginTop: 4 }}>{dagFout}</p>}
+                <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                  <button type="button" className="btn primary sm" disabled={reactieSaving} onClick={() => handleReactieVersturen(i)}>
+                    {reactieSaving ? "Bezig…" : "Verstuur"}
+                  </button>
+                  <button type="button" className="btn sm" onClick={() => { setOpenReactieDagIndex(null); setReactieTekst(""); }}>
+                    Annuleer
+                  </button>
+                </div>
+              </div>
+            )}
+            </React.Fragment>
           );
         })}
       </div>
@@ -792,8 +874,20 @@ export default function StudentLogbookPage() {
           if (opgeslagen) {
             const draft = JSON.parse(opgeslagen);
             if (draft.weekNummer === verwachtWeekNr) {
-              setLogbook(draft);
-              herstellenGelukt = true;
+              // Extra check: als sd bekend is en weekStart van draft klopt niet → niet herstellen
+              if (sd) {
+                const { weekStart: verwachteStart } = berekenWeekDatums(sd, verwachtWeekNr);
+                if (draft.weekStart && draft.weekStart !== verwachteStart) {
+                  // Draft heeft foute datums (bv. opgeslagen zonder startdatum) — verwijder en herbereken
+                  localStorage.removeItem(DRAFT_KEY(user.id));
+                } else {
+                  setLogbook(draft);
+                  herstellenGelukt = true;
+                }
+              } else {
+                setLogbook(draft);
+                herstellenGelukt = true;
+              }
             } else {
               // Draft hoort bij een andere week (al ingediend) — verwijder
               localStorage.removeItem(DRAFT_KEY(user.id));
@@ -803,6 +897,16 @@ export default function StudentLogbookPage() {
 
         if (!herstellenGelukt) {
           setLogbook(defaultLogbook(verwachtWeekNr, sd));
+        } else if (sd) {
+          // Draft hersteld, maar datums altijd opnieuw berekenen vanuit de echte startdatum —
+          // anders staan er foute datums als de draft werd opgeslagen zonder startdatum.
+          const { weekStart, weekEinde, dagDatums } = berekenWeekDatums(sd, verwachtWeekNr);
+          setLogbook((prev) => ({
+            ...prev,
+            weekStart,
+            weekEinde,
+            dagen: prev.dagen.map((d, i) => ({ ...d, datum: dagDatums[i] ?? d.datum })),
+          }));
         }
       }
     } catch (err) {
@@ -818,8 +922,12 @@ export default function StudentLogbookPage() {
     async function init() {
       let sd = null;
 
-      // Stagevoorstel + contract parallel ophalen (met cache)
-      const cachedIntern   = cacheGet("student_internship");
+      // Stagevoorstel + contract parallel ophalen (met cache).
+      // Cache wordt genegeerd als startdatum ontbreekt — anders berekenen weekdatums verkeerd.
+      const cachedInternRaw = cacheGet("student_internship");
+      const cachedIntern = (cachedInternRaw?.startdatum ?? cachedInternRaw?.startDatum)
+        ? cachedInternRaw : null;
+      if (cachedInternRaw && !cachedIntern) cacheDelete("student_internship");
       const cachedContract = cacheGet("student_contract");
       const [internRes, contractRes] = await Promise.allSettled([
         cachedIntern   ? Promise.resolve({ data: cachedIntern })   : apiRequest("GET", "/internships/my"),
@@ -870,6 +978,20 @@ export default function StudentLogbookPage() {
     init();
   }, [user.id]);
 
+  // Zodra startDatum beschikbaar komt: corrigeer logbook.weekStart als het op de fallback-datum staat.
+  useEffect(() => {
+    if (!startDatum || editWeek) return;
+    const { weekStart: correctStart, weekEinde: correctEinde, dagDatums } = berekenWeekDatums(startDatum, logbook.weekNummer);
+    if (logbook.weekStart !== correctStart) {
+      setLogbook((prev) => ({
+        ...prev,
+        weekStart: correctStart,
+        weekEinde: correctEinde,
+        dagen: prev.dagen.map((d, i) => ({ ...d, datum: dagDatums[i] ?? d.datum })),
+      }));
+    }
+  }, [startDatum]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Sla de huidige concept-week op in localStorage zodra minstens één dag bevestigd is.
   // Zo blijft de voortgang bewaard als de student wegnavigiert.
   useEffect(() => {
@@ -897,10 +1019,14 @@ export default function StudentLogbookPage() {
   const huidigFormulierWeek = editWeek ? editWeek.week_nummer : logbook.weekNummer;
   // 'in_opbouw' = nog bezig, NIET ingediend — de student moet die week nog kunnen aanvullen.
   const weekAlIngediend =
-    !editWeek && weken.some((w) => w.week_nummer === huidigFormulierWeek && w.status !== "in_opbouw");
+    !editWeek && weken.some((w) => Number(w.week_nummer) === huidigFormulierWeek && w.status !== "in_opbouw");
+  // Hoogste week_nummer dat al ingediend is (niet in_opbouw) — gebruikt Number() om type-mismatch te vermijden
+  const maxIngediendWeekNr = weken
+    .filter((w) => w.status !== "in_opbouw")
+    .reduce((max, w) => Math.max(max, Number(w.week_nummer)), 0);
   const vorigeWeekOk =
     huidigFormulierWeek === 1 ||
-    weken.some((w) => w.week_nummer === huidigFormulierWeek - 1);
+    maxIngediendWeekNr >= huidigFormulierWeek - 1;
   // Week beschikbaar als: vorige week ingediend OF de tijd voor deze week is aangebroken
   const weekBeschikbaar =
     editWeek != null ||
@@ -983,6 +1109,14 @@ export default function StudentLogbookPage() {
   /* Bewerken starten: week data inladen in formulier */
   function handleBewerken(week) {
     const formulierData = weekNaarFormulier(week);
+    // Herbereken datums vanuit de echte startDatum — de DB kan foute datums bevatten (bv. Zondag ipv Maandag).
+    if (startDatum) {
+      const weekNr = Number(formulierData.weekNummer || week.week_nummer);
+      const { weekStart, weekEinde, dagDatums } = berekenWeekDatums(startDatum, weekNr);
+      formulierData.weekStart = weekStart;
+      formulierData.weekEinde = weekEinde;
+      formulierData.dagen = formulierData.dagen.map((d, i) => ({ ...d, datum: dagDatums[i] ?? d.datum }));
+    }
     setEditWeek(week);
     setLogbook(formulierData);
     setSubmitted(false);
