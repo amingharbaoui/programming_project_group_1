@@ -273,6 +273,11 @@ export default function StudentDocumentsPage() {
   // Eigen documenten: geen document_soort_id
   const eigenDocs = documenten.filter((d) => !d.document_soort_id);
 
+  // 503/508: automatisch gegenereerde documenten (tussentijdse/finale evaluatie, eindoverzicht) zijn read-only
+  // en horen niet bij de verplichte upload-soorten — toon ze in een eigen sectie zodat de student ze terugvindt.
+  const GEGENEREERD = new Set(["evaluatie_tussentijds", "evaluatie_finaal", "eindoverzicht"]);
+  const gegenereerdeDocs = documenten.filter((d) => GEGENEREERD.has(d.soort_type));
+
   async function handleEigenUpload(e) {
     const bestand = e.target.files?.[0];
     if (!bestand) return;
@@ -402,6 +407,21 @@ export default function StudentDocumentsPage() {
           onChange={handleEigenUpload}
         />
       </div>
+
+      {/* 503/508: automatisch gegenereerde documenten (evaluaties + eindoverzicht), read-only */}
+      {gegenereerdeDocs.length > 0 && (
+        <div className="doc-card">
+          <div className="doc-card-titel">
+            <IconFolderOpen size={18} stroke={1.8} />
+            Evaluaties en eindoverzicht
+          </div>
+          <div className="doc-lijst">
+            {gegenereerdeDocs.map((doc) => (
+              <EigenDocRij key={doc.id} doc={doc} onBekijken={(url, naam) => setPreview({ url, naam })} />
+            ))}
+          </div>
+        </div>
+      )}
 
     </div>
 

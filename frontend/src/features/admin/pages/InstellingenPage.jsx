@@ -41,6 +41,7 @@ export default function InstellingenPage() {
 
   const [rubriekCriteria, setRubriekCriteria] = useState([]);
   const [nieuwRubriek, setNieuwRubriek] = useState("");
+  const [nieuwRubriekMax, setNieuwRubriekMax] = useState(5);
   const [nieuwRubriekSaving, setNieuwRubriekSaving] = useState(false);
   const [bewerkRubriek, setBewerkRubriek] = useState(null);
   const [verwijderRubriek, setVerwijderRubriek] = useState(null);
@@ -267,12 +268,14 @@ export default function InstellingenPage() {
     e.preventDefault();
     const titel = nieuwRubriek.trim();
     if (!titel) return;
+    const maxScore = Number(nieuwRubriekMax) || 5;
     setNieuwRubriekSaving(true);
     try {
-      const res = await api.post("/admin/rubriek-criteria", { titel, volgorde: rubriekCriteria.length + 1 });
-      const nieuw = res.data.data || { id: Date.now(), titel, max_score: 5, volgorde: rubriekCriteria.length + 1, actief: 1 };
+      const res = await api.post("/admin/rubriek-criteria", { titel, maxScore, volgorde: rubriekCriteria.length + 1 });
+      const nieuw = res.data.data || { id: Date.now(), titel, max_score: maxScore, volgorde: rubriekCriteria.length + 1, actief: 1 };
       setRubriekCriteria((prev) => [...prev, nieuw]);
       setNieuwRubriek("");
+      setNieuwRubriekMax(5);
       showToast("Rubriekcriterium toegevoegd.");
       cacheDelete("admin_settings");
     } catch (err) {
@@ -689,6 +692,17 @@ export default function InstellingenPage() {
                 placeholder="bv. Communicatie en presentatie..."
                 value={nieuwRubriek}
                 onChange={(e) => setNieuwRubriek(e.target.value)}
+              />
+            </div>
+            <div className="modal_field" style={{ maxWidth: 110 }}>
+              <label className="modal_label">Max score</label>
+              <input
+                className="modal_input"
+                type="number"
+                min="1"
+                max="100"
+                value={nieuwRubriekMax}
+                onChange={(e) => setNieuwRubriekMax(e.target.value)}
               />
             </div>
             <div className="inst_new_doc_btn_wrap">

@@ -1145,9 +1145,8 @@ async function createDossierAfterApproval(connection, stagevoorstelId, pendingMa
       });
     }
   }
-  if (!mentorId) {
-    mentorId = await getDefaultMentorId(connection);
-  }
+  // 506: geen willekeurige default-mentor meer koppelen. Vinden we geen geldige mentor (juist bedrijf, zie
+  // getMentorIdByEmail/491), dan blijft mentor_id NULL en koppelt de admin de mentor bewust via Toewijzingen.
 
   const dossiernummer = `DOS-${new Date().getFullYear()}-${String(stagevoorstelId).padStart(4, "0")}`;
 

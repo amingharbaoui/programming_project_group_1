@@ -21,9 +21,9 @@ function faseSub(status) {
 
 function voortgangPct(s) {
   const stageLoopt = ["actief", "stage_loopt"].includes(s.dossier_status);
-  if (!stageLoopt || !s.aantal_weken) return null;
-  const gedaan = s.weken_gedaan ?? Math.round(s.aantal_weken * 0.6); // fallback
-  return Math.min(100, Math.round((gedaan / s.aantal_weken) * 100));
+  // 514: geen fake fallbackpercentage — toon enkel voortgang als de echte weken_gedaan beschikbaar is.
+  if (!stageLoopt || !s.aantal_weken || s.weken_gedaan == null) return null;
+  return Math.min(100, Math.round((s.weken_gedaan / s.aantal_weken) * 100));
 }
 
 function logboekBadge(status) {
