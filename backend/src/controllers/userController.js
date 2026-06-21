@@ -318,8 +318,12 @@ async function activateMentor(req, res) {
   if (!token) return fail(res, 400, "Token ontbreekt");
   if (!wachtwoord || String(wachtwoord).length < 8) return fail(res, 400, "Kies een wachtwoord van minstens 8 tekens");
 
+  // Eén transactie: het gebruikersaccount en de mentor-uitnodiging horen samen actief te worden.
+  // Faalt de tweede update, dan mag de eerste (account actief + wachtwoord) niet blijven staan.
+  const conn = await db.getConnection();
   try {
-    const [rows] = await db.query(
+    await conn.beginTransaction();
+    const [rows] = await conn.query(
       `
       SELECT m.gebruiker_id, m.uitnodiging_vervalt_op
       FROM mentoren m
@@ -331,13 +335,14 @@ async function activateMentor(req, res) {
     );
 
     const mentor = rows[0];
-    if (!mentor) return fail(res, 404, "Uitnodiging niet gevonden");
+    if (!mentor) { await conn.rollback(); return fail(res, 404, "Uitnodiging niet gevonden"); }
     if (mentor.uitnodiging_vervalt_op && new Date(mentor.uitnodiging_vervalt_op) < new Date()) {
+      await conn.rollback();
       return fail(res, 410, "Uitnodiging is verlopen");
     }
 
     const wachtwoordHash = hashLocalPassword(wachtwoord);
-    await db.query(
+    await conn.query(
       `
       UPDATE gebruikers
       SET status = 'actief',
@@ -347,7 +352,7 @@ async function activateMentor(req, res) {
       `,
       [wachtwoordHash, mentor.gebruiker_id]
     );
-    await db.query(
+    await conn.query(
       `
       UPDATE mentoren
       SET uitnodiging_status = 'geactiveerd',
@@ -359,9 +364,13 @@ async function activateMentor(req, res) {
       [telefoon || null, mentor.gebruiker_id]
     );
 
+    await conn.commit();
     return ok(res, { mentorId: mentor.gebruiker_id }, "Mentoraccount geactiveerd");
   } catch (error) {
+    await conn.rollback();
     return fail(res, 500, "Mentor activeren mislukt", error.message);
+  } finally {
+    conn.release();
   }
 }
 
