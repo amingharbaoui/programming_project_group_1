@@ -1,5 +1,5 @@
-import { createContext, useContext, useState } from "react";
-import { setAuthToken } from "../services/api";
+import { createContext, useContext, useState, useEffect } from "react";
+import { setAuthToken, apiRequest } from "../services/api";
 
 const AuthContext = createContext(null);
 const USER_KEY = "stagify_user";
@@ -25,6 +25,29 @@ function clearRoleCaches() {
 export function AuthProvider({ children }) {
   // Geen auto-login meer: bij het opstarten enkel ingelogd als er een opgeslagen sessie is.
   const [user, setUser] = useState(loadStoredUser());
+
+  // Bij app-start het opgeslagen token tegen de backend verifiëren (auditpunt 303/311):
+  // - een verlopen/ongeldig token wordt meteen opgeruimd door de api-interceptor (logout + /login),
+  //   i.p.v. een stale UI te tonen tot de eerste beveiligde call faalt;
+  // - een door admin gewijzigde rol/naam (of deactivatie) wordt na een refresh opgepikt.
+  useEffect(() => {
+    if (!loadStoredUser()) return; // geen sessie om te verifiëren
+    let actief = true;
+    apiRequest("GET", "/auth/me")
+      .then((res) => {
+        const verse = res?.data;
+        if (!actief || !verse) return;
+        const next = {
+          id: verse.id,
+          name: `${verse.voornaam || ""} ${verse.achternaam || ""}`.trim(),
+          role: verse.hoofdrol,
+        };
+        try { localStorage.setItem(USER_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+        setUser(next);
+      })
+      .catch(() => { /* 401 → de api-interceptor wist de sessie en navigeert naar /login */ });
+    return () => { actief = false; };
+  }, []);
 
   function loginUser(apiUser) {
     clearRoleCaches();
