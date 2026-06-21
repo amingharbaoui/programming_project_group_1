@@ -155,7 +155,9 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, d
         {}
       );
       onRefresh && onRefresh();
-      setSuccesModal("Scores succesvol opgeslagen.");
+      // Concept-save bewaart enkel de competentiescores; verslag en eindpresentatiescore worden pas
+      // bij Registreren weggeschreven — dat hier eerlijk vermelden.
+      setSuccesModal("Competentiescores opgeslagen. Het verslag en de eindpresentatiescore bewaar je bij 'Registreren'.");
     } catch (err) {
       setFoutModal(err.response?.data?.message || "Opslaan mislukt");
     } finally {

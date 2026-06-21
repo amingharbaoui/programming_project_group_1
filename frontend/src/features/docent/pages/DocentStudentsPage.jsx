@@ -77,6 +77,14 @@ function getStatus(s) {
   return { cls: "s_ok", txt: "In orde" };
 }
 
+// Stuur de docent naar de juiste actiepagina i.p.v. altijd het read-only dossier.
+function actieRoute(s) {
+  if (s.actie_type === "logboek")   return `/docent/logbooks?student=${s.id}`;
+  if (s.actie_type === "evaluatie") return `/docent/evaluations?student=${s.id}`;
+  if (s.actie_type === "planning")  return `/docent/planning`;
+  return `/docent/students/${s.dossier_id}/dossier`;
+}
+
 export default function DocentStudentsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -242,7 +250,7 @@ export default function DocentStudentsPage() {
                     <td><span className={`status ${status.cls}`}>{status.txt}</span></td>
 
                     <td style={{ textAlign: "right" }}>
-                      <button className="btn sm" onClick={() => navigate(`/docent/students/${s.dossier_id}/dossier`)}>
+                      <button className="btn sm" onClick={() => navigate(actieRoute(s))}>
                         {s.actie_type !== "geen" ? <IconArrowRight size={14} stroke={1.8} /> : <IconEye size={14} stroke={1.8} />}
                         {s.actie_type !== "geen" ? "Openen" : "Bekijken"}
                       </button>
