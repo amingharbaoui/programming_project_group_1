@@ -108,6 +108,7 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, d
   const [docentMotiveringen, setDocentMotiveringen] = useState({ ...docentMotiveringenBestaand });
   const [verslag, setVerslag] = useState(evaluatie?.verslag ?? "");
   const [eindpresentatieScore, setEindpresentatieScore] = useState(evaluatie?.eindpresentatie_score ?? null);
+  const [rubriek, setRubriek] = useState([]); // [{ id, titel, max_score, score, feedback }]
   const [bezig, setBezig]   = useState(false);
   const [melding, setMelding] = useState({ tekst: "", type: "" });
   const [vrijgaveMelding, setVrijgaveMelding] = useState({ tekst: "", type: "" });
@@ -133,12 +134,32 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, d
     setEindpresentatieScore(evaluatie?.eindpresentatie_score ?? null);
     setMelding({ tekst: "", type: "" });
     setVrijgaveMelding({ tekst: "", type: "" });
-  }, [evaluatie?.id]);
+    // Presentatie-rubriek laden voor de finale evaluatie (criteria + eventuele eerdere scores).
+    setRubriek([]);
+    if (evaluatie && activeType === "finaal") {
+      api.get(`/evaluations/${evaluatie.id}/rubriek`)
+        .then((res) => setRubriek(res.data.data?.criteria || []))
+        .catch(() => setRubriek([]));
+    }
+  }, [evaluatie?.id, activeType]);
 
   // De docent vult pas in nadat student én mentor hebben ingediend (status klaar_voor_docent).
   const kanInvullen =
     evaluatie &&
     evaluatie.status === "klaar_voor_docent";
+
+  // Rubriekscores klaarzetten voor verzending naar de backend.
+  function rubriekPayload() {
+    return rubriek.map((r) => ({
+      rubriekCriteriumId: r.id,
+      score: (r.score === null || r.score === undefined || r.score === "") ? null : Number(r.score),
+      feedback: r.feedback || "",
+    }));
+  }
+
+  function setRubriekVeld(id, veld, waarde) {
+    setRubriek((prev) => prev.map((r) => r.id === id ? { ...r, [veld]: waarde } : r));
+  }
 
   async function handleOpslaan() {
     if (!evaluatie) return;
@@ -154,10 +175,14 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, d
         { scores: scoresArr, ingediend: false },
         {}
       );
+      // Bij de finale evaluatie ook de rubriekscores als concept bewaren.
+      if (activeType === "finaal" && rubriek.length > 0) {
+        await api.post(`/evaluations/${evaluatie.id}/rubriek`, { scores: rubriekPayload() }, {});
+      }
       onRefresh && onRefresh();
-      // Concept-save bewaart enkel de competentiescores; verslag en eindpresentatiescore worden pas
-      // bij Registreren weggeschreven — dat hier eerlijk vermelden.
-      setSuccesModal("Competentiescores opgeslagen. Het verslag en de eindpresentatiescore bewaar je bij 'Registreren'.");
+      setSuccesModal(activeType === "finaal"
+        ? "Competentiescores en rubriek opgeslagen als concept. Het eindcijfer wordt pas berekend bij 'Registreren'."
+        : "Competentiescores opgeslagen. Het verslag bewaar je bij 'Registreren'.");
     } catch (err) {
       setFoutModal(err.response?.data?.message || "Opslaan mislukt");
     } finally {
@@ -187,8 +212,8 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, d
       setFoutModal("Geef voor elke competentie een score in.");
       return;
     }
-    if (activeType === "finaal" && (eindpresentatieScore === null || eindpresentatieScore === "" || eindpresentatieScore === undefined)) {
-      setFoutModal("Geef een score (0–20) voor de eindpresentatie in.");
+    if (activeType === "finaal" && rubriek.length > 0 && rubriek.some((r) => r.score === null || r.score === undefined || r.score === "")) {
+      setFoutModal("Geef een score voor elk rubriekcriterium van de eindpresentatie in.");
       return;
     }
     const scoresArr = competenties.map((c) => ({
@@ -203,10 +228,14 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, d
         { scores: scoresArr, ingediend: false },
         {}
       );
+      // Finaal: eerst de rubriekscores wegschrijven; de berekening leidt de presentatiescore (20%) daaruit af.
+      if (activeType === "finaal" && rubriek.length > 0) {
+        await api.post(`/evaluations/${evaluatie.id}/rubriek`, { scores: rubriekPayload() }, {});
+      }
       await api.post(
         `/evaluations/${evaluatie.id}/calculate`,
         {
-          eindpresentatieScore: activeType === "finaal" ? eindpresentatieScore : null,
+          eindpresentatieScore: (activeType === "finaal" && rubriek.length === 0) ? eindpresentatieScore : null,
           verslag: verslag?.trim() ? verslag.trim() : null,
         },
         {}
@@ -381,7 +410,43 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, d
         </div>
       )}
 
-      {kanInvullen && activeType === "finaal" && (
+      {kanInvullen && activeType === "finaal" && rubriek.length > 0 && (
+        <div className="form_group" style={{ marginTop: "14px" }}>
+          <label className="form_label">Rubriek eindpresentatie (werkstuk · telt 20%) <span style={{ color: "var(--red)" }}>*</span></label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 6 }}>
+            {rubriek.map((r) => (
+              <div key={r.id} style={{ border: "0.5px solid var(--border)", borderRadius: 8, padding: "10px 12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: "var(--dark)", flex: 1, minWidth: 160 }}>{r.titel}</span>
+                  <input
+                    type="number"
+                    min="0"
+                    max={r.max_score || 5}
+                    step="0.5"
+                    className="form_input"
+                    style={{ maxWidth: 90 }}
+                    value={r.score ?? ""}
+                    onChange={(e) => setRubriekVeld(r.id, "score", e.target.value === "" ? null : Number(e.target.value))}
+                  />
+                  <span style={{ fontSize: 12, color: "var(--sub)" }}>/ {r.max_score || 5}</span>
+                </div>
+                <textarea
+                  className="form_input"
+                  placeholder="Feedback (optioneel)"
+                  style={{ minHeight: 40, fontSize: 12.5, marginTop: 8 }}
+                  value={r.feedback ?? ""}
+                  onChange={(e) => setRubriekVeld(r.id, "feedback", e.target.value)}
+                />
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: "11.5px", color: "var(--sub)", marginTop: "6px" }}>
+            Eindcijfer (op 20) = competentiescore×4 × 80% + rubriekgemiddelde × 20%. Niet ingevuld telt als 0.
+          </p>
+        </div>
+      )}
+
+      {kanInvullen && activeType === "finaal" && rubriek.length === 0 && (
         <div className="form_group" style={{ marginTop: "14px" }}>
           <label className="form_label">Eindpresentatie score op 20 (werkstuk · 20%) <span style={{ color: "var(--red)" }}>*</span></label>
           <input

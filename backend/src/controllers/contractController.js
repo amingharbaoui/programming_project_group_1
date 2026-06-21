@@ -191,6 +191,13 @@ async function registerOvereenkomst(req, res) {
       await conn.rollback();
       return fail(res, 409, "De overeenkomst is nog niet door alle partijen ondertekend");
     }
+    // Koppel-gate: een stage kan pas starten als zowel de mentor als de stagebegeleider (docent)
+    // gekoppeld zijn — anders kan de stage niet begeleid/geëvalueerd worden.
+    if (!o.mentor_id || !o.stagebegeleider_id) {
+      await conn.rollback();
+      const ontbreekt = [!o.mentor_id ? "een mentor" : null, !o.stagebegeleider_id ? "een stagebegeleider (docent)" : null].filter(Boolean).join(" en ");
+      return fail(res, 409, `Koppel eerst ${ontbreekt} aan dit dossier vóór je de stage registreert`);
+    }
 
     const [docs] = await conn.query(
       `SELECT COUNT(*) AS openstaand

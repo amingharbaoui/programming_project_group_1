@@ -22,7 +22,16 @@ async function getSettings(req, res) {
     } catch (_) {
       // tabel bestaat nog niet — patch_checklist_items.sql nog niet uitgevoerd
     }
-    return ok(res, { stageRegels, documentSoorten, checklistItems }, "Instellingen opgehaald");
+    let rubriekCriteria = [];
+    try {
+      const [rows] = await db.query(
+        "SELECT id, titel, beschrijving, max_score, volgorde, actief FROM rubriek_criteria ORDER BY volgorde ASC, id ASC"
+      );
+      rubriekCriteria = rows;
+    } catch (_) {
+      // tabel bestaat nog niet — patch_eindpresentatie_rubriek.sql nog niet uitgevoerd
+    }
+    return ok(res, { stageRegels, documentSoorten, checklistItems, rubriekCriteria }, "Instellingen opgehaald");
   } catch (error) {
     return fail(res, 500, "Instellingen ophalen mislukt", error.message);
   }
@@ -286,4 +295,66 @@ async function deleteDocumentType(req, res) {
   }
 }
 
-module.exports = { getSettings, updateStageRule, updateDocumentType, createDocumentType, resetDocumentTypes, deleteDocumentType, createChecklistItem, updateChecklistItem, deleteChecklistItem, resetChecklistItems };
+// ── Rubriek eindpresentatie (flexibel beheerd door admin) ──
+
+async function createRubriekCriterium(req, res) {
+  const titel = String(req.body.titel ?? "").trim();
+  if (!titel) return fail(res, 400, "Titel is verplicht");
+  const maxScore = Number(req.body.maxScore ?? req.body.max_score) || 5;
+  const volgorde = Number(req.body.volgorde) || 0;
+  try {
+    const [r] = await db.query(
+      "INSERT INTO rubriek_criteria (titel, beschrijving, max_score, volgorde, actief) VALUES (?, ?, ?, ?, 1)",
+      [titel, req.body.beschrijving || null, maxScore, volgorde]
+    );
+    return ok(res, { id: r.insertId, titel, beschrijving: req.body.beschrijving || null, max_score: maxScore, volgorde, actief: 1 }, "Rubriekcriterium aangemaakt");
+  } catch (error) {
+    return fail(res, 500, "Rubriekcriterium aanmaken mislukt", error.message);
+  }
+}
+
+async function updateRubriekCriterium(req, res) {
+  const id = Number(req.params.id);
+  if (!id) return fail(res, 400, "Ongeldig rubriekcriterium-id");
+  const fields = [];
+  const vals = [];
+  if (req.body.titel !== undefined) {
+    const titel = String(req.body.titel).trim();
+    if (!titel) return fail(res, 400, "Titel mag niet leeg zijn");
+    fields.push("titel = ?"); vals.push(titel);
+  }
+  if (req.body.beschrijving !== undefined) { fields.push("beschrijving = ?"); vals.push(req.body.beschrijving || null); }
+  if (req.body.maxScore !== undefined || req.body.max_score !== undefined) {
+    const ms = Number(req.body.maxScore ?? req.body.max_score);
+    if (!Number.isInteger(ms) || ms < 1 || ms > 100) return fail(res, 400, "Max score moet tussen 1 en 100 liggen");
+    fields.push("max_score = ?"); vals.push(ms);
+  }
+  if (req.body.volgorde !== undefined) { fields.push("volgorde = ?"); vals.push(Number(req.body.volgorde) || 0); }
+  if (req.body.actief !== undefined) { fields.push("actief = ?"); vals.push(req.body.actief ? 1 : 0); }
+  if (fields.length === 0) return fail(res, 400, "Geen velden om aan te passen");
+  try {
+    const [r] = await db.query(
+      `UPDATE rubriek_criteria SET ${fields.join(", ")}, aangepast_op = NOW() WHERE id = ?`,
+      [...vals, id]
+    );
+    if (r.affectedRows === 0) return fail(res, 404, "Rubriekcriterium niet gevonden");
+    return ok(res, { id }, "Rubriekcriterium bijgewerkt");
+  } catch (error) {
+    return fail(res, 500, "Rubriekcriterium bijwerken mislukt", error.message);
+  }
+}
+
+async function deleteRubriekCriterium(req, res) {
+  const id = Number(req.params.id);
+  if (!id) return fail(res, 400, "Ongeldig rubriekcriterium-id");
+  try {
+    // Soft-delete (actief = 0) zodat bestaande presentatiescores hun criterium niet verliezen.
+    const [r] = await db.query("UPDATE rubriek_criteria SET actief = 0, aangepast_op = NOW() WHERE id = ?", [id]);
+    if (r.affectedRows === 0) return fail(res, 404, "Rubriekcriterium niet gevonden");
+    return ok(res, { id }, "Rubriekcriterium gedeactiveerd");
+  } catch (error) {
+    return fail(res, 500, "Rubriekcriterium verwijderen mislukt", error.message);
+  }
+}
+
+module.exports = { getSettings, updateStageRule, updateDocumentType, createDocumentType, resetDocumentTypes, deleteDocumentType, createChecklistItem, updateChecklistItem, deleteChecklistItem, resetChecklistItems, createRubriekCriterium, updateRubriekCriterium, deleteRubriekCriterium };

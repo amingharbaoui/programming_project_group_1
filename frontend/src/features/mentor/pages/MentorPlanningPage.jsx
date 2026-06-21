@@ -109,7 +109,7 @@ export default function MentorPlanningPage() {
       setBezig(momentId);
       setMelding({ id: null, tekst: "", type: "" });
       await api.patch(`/mentor/planning/${momentId}/bevestig`, {});
-      setMelding({ id: momentId, tekst: "Bedrijfsbezoek bevestigd! De docent en student kregen een melding.", type: "s_ok" });
+      setMelding({ id: momentId, tekst: "Moment bevestigd! De docent en student kregen een melding.", type: "s_ok" });
       cacheDelete(`mentor_planning_${geselecteerdDossier}`);
       await loadPlanning(geselecteerdDossier, true);
     } catch (err) {
@@ -125,7 +125,7 @@ export default function MentorPlanningPage() {
       setBezig(momentId);
       setMelding({ id: null, tekst: "", type: "" });
       await api.patch(`/mentor/planning/${momentId}/alternatief`, { bericht: alternatifTekst });
-      setMelding({ id: momentId, tekst: "Alternatief voorstel verstuurd. De docent plant het bezoek opnieuw in.", type: "s_ok" });
+      setMelding({ id: momentId, tekst: "Alternatief voorstel verstuurd. De docent plant het moment opnieuw in.", type: "s_ok" });
       setAlternatifOpen(null);
       setAlternatifTekst("");
       cacheDelete(`mentor_planning_${geselecteerdDossier}`);
@@ -183,7 +183,7 @@ export default function MentorPlanningPage() {
       )}
 
       {!planningLoading && momenten.map((moment) => {
-        const teBevestigen = !dossierAfgerond && moment.type === "bedrijfsbezoek" && ["voorgesteld", "gepland"].includes(moment.status);
+        const teBevestigen = !dossierAfgerond && ["bedrijfsbezoek", "eindpresentatie"].includes(moment.type) && ["voorgesteld", "gepland"].includes(moment.status);
         const isAlternatifOpen = alternatifOpen === moment.id;
 
         return (
@@ -235,8 +235,8 @@ export default function MentorPlanningPage() {
             {teBevestigen && !isAlternatifOpen && (
               <div style={{ marginTop: "12px", fontSize: "12px", color: "var(--sub)" }}>
                 {moment.voorgesteld_door_naam
-                  ? `${moment.voorgesteld_door_naam} stelt dit bezoek voor. Bevestig of stel een ander moment voor.`
-                  : "Bevestig het bezoek of stel een ander moment voor."}
+                  ? `${moment.voorgesteld_door_naam} stelt dit moment voor. Bevestig of stel een ander moment voor.`
+                  : "Bevestig het moment of stel een ander moment voor."}
               </div>
             )}
 

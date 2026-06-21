@@ -323,6 +323,29 @@ export default function StudentEvaluationPage() {
     }
   }
 
+  async function handleConcept() {
+    const actief = huidigeEval();
+    if (!actief) return;
+    setBezig(true);
+    setMelding(null);
+    try {
+      const payload = {
+        ingediend: false,
+        scores: (data?.competenties || []).map((c) => ({
+          competentie_id: c.id,
+          score: scores[c.id]?.score ?? null,
+          motivering: scores[c.id]?.motivering ?? "",
+        })),
+      };
+      await apiRequest("POST", `/evaluations/${actief.id}/scores`, payload);
+      setMelding({ type: "ok", tekst: "Concept opgeslagen — je kan later verder en indienen." });
+    } catch (err) {
+      setMelding({ type: "fout", tekst: err.response?.data?.message || "Concept opslaan mislukt." });
+    } finally {
+      setBezig(false);
+    }
+  }
+
   async function handleIndienen() {
     const actief = huidigeEval();
     if (!actief) return;
@@ -511,15 +534,24 @@ export default function StudentEvaluationPage() {
             <span style={{ fontSize: 12.5, color: "var(--sub)" }}>
               <strong>{ingevuld}/{totaal}</strong> competenties ingevuld
             </span>
-            <button
-              className="btn primary sm"
-              disabled={!allesIn || bezig}
-              title={!allesIn ? "Vul eerst alle competenties in" : ""}
-              onClick={handleIndienen}
-            >
-              <IconSend size={14} />
-              {bezig ? "Bezig…" : "Indienen"}
-            </button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button
+                className="btn sm"
+                disabled={bezig}
+                onClick={handleConcept}
+              >
+                {bezig ? "Bezig…" : "Opslaan als concept"}
+              </button>
+              <button
+                className="btn primary sm"
+                disabled={!allesIn || bezig}
+                title={!allesIn ? "Vul eerst alle competenties in" : ""}
+                onClick={handleIndienen}
+              >
+                <IconSend size={14} />
+                {bezig ? "Bezig…" : "Indienen"}
+              </button>
+            </div>
           </div>
         </>
       )}
