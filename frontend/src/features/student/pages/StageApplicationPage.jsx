@@ -303,13 +303,17 @@ export default function StageApplicationPage() {
           </div>
 
           <div className="actions">
-            <button type="button" className="btn" onClick={handleSaveDraft} disabled={savingDraft}>
-              <IconDeviceFloppy size={16} />
-              {savingDraft ? "Opslaan..." : "Opslaan als concept"}
-            </button>
+            {/* Bij "aanpassingen gevraagd" weigert de backend een concept-save (er loopt al een voorstel);
+                dan kan de student enkel meteen opnieuw indienen. */}
+            {huidigStatus !== "aanpassingen_gevraagd" && (
+              <button type="button" className="btn" onClick={handleSaveDraft} disabled={savingDraft}>
+                <IconDeviceFloppy size={16} />
+                {savingDraft ? "Opslaan..." : "Opslaan als concept"}
+              </button>
+            )}
             <button type="submit" className="btn primary">
               <IconSend size={16} />
-              Indienen
+              {huidigStatus === "aanpassingen_gevraagd" ? "Opnieuw indienen" : "Indienen"}
             </button>
           </div>
 

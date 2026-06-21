@@ -8,7 +8,9 @@ export const STUDENT_PATH_KEYS = {
   "/student/documents": "documenten",
   "/student/logbook": "logboek",
   "/student/evaluation": "evaluatie",
-  "/student/planning": "logboek",
+  // Planning is een eigen sleutel: een bedrijfsbezoek/eindpresentatie kan al gepland worden zodra de
+  // stage geregistreerd (startklaar) is — los van het logboek, dat pas vanaf de startdatum opent.
+  "/student/planning": "planning",
 };
 
 export const STUDENT_FASES = {
@@ -86,14 +88,14 @@ export const STUDENT_FASES = {
     faseIdx: 4,
     fase: "Stage",
     actie: "Alles is in orde. Je logboek opent vanaf je startdatum.",
-    open: ["stage", "overeenkomst", "documenten"],
+    open: ["stage", "overeenkomst", "documenten", "planning"],
     warn: [],
   },
   gestart: {
     faseIdx: 4,
     fase: "Stage loopt",
     actie: "Vul je logboek van vandaag in.",
-    open: ["stage", "overeenkomst", "logboek", "evaluatie", "documenten"],
+    open: ["stage", "overeenkomst", "logboek", "evaluatie", "documenten", "planning"],
     warn: [],
     dot: "logboek",
   },
@@ -101,7 +103,7 @@ export const STUDENT_FASES = {
     faseIdx: 4,
     fase: "Stage loopt",
     actie: "Logboek van vandaag nog niet ingevuld.",
-    open: ["stage", "overeenkomst", "logboek", "evaluatie", "documenten"],
+    open: ["stage", "overeenkomst", "logboek", "evaluatie", "documenten", "planning"],
     warn: [],
     dot: "logboek",
   },
@@ -109,14 +111,14 @@ export const STUDENT_FASES = {
     faseIdx: 5,
     fase: "Evaluatie",
     actie: "Bereid je eindpresentatie voor.",
-    open: ["stage", "overeenkomst", "logboek", "evaluatie", "documenten"],
+    open: ["stage", "overeenkomst", "logboek", "evaluatie", "documenten", "planning"],
     warn: [],
   },
   afgerond: {
     faseIdx: 5,
     fase: "Afgerond",
     actie: "Je eindresultaat staat klaar bij Evaluatie.",
-    open: ["stage", "overeenkomst", "logboek", "evaluatie", "documenten"],
+    open: ["stage", "overeenkomst", "logboek", "evaluatie", "documenten", "planning"],
     warn: [],
     dot: "evaluatie",
   },

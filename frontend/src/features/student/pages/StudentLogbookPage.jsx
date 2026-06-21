@@ -140,8 +140,9 @@ function LogboekWeek({ week, onBewerken, onVernieuwen }) {
             </div>
           )}
 
-          {/* Antwoordveld op feedback */}
-          {!aanpassingNodig && (week.mentor_feedback || week.docent_feedback) && (
+          {/* Antwoordveld op feedback — enkel bij een teruggestuurde week, want de backend laat
+              een studentantwoord alleen toe wanneer de week voor aanpassing is teruggestuurd. */}
+          {aanpassingNodig && (week.mentor_feedback || week.docent_feedback) && (
             <AntwoordBlok week={week} onAntwoordOpgeslagen={onVernieuwen} />
           )}
 
@@ -187,17 +188,20 @@ function AntwoordBlok({ week, onAntwoordOpgeslagen }) {
   const [tekst, setTekst]     = useState(week.student_antwoord || "");
   const [bezig, setBezig]     = useState(false);
   const [opgeslagen, setOpgeslagen] = useState(false);
+  const [fout, setFout]       = useState("");
 
   async function verstuur() {
     if (!tekst.trim()) return;
     setBezig(true);
+    setFout("");
     try {
       await apiRequest("PATCH", `/logbooks/weeks/${week.id}/antwoord`, { antwoord: tekst });
       setOpgeslagen(true);
       setOpen(false);
       if (onAntwoordOpgeslagen) onAntwoordOpgeslagen();
-    } catch {
-      /* stil falen */
+    } catch (err) {
+      // Fout zichtbaar maken i.p.v. stil falen, anders denkt de student dat het antwoord verstuurd is.
+      setFout(err.response?.data?.message || "Antwoord versturen mislukt.");
     } finally {
       setBezig(false);
     }
@@ -238,6 +242,7 @@ function AntwoordBlok({ week, onAntwoordOpgeslagen }) {
             </button>
             <button className="btn sm" onClick={() => setOpen(false)}>Annuleer</button>
           </div>
+          {fout && <p className="status s_rood" style={{ marginTop: 6, fontSize: 12 }}>{fout}</p>}
         </div>
       )}
     </div>

@@ -69,6 +69,8 @@ export default function MentorEvaluationPage() {
             ns[key][s.competentie_id] = s.score;
             nm[key][s.competentie_id] = s.motivering || "";
           }
+          // Algemene praktijkfeedback terugladen, anders overschrijft een volgende opslag ze met leeg.
+          nm[key].algemeen = ev.mentor_algemene_feedback || "";
         }
         setScores(ns);
         setMotiv(nm);
@@ -91,6 +93,8 @@ export default function MentorEvaluationPage() {
             ns[key][s.competentie_id] = s.score;
             nm[key][s.competentie_id] = s.motivering || "";
           }
+          // Algemene praktijkfeedback terugladen, anders overschrijft een volgende opslag ze met leeg.
+          nm[key].algemeen = ev.mentor_algemene_feedback || "";
         }
         setScores(ns);
         setMotiv(nm);

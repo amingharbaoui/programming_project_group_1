@@ -472,6 +472,22 @@ export default function StudentEvaluationPage() {
         </div>
       )}
 
+      {/* Verslag van een geregistreerde (tussentijdse) bespreking — zodat de student het ook echt kan inzien. */}
+      {actief?.status === "geregistreerd" && (actief.verslag || actief.mentor_algemene_feedback) && (
+        <div className="banner blauw">
+          <IconClipboardCheck size={18} />
+          <div>
+            <div className="b-title">Verslag van de {actief.type === "finaal" ? "finale" : "tussentijdse"} bespreking</div>
+            {actief.verslag && <div className="b-text" style={{ whiteSpace: "pre-wrap" }}>{actief.verslag}</div>}
+            {actief.mentor_algemene_feedback && (
+              <div className="b-text" style={{ marginTop: 6 }}>
+                <strong>Praktijkfeedback mentor:</strong> {actief.mentor_algemene_feedback}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Banner: open, nog in te vullen */}
       {kanInvullen && (
         <>
