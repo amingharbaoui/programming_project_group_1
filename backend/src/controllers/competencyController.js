@@ -92,6 +92,16 @@ async function createCompetency(req, res) {
       return fail(res, 404, "Geen competentieprofiel gevonden om aan toe te voegen");
     }
 
+    // Een actief profiel is read-only: net als bij wijzigen/verwijderen mag er ook niet
+    // stilzwijgend een competentie aan toegevoegd worden (anders verandert een lopende evaluatie).
+    const [prof] = await db.query(
+      `SELECT status FROM competentie_profielen WHERE id = ? LIMIT 1`,
+      [profielId]
+    );
+    if (prof[0]?.status === "actief") {
+      return fail(res, 409, "Een actief competentieprofiel is read-only; dupliceer het en pas de nieuwe versie aan");
+    }
+
     const [result] = await db.query(
       `
       INSERT INTO competenties
