@@ -219,9 +219,11 @@ async function registerOvereenkomst(req, res) {
       return fail(res, 409, "Deze overeenkomst is ondertussen al geregistreerd of gewijzigd; vernieuw de pagina");
     }
 
-    // Verzekering in orde + dossier startklaar registreren.
+    // Verzekering in orde + dossier startklaar registreren. Forward-only: nooit een dossier dat al verder
+    // staat terugzetten naar 'geregistreerd' (auditpunt 404).
     await conn.query(
-      "UPDATE stagedossiers SET status = 'geregistreerd', verzekering_in_orde = 1, aangepast_op = NOW() WHERE id = ?",
+      `UPDATE stagedossiers SET status = 'geregistreerd', verzekering_in_orde = 1, aangepast_op = NOW()
+       WHERE id = ? AND status NOT IN ('geregistreerd', 'stage_loopt', 'resultaat_vrijgegeven', 'afgerond')`,
       [dossierId]
     );
 
