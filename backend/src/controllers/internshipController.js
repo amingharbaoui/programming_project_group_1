@@ -907,10 +907,16 @@ async function decideApplication(req, res) {
       updateSql += ", afgekeurd_op = NOW()";
     }
 
-    updateSql += " WHERE id = ?";
+    // Conditioneel op de status: bij een dubbelklik of twee commissieleden tegelijk mag maar één request
+    // de beslissing doorvoeren; de tweede krijgt affectedRows 0 → rollback + 409 (auditpunt 391).
+    updateSql += " WHERE id = ? AND status IN ('ingediend', 'heringediend')";
     updateParams.push(stagevoorstelId);
 
-    await connection.query(updateSql, updateParams);
+    const [updateResult] = await connection.query(updateSql, updateParams);
+    if (updateResult.affectedRows === 0) {
+      await connection.rollback();
+      return fail(res, 409, "Dit voorstel is ondertussen al beslist; vernieuw de pagina");
+    }
 
     const pendingMails = [];
     if (isGoedkeuring) {
