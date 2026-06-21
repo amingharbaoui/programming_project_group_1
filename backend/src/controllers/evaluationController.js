@@ -60,10 +60,15 @@ async function openEvaluation(req, res) {
     );
 
     if (existing.length > 0) {
-      if (existing[0].status === "niet_open") {
+      // Enkel een nog-niet-geopende evaluatie effectief openen; voor een evaluatie die al verder staat
+      // (ingediend/geregistreerd/vrijgegeven) de ECHTE status teruggeven i.p.v. altijd "open" te beweren.
+      let huidigeStatus = existing[0].status;
+      if (huidigeStatus === "niet_open") {
         await db.query("UPDATE evaluaties SET status = 'open', aangepast_op = NOW() WHERE id = ?", [existing[0].id]);
+        huidigeStatus = "open";
       }
-      return ok(res, { id: existing[0].id, type: finalType, status: "open" }, "Evaluatie bestond al en staat open");
+      return ok(res, { id: existing[0].id, type: finalType, status: huidigeStatus },
+        huidigeStatus === "open" ? "Evaluatie staat open" : "Evaluatie bestaat al en is al in behandeling");
     }
 
     const [result] = await db.query(

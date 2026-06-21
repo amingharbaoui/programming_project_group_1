@@ -1513,11 +1513,25 @@ async function assignDossier(req, res) {
   if (docentId == null && mentorId == null) return fail(res, 400, "Geef minstens een docent of mentor op");
 
   try {
-    const [d] = await db.query("SELECT id, student_id, status FROM stagedossiers WHERE id = ? LIMIT 1", [dossierId]);
+    const [d] = await db.query("SELECT id, student_id, status, stagebegeleider_id FROM stagedossiers WHERE id = ? LIMIT 1", [dossierId]);
     if (d.length === 0) return fail(res, 404, "Dossier niet gevonden");
     // Geen herassign meer nadat het resultaat vrijgegeven of het dossier afgerond is.
     if (["resultaat_vrijgegeven", "afgerond"].includes(d[0].status)) {
       return fail(res, 409, "Een afgerond dossier kan niet meer opnieuw toegewezen worden");
+    }
+
+    // De stagebegeleider niet meer wisselen zodra de docent al scores invoerde — anders zouden oude én
+    // nieuwe docentscores in de berekening kunnen belanden.
+    if (docentId != null && d[0].stagebegeleider_id && Number(d[0].stagebegeleider_id) !== Number(docentId)) {
+      const [[telling]] = await db.query(
+        `SELECT COUNT(*) AS n FROM competentie_scores cs
+         JOIN evaluaties e ON e.id = cs.evaluatie_id
+         WHERE e.stagedossier_id = ? AND cs.rol = 'docent'`,
+        [dossierId]
+      );
+      if (telling.n > 0) {
+        return fail(res, 409, "De stagebegeleider kan niet meer gewijzigd worden: er zijn al docentscores ingevoerd voor dit dossier");
+      }
     }
 
     if (docentId != null) {
