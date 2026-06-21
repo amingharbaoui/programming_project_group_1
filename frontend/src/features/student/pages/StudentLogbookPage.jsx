@@ -1219,6 +1219,28 @@ export default function StudentLogbookPage() {
     );
   }
 
+  // 472: het dossier moet startklaar geregistreerd zijn voor het logboek echt mag — de backend weigert deze
+  // te-vroege statussen toch. Toon dan een duidelijke kaart i.p.v. een formulier dat bij opslaan faalt.
+  if (["wacht_op_student", "wacht_op_bedrijf", "in_controle_bij_administratie", "document_afgekeurd"].includes(dossierStatus)) {
+    return (
+      <div className="page-inner">
+        <div className="page-header">
+          <h1>Logboek</h1>
+        </div>
+        <div className="card">
+          <div className="card_title" style={{ color: "var(--red)" }}>
+            <IconLock size={16} />
+            Stagedossier nog niet startklaar
+          </div>
+          <p style={{ fontSize: 13, color: "var(--sub)" }}>
+            Je kan het logboek pas invullen zodra de administratie je stageovereenkomst geregistreerd heeft.
+            Zodra alles in orde is, verschijnt het logboekformulier hier automatisch.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   // Gate: na vrijgave/afronding is het logboek read-only — net zoals de backend nieuwe inzendingen weigert.
   if (["resultaat_vrijgegeven", "afgerond", "voltooid"].includes(dossierStatus)) {
     return (

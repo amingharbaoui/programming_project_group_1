@@ -81,6 +81,18 @@ async function deactivateUser(req, res) {
       if (admins[0].aantal <= 1) return fail(res, 400, "Laatste actieve administratie-account kan niet gedeactiveerd worden");
     }
 
+    // 466: een gebruiker die nog aan een niet-afgerond dossier hangt (als student, mentor of stagebegeleider)
+    // niet deactiveren — anders wordt iemand midden in de flow uitgelogd ("account verwijderd"-gevoel).
+    const [gekoppeld] = await db.query(
+      `SELECT COUNT(*) AS aantal FROM stagedossiers
+       WHERE (student_id = ? OR mentor_id = ? OR stagebegeleider_id = ?)
+         AND status NOT IN ('resultaat_vrijgegeven', 'afgerond', 'voltooid')`,
+      [id, id, id]
+    );
+    if (gekoppeld[0].aantal > 0) {
+      return fail(res, 409, "Deze gebruiker is nog gekoppeld aan een lopend dossier; herverdeel die dossiers eerst voor je het account deactiveert");
+    }
+
     await db.query("UPDATE gebruikers SET status = 'inactief', aangepast_op = NOW() WHERE id = ?", [id]);
     return ok(res, { id, status: "inactief" }, "Gebruiker gedeactiveerd");
   } catch (error) {
@@ -145,6 +157,18 @@ async function updateUser(req, res) {
     const familie = (rol) => (rol === "student" ? "student" : rol === "mentor" ? "mentor" : "medewerker");
     if (familie(hoofdrol) !== familie(huidig[0].hoofdrol)) {
       return fail(res, 409, "Een gebruiker kan niet naar een andere rolfamilie (student, mentor, medewerker) gewijzigd worden. Maak hiervoor een nieuwe gebruiker aan via een uitnodiging.");
+    }
+    // 467: een docent die nog stagebegeleider is van lopende dossiers niet wegzetten als admin/commissie —
+    // anders verliezen die dossiers hun begeleider en vallen logboek/evaluatie/planning stil.
+    if (huidig[0].hoofdrol === "docent" && hoofdrol !== "docent") {
+      const [begeleidt] = await db.query(
+        `SELECT COUNT(*) AS aantal FROM stagedossiers
+         WHERE stagebegeleider_id = ? AND status NOT IN ('resultaat_vrijgegeven', 'afgerond', 'voltooid')`,
+        [id]
+      );
+      if (begeleidt[0].aantal > 0) {
+        return fail(res, 409, "Deze docent is nog stagebegeleider van lopende dossiers; herverdeel die eerst voor je de rol wijzigt");
+      }
     }
   }
 

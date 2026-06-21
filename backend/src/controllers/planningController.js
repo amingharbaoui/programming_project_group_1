@@ -159,7 +159,8 @@ async function updateDocentPlanning(req, res) {
   // (datum/locatie/verslag/deelnemers), zodat een afgesloten moment of afgerond dossier niet
   // stilletjes nog aangepast kan worden.
   const [huidig] = await db.query(
-    `SELECT pm.status, pm.type, sd.status AS dossier_status FROM planning_momenten pm
+    `SELECT pm.status, pm.type, pm.gepland_op, (pm.gepland_op > NOW()) AS in_de_toekomst, sd.status AS dossier_status
+     FROM planning_momenten pm
      JOIN stagedossiers sd ON sd.id = pm.stagedossier_id
      WHERE pm.id = ? AND sd.stagebegeleider_id = ? LIMIT 1`,
     [planningId, docentId]
@@ -186,6 +187,10 @@ async function updateDocentPlanning(req, res) {
   // Overgangscontrole: "gegeven/geweest" alleen vanuit een logische status.
   if (status && ["gegeven", "geweest"].includes(status) && !["bevestigd", "gepland"].includes(huidigeStatus)) {
     return fail(res, 409, "Dit moment kan niet als gegeven/geweest gemarkeerd worden vanuit de huidige status");
+  }
+  // 473: een moment dat nog in de toekomst ligt kan niet al als gegeven/geweest gemarkeerd worden.
+  if (status && ["gegeven", "geweest"].includes(status) && Number(huidig[0].in_de_toekomst) === 1) {
+    return fail(res, 409, "Dit moment ligt nog in de toekomst en kan pas als gegeven/geweest gemarkeerd worden nadat het heeft plaatsgevonden");
   }
 
   const fields = [];

@@ -36,7 +36,16 @@ const upload = multer({
   },
 });
 
-const uploadMiddleware = upload.single("bestand");
+// 476: multer-fouten (verkeerd type / te groot bestand) vertalen naar een nette JSON-melding i.p.v. een
+// generieke "Interne serverfout", zodat de student een bruikbare uploadboodschap ziet.
+const uploadSingle = upload.single("bestand");
+function uploadMiddleware(req, res, next) {
+  uploadSingle(req, res, (err) => {
+    if (!err) return next();
+    if (err.code === "LIMIT_FILE_SIZE") return fail(res, 400, "Het bestand mag maximaal 10 MB groot zijn");
+    return fail(res, 400, err.message || "Upload geweigerd: ongeldig bestand");
+  });
+}
 
 function getUserId(req) {
   // Geen demo-fallback meer (auditpunt 312): zonder ingelogde gebruiker liever null dan stil user 1.
