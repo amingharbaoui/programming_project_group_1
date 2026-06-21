@@ -1,0 +1,12 @@
+DOCENT_MENTOR_POLISH_OVERZICHT.md
+KNOWN_ISSUES.md
+backend/scripts/audit-users.js
+backend/scripts/backfill-logboek-afgerond.js
+backend/src/controllers/docentController.js
+backend/src/controllers/mentorController.js
+frontend/src/constants/navigation.js
+frontend/src/features/docent/pages/DocentStudentDossierPage.jsx
+frontend/src/features/docent/pages/DocentStudentsPage.jsx
+frontend/src/features/mentor/pages/MentorDossierPage.jsx
+frontend/src/features/mentor/pages/MentorLogbooksPage.jsx
+frontend/src/features/mentor/pages/MentorStudentsPage.jsx
