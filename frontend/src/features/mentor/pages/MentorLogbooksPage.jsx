@@ -296,7 +296,7 @@ export default function MentorLogbooksPage() {
                             {/* Bevestig dag knop */}
                             {kanDagBevestigen && (
                               d.mentor_bevestigd_op ? (
-                                <span className="status s_ok"><i className="ti ti-check" />Bevestig dag</span>
+                                <span className="status s_ok"><i className="ti ti-check" />Bevestigd</span>
                               ) : (
                                 <button
                                   className="btn primary sm"
@@ -308,7 +308,7 @@ export default function MentorLogbooksPage() {
                               )
                             )}
                             {!kanDagBevestigen && d.mentor_bevestigd_op && (
-                              <span className="status s_ok"><i className="ti ti-check" />Bevestig dag</span>
+                              <span className="status s_ok"><i className="ti ti-check" />Bevestigd</span>
                             )}
                             {/* Reageer knop */}
                             {(kanDagBevestigen || d.mentor_opmerking) && (

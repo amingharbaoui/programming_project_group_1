@@ -21,17 +21,16 @@ function getStatusClass(status) {
   return "s_grijs";
 }
 
-function getStatusLabel(status) {
-  const labels = {
-    voorgesteld:          "Wacht op bevestiging mentor",
-    bevestigd:            "Bevestigd door mentor",
-    alternatief_gevraagd: "Mentor stelt ander moment voor",
-    gepland:              "Gepland",
-    gegeven:              "Gegeven",
-    geweest:              "Geweest",
-    geannuleerd:          "Geannuleerd",
-  };
-  return labels[status] || status || "-";
+function getStatusLabel(status, moment = {}) {
+  // Exacte prototype-labels; bij 'geweest' hangt het label af van of het verslag al geregistreerd is.
+  if (status === "voorgesteld") return "Wacht op bevestiging mentor";
+  if (status === "bevestigd") return "Gepland · bevestigd door de mentor";
+  if (status === "alternatief_gevraagd") return "Mentor stelt ander moment voor";
+  if (status === "gepland") return "Ingepland";
+  if (status === "geweest") return moment.verslag ? "Geweest — verslag geregistreerd" : "Geweest — verslag te registreren";
+  if (status === "gegeven") return "Gegeven";
+  if (status === "geannuleerd") return "Geannuleerd";
+  return status || "-";
 }
 
 export default function DocentPlanningPage() {
@@ -231,7 +230,7 @@ export default function DocentPlanningPage() {
         </td>
         <td className="doc_sub">{formatDateTime(p.gepland_op)}</td>
         <td className="doc_sub">{p.locatie || "-"}</td>
-        <td><span className={"status " + getStatusClass(p.status)}>{getStatusLabel(p.status)}</span></td>
+        <td><span className={"status " + getStatusClass(p.status)}>{getStatusLabel(p.status, p)}</span></td>
         <td style={{ textAlign: "right" }}>
           {["bevestigd", "gepland"].includes(p.status) && (
             <button className="btn sm" disabled={gegevenId === p.id} onClick={() => markeerGegeven(p.id, p.type)}>
