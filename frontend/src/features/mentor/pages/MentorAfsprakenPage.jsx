@@ -126,6 +126,11 @@ export default function MentorAfsprakenPage() {
   }
 
   async function opslaan() {
+    // Niets delen als alle velden leeg zijn: anders krijgt de student een melding zonder inhoud.
+    if (!Object.values(veldenEdit).some((v) => String(v || "").trim() !== "")) {
+      setMelding({ tekst: "Vul minstens één praktische afspraak in voor je ze deelt.", type: "s_rood" });
+      return;
+    }
     try {
       setBezig(true);
       setMelding({ tekst: "", type: "" });

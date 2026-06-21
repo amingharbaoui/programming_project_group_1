@@ -184,7 +184,6 @@ async function updateAfspraken(req, res) {
   let veldenJson = null;
   let tekst = afspraken;
   if (velden && typeof velden === "object") {
-    veldenJson = JSON.stringify(velden);
     const labels = [
       ["Werkuren", velden.werkuren],
       ["Thuiswerk", velden.thuiswerk],
@@ -194,10 +193,13 @@ async function updateAfspraken(req, res) {
       ["Extra info", velden.extra]
     ];
     tekst = labels.filter(([, v]) => v && String(v).trim()).map(([k, v]) => `${k}: ${v}`).join("\n");
+    // Alleen als er minstens één veld effectief ingevuld is, bewaren we de gestructureerde data;
+    // een volledig leeg veldenobject mag niet als "gedeeld" tellen.
+    if (tekst.trim() !== "") veldenJson = JSON.stringify(velden);
   }
 
   if ((tekst === undefined || tekst === null || String(tekst).trim() === "") && !veldenJson) {
-    return fail(res, 400, "Veld 'afspraken' of 'velden' ontbreekt");
+    return fail(res, 400, "Vul minstens één praktische afspraak in voor je ze deelt");
   }
 
   try {
