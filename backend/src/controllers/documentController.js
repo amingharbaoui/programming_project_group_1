@@ -285,13 +285,14 @@ async function approveDocument(req, res) {
       return fail(res, 409, "Dit document is niet meer in behandeling en kan niet goedgekeurd worden");
     }
 
+    // Conditioneel op de status zodat twee gelijktijdige controles (twee admins) elkaar niet overschrijven (394).
     const [r] = await db.query(
       `UPDATE documenten
        SET status = 'goedgekeurd', afkeurreden = NULL, gecontroleerd_door_id = ?, gecontroleerd_op = NOW(), aangepast_op = NOW()
-       WHERE id = ?`,
+       WHERE id = ? AND status IN ('ingediend', 'in_controle')`,
       [Number(req.user?.id), id]
     );
-    if (r.affectedRows === 0) return fail(res, 404, "Document niet gevonden");
+    if (r.affectedRows === 0) return fail(res, 409, "Dit document is ondertussen al verwerkt; vernieuw de pagina");
 
     try {
       const studentId = await getDocumentStudentId(id);
@@ -326,13 +327,14 @@ async function rejectDocument(req, res) {
       return fail(res, 409, "Dit document is niet meer in behandeling en kan niet afgekeurd worden");
     }
 
+    // Conditioneel op de status zodat twee gelijktijdige controles elkaar niet overschrijven (394).
     const [r] = await db.query(
       `UPDATE documenten
        SET status = 'afgekeurd', afkeurreden = ?, gecontroleerd_door_id = ?, gecontroleerd_op = NOW(), aangepast_op = NOW()
-       WHERE id = ?`,
+       WHERE id = ? AND status IN ('ingediend', 'in_controle')`,
       [reden, Number(req.user?.id), id]
     );
-    if (r.affectedRows === 0) return fail(res, 404, "Document niet gevonden");
+    if (r.affectedRows === 0) return fail(res, 409, "Dit document is ondertussen al verwerkt; vernieuw de pagina");
 
     try {
       const studentId = await getDocumentStudentId(id);
@@ -365,8 +367,12 @@ async function serveBestand(req, res) {
 
   // Eigenaarschap: enkel betrokkenen van het dossier mogen het bestand openen (administratie alles).
   try {
-    const [users] = await db.query("SELECT hoofdrol FROM gebruikers WHERE id = ? LIMIT 1", [sessie.id]);
-    const rol = users[0]?.hoofdrol;
+    const [users] = await db.query("SELECT hoofdrol, status FROM gebruikers WHERE id = ? LIMIT 1", [sessie.id]);
+    // Zelfde regel als de auth-middleware: een gedeactiveerde gebruiker mag geen bestanden meer openen (392).
+    if (!users[0] || users[0].status !== "actief") {
+      return res.status(401).json({ success: false, message: "Sessie niet meer geldig" });
+    }
+    const rol = users[0].hoofdrol;
     if (rol !== "administratie") {
       const [docs] = await db.query(
         `SELECT d.student_id, d.mentor_id, d.stagebegeleider_id
