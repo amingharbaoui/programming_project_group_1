@@ -227,6 +227,14 @@ export default function StudentEvaluationPage() {
   const [melding, setMelding]     = useState(null);
   const [openComp, setOpenComp]   = useState(null); // competentie object
   const [activeType, setActiveType] = useState(null); // null = automatische keuze (tussentijds/finaal)
+  const [verslagPopup, setVerslagPopup] = useState(null); // 535: { type } auto-popup "Verslag beschikbaar"
+  const [verslagGezien, setVerslagGezien] = useState(() => new Set());
+
+  // 535: pop-up zodra een (tussentijdse/finale) evaluatie geregistreerd is en de student dat nog niet zag.
+  useEffect(() => {
+    const ev = (data?.evaluaties || []).find((e) => e.status === "geregistreerd" && !verslagGezien.has(e.id));
+    setVerslagPopup(ev ? { id: ev.id, type: ev.type } : null);
+  }, [data, verslagGezien]);
 
   async function laadData() {
     setLoading(true);
@@ -433,6 +441,29 @@ export default function StudentEvaluationPage() {
 
   return (
     <div className="page-inner">
+
+      {verslagPopup && (
+        <div className="modal_overlay" onClick={() => setVerslagGezien((p) => new Set(p).add(verslagPopup.id))}>
+          <div className="modal_box" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal_header">
+              <span className="modal_title">Verslag beschikbaar</span>
+              <button className="icon_btn" onClick={() => setVerslagGezien((p) => new Set(p).add(verslagPopup.id))}><i className="ti ti-x" /></button>
+            </div>
+            <div className="modal_body">
+              <p className="muted" style={{ marginTop: 0, fontSize: 12.5 }}>
+                {verslagPopup.type === "finaal" ? "Finale evaluatie" : "Tussentijdse evaluatie"} · geregistreerd door je docent
+              </p>
+              <p style={{ margin: 0, fontSize: 14, color: "var(--dark)" }}>
+                Je {verslagPopup.type === "finaal" ? "finale" : "tussentijdse"} evaluatie is geregistreerd. Je vindt de scores en feedback van iedereen als document bij Documenten.
+              </p>
+            </div>
+            <div className="modal_footer">
+              <button className="btn" onClick={() => setVerslagGezien((p) => new Set(p).add(verslagPopup.id))}>Later</button>
+              <button className="btn primary" onClick={() => { setVerslagGezien((p) => new Set(p).add(verslagPopup.id)); navigate("/student/documents"); }}>Bekijk verslag</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {openComp && (
         <CompModal
