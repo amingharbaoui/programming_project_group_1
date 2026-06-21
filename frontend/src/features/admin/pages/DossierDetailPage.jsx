@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import "./DossierDetailPage.css";
 import "../../../index.css";
 import api, { fileUrl } from "../../../services/api";
+import { cacheDelete } from "../adminCache";
 import {
   IconArrowLeft,
   IconFolder,
@@ -182,6 +183,8 @@ export default function DossierDetailPage() {
       setError("");
       const res = await api.get(`/admin/dossiers/${id}`);
       setDossier(res.data.data);
+      // De overzichtslijst-cache invalideren zodat statuswijzigingen daar niet stale blijven.
+      cacheDelete("admin_dossiers");
     } catch (err) {
       setError(err.response?.data?.message || "Dossier ophalen mislukt");
     } finally {

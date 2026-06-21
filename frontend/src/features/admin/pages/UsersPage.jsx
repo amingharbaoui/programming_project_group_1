@@ -398,7 +398,7 @@ export default function UsersPage() {
           rawUser={wijzigenTarget}
           koppeling={wijzigenTarget.koppeling || "-"}
           onClose={() => setWijzigenTarget(null)}
-          onSaved={() => { setWijzigenTarget(null); loadUsers(); showToast("Gebruiker opgeslagen."); }}
+          onSaved={() => { setWijzigenTarget(null); cacheDelete("admin_users"); loadUsers(); showToast("Gebruiker opgeslagen."); }}
           onDeactiveerClick={() => setBevestigTarget(wijzigenTarget)}
         />
       )}
@@ -414,6 +414,7 @@ export default function UsersPage() {
           onClose={() => setUitnodigingOpen(false)}
           onSaved={() => {
             setUitnodigingOpen(false);
+            cacheDelete("admin_users");
             loadUsers();
             showToast("Mentor uitgenodigd — activatielink verstuurd.");
           }}
@@ -424,6 +425,7 @@ export default function UsersPage() {
           onClose={() => setAlgemeenOpen(false)}
           onSaved={() => {
             setAlgemeenOpen(false);
+            cacheDelete("admin_users");
             loadUsers();
             showToast("Gebruiker uitgenodigd.");
           }}
