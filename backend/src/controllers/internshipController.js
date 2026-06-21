@@ -733,7 +733,9 @@ async function getCommitteeApplications(req, res) {
 
         b.beslissing AS laatste_beslissing,
         b.feedback AS laatste_feedback,
-        b.beslist_op AS laatste_beslist_op
+        b.beslist_op AS laatste_beslist_op,
+        b.motivering AS laatste_motivering,
+        b.uitzondering_motivering AS laatste_uitzondering_motivering
       FROM stagevoorstellen sp
       JOIN studenten s ON s.gebruiker_id = sp.student_id
       JOIN gebruikers g ON g.id = s.gebruiker_id

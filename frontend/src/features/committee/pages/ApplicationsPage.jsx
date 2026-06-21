@@ -52,12 +52,17 @@ function statusKlasse(status) {
   return "s_grijs";
 }
 
+function isGoedgekeurdStatus(status) {
+  return ["goedgekeurd", "goedgekeurd_met_uitzondering"].includes(status);
+}
+
 function statusIconKlasse(status) {
   return {
     ingediend:             "ti-hourglass",
     aanpassingen_gevraagd: "ti-message-circle",
     heringediend:          "ti-refresh",
     goedgekeurd:           "ti-check",
+    goedgekeurd_met_uitzondering: "ti-check",
     afgekeurd:             "ti-x",
     ingetrokken:           "ti-arrow-back-up",
   }[status] || "ti-hourglass";
@@ -69,6 +74,7 @@ function stappenIndex(status) {
     aanpassingen_gevraagd: 2,
     heringediend:          1,
     goedgekeurd:           3,
+    goedgekeurd_met_uitzondering: 3,
     afgekeurd:             3,
     ingetrokken:           3,
   }[status] ?? 1;
@@ -81,6 +87,7 @@ function stappenSubs(status, aanvraag) {
     aanpassingen_gevraagd: [ingDatum, "Feedback verstuurd", "Aanpassingen vereist", ""],
     heringediend:          [ingDatum, "Herbeoordeling", "", ""],
     goedgekeurd:           [ingDatum, "Afgerond", "Goedgekeurd", "Dossier opstarten"],
+    goedgekeurd_met_uitzondering: [ingDatum, "Afgerond", "Goedgekeurd (uitzondering)", "Dossier opstarten"],
     afgekeurd:             [ingDatum, "Afgerond", "Afgekeurd", "Geen dossier"],
     ingetrokken:           [ingDatum, "Gestopt", "Ingetrokken door student", "Geen dossier"],
   }[status] || ["", "", "", ""];
@@ -607,7 +614,7 @@ function AanvraagView({ aanvraag, onTerug, onBeslissing }) {
   const status     = aanvraag.status;
   const isBeslis   = ["ingediend", "heringediend"].includes(status);
   const isWacht    = status === "aanpassingen_gevraagd";
-  const isGoed     = status === "goedgekeurd";
+  const isGoed     = isGoedgekeurdStatus(status);
   const isAfgekeurd = status === "afgekeurd";
   const isIngetrokken = status === "ingetrokken";
   const heeftMeerdereVersies = aanvraag.huidige_versie_nummer > 1;
@@ -862,13 +869,13 @@ function OverzichtView({ aanvragen, loading, fout, onVernieuwen, onOpen }) {
     { lbl: "Nieuwe aanvragen", n: aanvragen.filter((a) => a.status === "ingediend").length,             ic: "ti-file-plus" },
     { lbl: "Heringediend",     n: aanvragen.filter((a) => a.status === "heringediend").length,           ic: "ti-refresh" },
     { lbl: "Wacht op student", n: aanvragen.filter((a) => a.status === "aanpassingen_gevraagd").length,  ic: "ti-hourglass" },
-    { lbl: "Afgerond",         n: aanvragen.filter((a) => ["goedgekeurd","afgekeurd","ingetrokken"].includes(a.status)).length, ic: "ti-circle-check" },
+    { lbl: "Afgerond",         n: aanvragen.filter((a) => isGoedgekeurdStatus(a.status) || ["afgekeurd","ingetrokken"].includes(a.status)).length, ic: "ti-circle-check" },
   ];
 
   /* Filter (nieuw+heringediend / afgerond / alle) */
   const zichtbaar = aanvragen.filter((a) => {
     if (filter === "open") return kanBeslissen(a.status);
-    if (filter === "afgerond") return ["goedgekeurd", "afgekeurd", "ingetrokken"].includes(a.status);
+    if (filter === "afgerond") return isGoedgekeurdStatus(a.status) || ["afgekeurd", "ingetrokken"].includes(a.status);
     return true;
   });
 
