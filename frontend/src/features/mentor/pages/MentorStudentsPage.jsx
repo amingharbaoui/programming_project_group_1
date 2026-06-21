@@ -149,7 +149,7 @@ export default function MentorStudentsPage() {
                     <td
                       style={{ cursor: "pointer" }}
                       title="Open de evaluatie"
-                      onClick={() => navigate(`/mentor/evaluations?student=${s.id}`)}
+                      onClick={() => navigate(`/mentor/evaluation?student=${s.id}`)}
                     >
                       <span className={`status ${eb.cls}`}>
                         {eb.icon && <i className={`ti ${eb.icon}`} />}{eb.txt}
