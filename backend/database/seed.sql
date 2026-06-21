@@ -1,3 +1,7 @@
+-- LET OP: dit is een OUDE seed met placeholder-auth (SSO-gebruikers zonder wachtwoord).
+-- Gebruik voor de demo ALTIJD `node scripts/seed-demo.js` (wachtwoord Demo!2026 voor alle accounts).
+-- Dit bestand niet gebruiken voor de presentatie.
+
 USE stageify;
 
 INSERT INTO gebruikers
