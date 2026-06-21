@@ -69,6 +69,7 @@ async function main() {
       [15, "Aya", "Startklaar", "student.startklaar@ehb.be", "student", "actief"],
       [16, "Liam", "Loopt", "student.loopt@ehb.be", "student", "actief"],
       [17, "Nora", "Afgerond", "student.afgerond@ehb.be", "student", "actief"],
+      [23, "Tess", "Concept", "student.concept@ehb.be", "student", "actief"],
     ];
     for (const [id, vn, an, email, rol, status] of users) {
       const provider = rol === "mentor" ? "local" : "school_sso";
@@ -141,7 +142,8 @@ async function main() {
       (14,'S0014','Toegepaste Informatica','1TI-B','2025-2026'),
       (15,'S0015','Toegepaste Informatica','1TI-B','2025-2026'),
       (16,'S0016','Toegepaste Informatica','1TI-B','2025-2026'),
-      (17,'S0017','Toegepaste Informatica','1TI-B','2025-2026')`);
+      (17,'S0017','Toegepaste Informatica','1TI-B','2025-2026'),
+      (23,'S0023','Toegepaste Informatica','1TI-B','2025-2026')`);
 
     /* ---------- VOORSTELLEN (versie-helper) ---------- */
     let vid = 1, vvid = 1;
@@ -179,6 +181,8 @@ async function main() {
     const vStart = await voorstel(15, "goedgekeurd", { docent: 3 });
     const vLoopt = await voorstel(16, "goedgekeurd");
     const vAfgerond = await voorstel(17, "goedgekeurd", { docent: 3 });
+    // Conceptfase-demo (na de vaste 1-9 zodat de bestaande voorstel-ids stabiel blijven).
+    await voorstel(23, "concept");
 
     /* ---------- BESLISSINGEN (feedback/afkeur) ---------- */
     await q(`INSERT INTO voorstel_beslissingen (stagevoorstel_id, stagevoorstel_versie_id, beslist_door_id, beslissing, feedback, motivering, beslist_op)

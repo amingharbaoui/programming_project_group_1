@@ -88,7 +88,8 @@ export default function Sidebar({ collapsed }) {
         warn.delete(STUDENT_KEY_PATHS[access.dot]);
       }
 
-      if (access.open.includes("documenten")) {
+      // In de eindfase (afgerond/resultaat vrijgegeven) is een document geen openstaande taak meer.
+      if (access.open.includes("documenten") && access.key !== "afgerond") {
         const [docsRes, soortenRes] = await Promise.allSettled([
           apiRequest("GET", "/documents/my"),
           apiRequest("GET", "/documents/soorten"),
