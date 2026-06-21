@@ -4,7 +4,6 @@ const {
   getAdminDossierById,
   updateAdminDossierStatus,
   assignDossier,
-  registerDossierStartklaar,
   generateEindoverzicht,
   sendContractReminder
 } = require("../controllers/internshipController");
@@ -22,7 +21,6 @@ router.get("/dossiers", getAdminDossiers);
 router.get("/dossiers/:id", getAdminDossierById);
 router.patch("/dossiers/:id/status", updateAdminDossierStatus);
 router.patch("/dossiers/:id/assign", assignDossier);
-router.patch("/dossiers/:id/startklaar", registerDossierStartklaar);
 router.patch("/dossiers/:id/overeenkomst/registreer", registerOvereenkomst);
 router.post("/dossiers/:id/eindoverzicht", generateEindoverzicht);
 router.post("/dossiers/:id/reminder", sendContractReminder);

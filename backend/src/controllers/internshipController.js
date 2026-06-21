@@ -1421,26 +1421,17 @@ async function updateAdminDossierStatus(req, res) {
   const { status, verzekeringInOrde, praktischeAfspraken } = req.body || {};
   const afkeurReden = (req.body?.afkeurReden ?? req.body?.afkeurreden ?? "").toString().trim();
 
-  // Status gelijkgetrokken naar de NL-enum van het schema. Engelse waarden worden voor de
-  // zekerheid nog vertaald, zodat een oudere frontend niet stuk gaat.
+  // Deze route is enkel bedoeld voor het afkeuren van een document (de enige actie die de UI hier doet).
+  // De échte workflowovergangen (geregistreerd, stage_loopt, resultaat_vrijgegeven, afgerond) horen via
+  // hun eigen geguarde routes te lopen — contractregistratie, evaluatievrijgave, eindoverzicht — zodat
+  // die niet stilzwijgend overgeslagen kunnen worden (auditpunt 325).
   const statusMap = {
-    contract_pending: "wacht_op_student",
-    documents_pending: "in_controle_bij_administratie",
-    active: "geregistreerd",
-    completed: "afgerond",
-    wacht_op_student: "wacht_op_student",
-    wacht_op_bedrijf: "wacht_op_bedrijf",
-    in_controle_bij_administratie: "in_controle_bij_administratie",
     document_afgekeurd: "document_afgekeurd",
-    geregistreerd: "geregistreerd",
-    stage_loopt: "stage_loopt",
-    resultaat_vrijgegeven: "resultaat_vrijgegeven",
-    afgerond: "afgerond"
   };
 
   const nieuweStatus = statusMap[status];
   if (!nieuweStatus) {
-    return fail(res, 400, "Ongeldige dossierstatus");
+    return fail(res, 400, "Ongeldige dossierstatus; gebruik de specifieke workflow-acties voor andere overgangen");
   }
 
   try {
