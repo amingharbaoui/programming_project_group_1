@@ -397,7 +397,7 @@ export default function MyInternshipPage() {
 
       <div className="page-header">
         <h1>{pageTitle}</h1>
-        <p>Academiejaar 2025-2026</p>
+        <p>Academiejaar {data?.academiejaar || "—"}</p>
       </div>
 
       {/* ── GEEN VOORSTEL ── */}

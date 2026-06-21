@@ -172,9 +172,27 @@ export default function DossierDetailPage() {
   const [docModal, setDocModal] = useState(null); // null | { id, naam }
 
   /* PDF preview */
-  const [preview, setPreview] = useState(null); // null | { naam, url }
+  const [preview, setPreview] = useState(null); // null | { naam, url, src, isBlob }
   const [iframeErr, setIframeErr] = useState(false);
-  function openPreview(url, naam) { if (url) setPreview({ naam, url }); }
+  function sluitPreview() {
+    setPreview((p) => { if (p?.isBlob && p.src) URL.revokeObjectURL(p.src); return null; });
+    setIframeErr(false);
+  }
+  async function openPreview(url, naam) {
+    if (!url) return;
+    // Geüploade bestanden lopen via de token-route; API-PDF's (bv. de gegenereerde contractfallback)
+    // hebben een Authorization-header nodig en kan een iframe niet sturen → als blob ophalen.
+    if (url.startsWith("/uploads/")) {
+      setPreview({ naam, url, src: fileUrl(url), isBlob: false });
+      return;
+    }
+    try {
+      const res = await api.get(url, { responseType: "blob" });
+      setPreview({ naam, url, src: URL.createObjectURL(res.data), isBlob: true });
+    } catch {
+      showToast("Voorbeeld kon niet geladen worden", "error");
+    }
+  }
   const [docReden, setDocReden] = useState("");
   const [docRedenError, setDocRedenError] = useState("");
 
@@ -554,7 +572,9 @@ export default function DossierDetailPage() {
         <div className="dd_doc_list">
           {docs.map((doc) => {
             const cfg = docStatusMap[doc.status] || { cls: "s_gray", label: doc.status };
-            const canAct = doc.bestand_naam && ["ingediend", "in_controle"].includes(doc.status);
+            // In de eindfase is documentcontrole read-only (backend blokkeert het ook).
+            const dossierReadOnly = ["resultaat_vrijgegeven", "afgerond"].includes(dossier.status);
+            const canAct = !dossierReadOnly && doc.bestand_naam && ["ingediend", "in_controle"].includes(doc.status);
             return (
               <div key={doc.id} className="dd_doc_ctrl_row">
                 <IconFileText size={15} stroke={1.8} className="dd_doc_ctrl_icon" />
@@ -1010,20 +1030,20 @@ export default function DossierDetailPage() {
 
       {/* PDF Preview */}
       {preview && (
-        <div className="modal_overlay" onClick={() => { setPreview(null); setIframeErr(false); }}>
+        <div className="modal_overlay" onClick={sluitPreview}>
           <div className="modal_box" style={{ maxWidth: 860, width: "92vw" }} onClick={(e) => e.stopPropagation()}>
             <div className="modal_header">
               <span className="modal_title">{preview.naam}</span>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <a href={fileUrl(preview.url)} target="_blank" rel="noreferrer" className="btn sm">
+                <a href={preview.src} target="_blank" rel="noreferrer" className="btn sm">
                   <IconFileExport size={13} stroke={2} /> Openen in nieuw venster
                 </a>
-                <button className="icon_close" onClick={() => { setPreview(null); setIframeErr(false); }}><IconX size={16} stroke={2} /></button>
+                <button className="icon_close" onClick={sluitPreview}><IconX size={16} stroke={2} /></button>
               </div>
             </div>
             <div className="modal_body" style={{ padding: 0 }}>
               {/\.(png|jpe?g|gif|webp)(\?|$)/i.test(preview.url) ? (
-                <img src={fileUrl(preview.url)} alt={preview.naam} style={{ maxWidth: "100%", display: "block", borderRadius: "0 0 14px 14px" }} />
+                <img src={preview.src} alt={preview.naam} style={{ maxWidth: "100%", display: "block", borderRadius: "0 0 14px 14px" }} />
               ) : iframeErr ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, height: "70vh", color: "var(--faint)" }}>
                   <IconFileOff size={40} stroke={1.4} />
@@ -1031,7 +1051,7 @@ export default function DossierDetailPage() {
                 </div>
               ) : (
                 <iframe
-                  src={fileUrl(preview.url)}
+                  src={preview.src}
                   title={preview.naam}
                   style={{ width: "100%", height: "70vh", border: "none", borderRadius: "0 0 14px 14px", display: "block" }}
                   onLoad={(e) => {

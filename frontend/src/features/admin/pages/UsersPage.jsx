@@ -59,10 +59,30 @@ function WijzigenModal({ rawUser, koppeling, onClose, onSaved, onDeactiveerClick
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  const [resendMsg, setResendMsg] = useState("");
   const isActief = rawUser.status === "actief";
+  // Uitgenodigde mentoren kunnen we opnieuw uitnodigen via de bestaande endpoint (heractiveren werkt niet
+  // op status 'uitgenodigd'). Zo is er een herstelpad als de mail niet aankwam.
+  const isUitgenodigdeMentor = rawUser.status === "uitgenodigd" && rawUser.hoofdrol === "mentor";
 
   function set(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  async function handleResend() {
+    setSaving(true); setErr(""); setResendMsg("");
+    try {
+      const res = await api.post(`/admin/invitations/${rawUser.id}/resend`);
+      const rel = res.data?.data?.activatielink;
+      const link = rel ? `${window.location.origin}${rel}` : "";
+      setResendMsg(res.data?.data?.emailStatus === "verzonden"
+        ? "Uitnodiging opnieuw verzonden per e-mail."
+        : `Uitnodiging vernieuwd. Bezorg de mentor deze link: ${link}`);
+    } catch (e) {
+      setErr(e.response?.data?.message || "Opnieuw versturen mislukt");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleSubmit() {
@@ -124,14 +144,21 @@ function WijzigenModal({ rawUser, koppeling, onClose, onSaved, onDeactiveerClick
             </select>
           </div>
           {err && <p className="modal_error">{err}</p>}
+          {resendMsg && <p className="status s_ok" style={{ fontSize: 12, wordBreak: "break-all" }}>{resendMsg}</p>}
         </div>
         <div className="modal_footer" style={{ justifyContent: "space-between" }}>
-          <button
-            className={`btn ${isActief ? "btn-danger" : "btn-success"}`}
-            onClick={onDeactiveerClick} type="button" disabled={saving}
-          >
-            {isActief ? "Deactiveren" : "Heractiveren"}
-          </button>
+          {isUitgenodigdeMentor ? (
+            <button className="btn btn-success" onClick={handleResend} type="button" disabled={saving}>
+              Uitnodiging opnieuw versturen
+            </button>
+          ) : (
+            <button
+              className={`btn ${isActief ? "btn-danger" : "btn-success"}`}
+              onClick={onDeactiveerClick} type="button" disabled={saving}
+            >
+              {isActief ? "Deactiveren" : "Heractiveren"}
+            </button>
+          )}
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn" onClick={onClose} type="button" disabled={saving}>Annuleren</button>
             <button className="btn primary" onClick={handleSubmit} disabled={saving} type="button">
@@ -176,7 +203,9 @@ function MentorUitnodigingModal({ onClose, onSaved }) {
   }
 
   if (resultaat) {
-    const link = resultaat.activatielink || resultaat.activationLink;
+    const relLink = resultaat.activatielink || resultaat.activationLink;
+    // Volledige link tonen zodat hij ook buiten de huidige site-context bruikbaar is (zelfde als bij algemene uitnodiging).
+    const link = relLink ? `${window.location.origin}${relLink}` : "";
     const mailVerzonden = resultaat.emailStatus === "verzonden";
     return (
       <div className="modal_overlay" onClick={onClose}>
@@ -501,7 +530,7 @@ export default function UsersPage() {
             <option value="">Alle rollen</option>
             <option value="student">Student</option>
             <option value="docent">Docent</option>
-            <option value="mentor-extern">Mentor</option>
+            <option value="mentor">Mentor</option>
             <option value="administratie">Administratie</option>
             <option value="stagecommissie">Stagecommissie</option>
           </select>

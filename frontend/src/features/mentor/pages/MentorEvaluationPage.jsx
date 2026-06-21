@@ -158,7 +158,7 @@ export default function MentorEvaluationPage() {
       <div className="page-inner">
           <div className="page-header">
             <h1>Evaluaties</h1>
-            <p>Competentieprofiel: Toegepaste Informatica 2025–2026 — de student motiveert, jij scoort als advies</p>
+            <p>Actief competentieprofiel — de student motiveert, jij scoort als advies</p>
           </div>
           {error && <div className="card"><span className="status s_rood">{error}</span></div>}
           {!error && studenten.length === 0 && <div className="card"><p style={{ color: "var(--sub)", fontSize: 13 }}>Geen stagiairs gevonden.</p></div>}
@@ -203,7 +203,7 @@ export default function MentorEvaluationPage() {
         </div>
         <div className="page-header">
           <h1>{detailStudent ? `${detailStudent.voornaam} ${detailStudent.achternaam}` : "Evaluatie"}</h1>
-          <p>Competentieprofiel: Toegepaste Informatica 2025–2026 · versie 1.0</p>
+          <p>Actief competentieprofiel</p>
         </div>
 
         {/* stepper */}

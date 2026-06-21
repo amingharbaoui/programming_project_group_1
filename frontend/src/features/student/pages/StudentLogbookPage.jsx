@@ -686,6 +686,8 @@ export default function StudentLogbookPage() {
   const [loadingGate, setLoadingGate] = useState(true);
   // Competentiechips komen uit het actieve competentieprofiel (configureerbaar), met de vaste lijst als fallback.
   const [competentieLijst, setCompetentieLijst] = useState(LO_COMPETENTIES);
+  // Minimum aantal uren komt uit de actieve stageregel (configureerbaar in instellingen); 456 als fallback.
+  const [minUren, setMinUren] = useState(456);
 
   // null = nieuwe week invullen, week-object = bestaande week bewerken
   const [editWeek, setEditWeek] = useState(null);
@@ -752,6 +754,14 @@ export default function StudentLogbookPage() {
         const comps = compRes?.data?.competenties || [];
         if (comps.length > 0) setCompetentieLijst(comps.map((c) => ({ code: c.code, naam: c.naam })));
       } catch { /* valt terug op de vaste lijst */ }
+
+      // Minimum uren uit de actieve stageregel (configureerbaar in instellingen).
+      try {
+        const setRes = await apiRequest("GET", "/internships/settings");
+        const regel = setRes?.data?.stageRegels?.[0];
+        const mu = Number(regel?.minimum_uren);
+        if (Number.isFinite(mu) && mu > 0) setMinUren(mu);
+      } catch { /* valt terug op 456 */ }
 
       setLoadingGate(false);
 
@@ -986,7 +996,7 @@ export default function StudentLogbookPage() {
     (sum, w) => sum + (BEVESTIGD_STATUSSEN.includes(w.status) ? (Number(w.totaal_uren) || 0) : 0),
     0
   );
-  const MIN_UREN = 456;
+  const MIN_UREN = minUren;
   const urenPct = Math.min(100, Math.round((totaalUrenBevestigd / MIN_UREN) * 100));
   const urenResterend = Math.max(0, MIN_UREN - totaalUrenBevestigd);
   const urenNogTeBevestigen = Math.max(0, totaalUrenIngediend - totaalUrenBevestigd);

@@ -25,7 +25,9 @@ function formatDate(v) {
 }
 
 function kanBeslissen(status) {
-  return ["ingediend", "heringediend", "aanpassingen_gevraagd"].includes(status);
+  // Enkel deze statussen zijn echt beslisbaar (gelijk aan de backend). 'aanpassingen_gevraagd'
+  // wacht op de student en hoort onder de aparte "Wacht op student"-filter, niet onder "open".
+  return ["ingediend", "heringediend"].includes(status);
 }
 
 function statusLabel(status) {
@@ -84,32 +86,34 @@ function stappenSubs(status, aanvraag) {
   }[status] || ["", "", "", ""];
 }
 
-/* ── Auto-hints berekenen op basis van aanvraagdata ── */
-function computeHints(aanvraag) {
-  if (!aanvraag) return CRITERIA_DEFS.map(() => ({ cls: "ok", txt: "Ok" }));
+/* ── Auto-hints per systeemcriterium (gekoppeld aan een stabiele id, niet aan positie) ──
+   Zo blijven hints bij het juiste criterium, ook als de admin criteria toevoegt/herordent.
+   Onbekende/custom criteria krijgen geen automatische hint. */
+function computeHints(aanvraag, minWeken = 12, minUren = 456) {
+  if (!aanvraag) return {};
   const weken = Number(aanvraag.aantal_weken) || 0;
   const uren  = Number(aanvraag.totaal_uren || aanvraag.uren_per_week * weken) || 0;
   const heeftMentorFunctie = !!(aanvraag.mentor_functie && aanvraag.mentor_functie.trim());
   const geldige = aanvraag.startdatum && aanvraag.einddatum &&
     new Date(aanvraag.startdatum) < new Date(aanvraag.einddatum);
 
-  return [
-    weken >= 12
+  return {
+    min_weken: weken >= minWeken
       ? { cls: "ok",  txt: `Ok — ${weken} weken` }
       : { cls: "nok", txt: `Niet ok — ${weken} weken` },
-    uren >= 456
+    min_uren: uren >= minUren
       ? { cls: "ok",  txt: `Ok — ${uren} uur` }
       : { cls: "nok", txt: `Niet ok — ${uren || "?"} uur` },
-    { cls: "ok", txt: "Beoordeel de opdrachtomschrijving" },
-    heeftMentorFunctie
+    it_relevant: { cls: "ok", txt: "Beoordeel de opdrachtomschrijving" },
+    tech_mentor: heeftMentorFunctie
       ? { cls: "ok",  txt: `Ok — ${aanvraag.mentor_functie}` }
       : { cls: "nok", txt: "Mentorfunctie ontbreekt" },
-    { cls: "ok", txt: "Beoordeel de opdrachtomschrijving" },
-    { cls: "ok", txt: "Ok" },
-    geldige
+    omschrijving: { cls: "ok", txt: "Beoordeel de opdrachtomschrijving" },
+    prof_omgeving: { cls: "ok", txt: "Ok" },
+    stagevenster: geldige
       ? { cls: "ok",  txt: `Ok — ${formatDate(aanvraag.startdatum)} – ${formatDate(aanvraag.einddatum)}` }
       : { cls: "nok", txt: "Controleer de data" },
-  ];
+  };
 }
 
 /* ══════════════════════════════════════════
@@ -219,6 +223,7 @@ function VoorstelKaart({ aanvraag, versie }) {
 function CriteriaKaart({ aanvraag, criteria, onChange, readonly, defs = CRITERIA_DEFS }) {
   const hints    = computeHints(aanvraag);
   const aangevinkt = defs.filter((c) => criteria[c.id]).length;
+  // hints zijn nu per criterium-id; custom criteria krijgen geen automatische hint.
 
   return (
     <div className="card">
@@ -229,8 +234,8 @@ function CriteriaKaart({ aanvraag, criteria, onChange, readonly, defs = CRITERIA
       <p style={{ fontSize: 11.5, color: "var(--sub)", margin: "-4px 0 10px" }}>
         Verplichte criteria — vink elk criterium af. Goedkeuren kan pas als alles in orde is, of met een expliciet gemotiveerde uitzondering.
       </p>
-      {defs.map((c, i) => {
-        const hint = hints[i] || { cls: "ok", txt: "" };
+      {defs.map((c) => {
+        const hint = hints[c.id] || { cls: "ok", txt: "" };
         const ok   = hint.cls === "ok";
         return (
           <label key={c.id} className={`comm-crit${ok ? "" : " nok"}`} style={{ cursor: readonly ? "default" : "pointer" }}>
