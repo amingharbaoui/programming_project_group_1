@@ -73,7 +73,8 @@ export default function MentorLogbooksPage() {
   const [error, setError] = useState("");
   const [openWeeks, setOpenWeeks] = useState(new Set());
   const [feedbackByWeek, setFeedbackByWeek] = useState({});
-  const [opmerkingByDay, setOpmerkingByDay] = useState({}); // per dag: optionele mentor-opmerking
+  const [opmerkingByDay, setOpmerkingByDay] = useState({}); // per dag: feedback tekst
+  const [openFeedbackDayId, setOpenFeedbackDayId] = useState(null); // welke dag heeft reageer-form open
   const [actionLoadingId, setActionLoadingId] = useState(null);
 
   useEffect(() => {
@@ -290,25 +291,35 @@ export default function MentorLogbooksPage() {
                         <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--sub)" }}>
                           {d.aantal_uren || 0}u
                         </span>
-                        {!geenStage && kanDagBevestigen && (
-                          <span style={{ marginLeft: 8 }}>
-                            {d.mentor_bevestigd_op ? (
-                              <span className="status s_ok"><i className="ti ti-check" />Dag bevestigd</span>
-                            ) : (
+                        {!geenStage && (
+                          <div style={{ display: "flex", gap: 6, marginLeft: 8, alignItems: "center" }}>
+                            {/* Bevestig dag knop */}
+                            {kanDagBevestigen && (
+                              d.mentor_bevestigd_op ? (
+                                <span className="status s_ok"><i className="ti ti-check" />Bevestig dag</span>
+                              ) : (
+                                <button
+                                  className="btn primary sm"
+                                  disabled={actionLoadingId === `dag-${d.id}`}
+                                  onClick={() => confirmDag(d.id)}
+                                >
+                                  <i className="ti ti-check" />Bevestig dag
+                                </button>
+                              )
+                            )}
+                            {!kanDagBevestigen && d.mentor_bevestigd_op && (
+                              <span className="status s_ok"><i className="ti ti-check" />Bevestig dag</span>
+                            )}
+                            {/* Reageer knop */}
+                            {(kanDagBevestigen || d.mentor_opmerking) && (
                               <button
-                                className="btn primary sm"
-                                disabled={actionLoadingId === `dag-${d.id}`}
-                                onClick={() => confirmDag(d.id)}
+                                className="btn sm"
+                                onClick={() => setOpenFeedbackDayId(openFeedbackDayId === d.id ? null : d.id)}
                               >
-                                <i className="ti ti-check" />Bevestig dag
+                                <i className="ti ti-message" />Reageer
                               </button>
                             )}
-                          </span>
-                        )}
-                        {!geenStage && !kanDagBevestigen && d.mentor_bevestigd_op && (
-                          <span style={{ marginLeft: 8 }}>
-                            <span className="status s_ok"><i className="ti ti-check" />Dag bevestigd</span>
-                          </span>
+                          </div>
                         )}
                       </div>
                       {!geenStage && (
@@ -321,24 +332,48 @@ export default function MentorLogbooksPage() {
                               {comps.map((c) => <span key={c} className="e-chip">{c}</span>)}
                             </div>
                           )}
-                          {/* Bestaande opmerking tonen als de dag al bevestigd is */}
-                          {d.mentor_bevestigd_op && d.mentor_opmerking && (
+                          {/* Bestaande opmerking + student reactie tonen */}
+                          {d.mentor_opmerking && openFeedbackDayId !== d.id && (
                             <div className="e-veld" style={{ marginTop: 4 }}>
-                              <b style={{ color: "var(--primary)" }}>Jouw opmerking</b>
+                              <b style={{ color: "var(--primary)" }}>Jouw feedback</b>
                               <span style={{ flex: 1 }}>{d.mentor_opmerking}</span>
                             </div>
                           )}
-                          {/* Opmerking invoerveld vóór bevestigen */}
-                          {kanDagBevestigen && !d.mentor_bevestigd_op && (
-                            <div style={{ marginTop: 6 }}>
-                              <input
-                                type="text"
+                          {d.student_reactie && (
+                            <div className="e-veld" style={{ marginTop: 2 }}>
+                              <b style={{ color: "var(--sub)" }}>Reactie student</b>
+                              <span style={{ flex: 1 }}>{d.student_reactie}</span>
+                            </div>
+                          )}
+                          {/* Inline reageer-formulier */}
+                          {openFeedbackDayId === d.id && (
+                            <div style={{ marginTop: 10, padding: "12px", background: "var(--surface, #f9fafb)", borderRadius: 8, border: "1px solid var(--border)" }}>
+                              <label style={{ fontSize: 12.5, fontWeight: 600, display: "block", marginBottom: 6 }}>
+                                Feedback bij {d.datum ? new Date(d.datum).toLocaleDateString("nl-BE", { weekday: "long", day: "numeric", month: "long" }).replace(/^\w/, c => c.toUpperCase()) : "deze dag"}
+                              </label>
+                              <textarea
                                 className="form_input"
-                                placeholder="Opmerking bij deze dag (optioneel)"
+                                rows={3}
                                 value={opmerkingByDay[d.id] || ""}
                                 onChange={(e) => setOpmerkingByDay((prev) => ({ ...prev, [d.id]: e.target.value }))}
-                                style={{ fontSize: 12.5 }}
+                                placeholder="Schrijf hier je feedback voor de student..."
+                                style={{ resize: "vertical" }}
                               />
+                              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                                <button
+                                  className="btn primary sm"
+                                  disabled={actionLoadingId === `dag-${d.id}`}
+                                  onClick={() => { confirmDag(d.id); setOpenFeedbackDayId(null); }}
+                                >
+                                  Verstuur
+                                </button>
+                                <button
+                                  className="btn sm"
+                                  onClick={() => { setOpenFeedbackDayId(null); setOpmerkingByDay((prev) => ({ ...prev, [d.id]: "" })); }}
+                                >
+                                  Annuleer
+                                </button>
+                              </div>
                             </div>
                           )}
                         </>
