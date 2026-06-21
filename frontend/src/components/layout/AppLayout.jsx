@@ -4,6 +4,7 @@ import { Outlet, Navigate, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 import { useAuth } from "../../context/AuthContext";
+import FlowPopups from "./FlowPopups";
 
 const PAD_ROL = [
   { prefix: "/student", rol: "student" },
@@ -42,6 +43,7 @@ export default function AppLayout() {
         <Navbar onToggle={() => setCollapsed((c) => !c)} />
 
         <main className="page-scroll">
+          <FlowPopups />
           <Outlet />
         </main>
       </div>

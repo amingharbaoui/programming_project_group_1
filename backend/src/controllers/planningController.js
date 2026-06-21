@@ -97,7 +97,7 @@ async function createPlanningMoment(req, res, type) {
     if (!dossier) return fail(res, 403, "Geen toegang tot dit dossier");
     // Planning is pas zinvol zodra de stage geregistreerd is (niet in de contract-/controlefase),
     // en niet meer nadat het dossier is vrijgegeven/afgerond.
-    if (!["geregistreerd", "stage_loopt"].includes(dossier.status)) {
+    if (!["geregistreerd", "actief", "stage_loopt"].includes(dossier.status)) {
       return fail(res, 409, "Planning kan enkel zolang de stage geregistreerd is of loopt");
     }
     // Zonder gekoppelde mentor kan een moment niet bevestigd worden (de mentor krijgt de melding) — blokkeer
@@ -475,7 +475,7 @@ async function listMyPlanning(req, res) {
 
   // De student ziet pas een moment nadat het goedgekeurd is — onbevestigde voorstellen blijven verborgen
   // tot mentor/docent akkoord zijn (zelfde flow als de meldingen).
-  const statusFilter = role === "student" ? " AND pm.status NOT IN ('voorgesteld', 'alternatief_gevraagd')" : "";
+  const statusFilter = role === "student" ? " AND pm.status IN ('bevestigd', 'gegeven', 'geweest')" : "";
 
   try {
     const [rows] = await db.query(

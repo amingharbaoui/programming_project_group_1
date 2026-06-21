@@ -4,6 +4,12 @@ import { useAuth } from "../../../context/AuthContext";
 import "./DocentPlanningPage.css";
 import { IconPlus, IconCheck, IconX, IconCalendarPlus, IconRefresh } from "@tabler/icons-react";
 import { cacheGet, cacheSet, cacheDelete } from "../docentCache";
+import {
+  canMarkMomentDone,
+  canPlanPresentation,
+  canPlanVisit,
+  planningStatusClass,
+} from "../../../utils/stageFlow";
 
 function formatDateTime(val) {
   if (!val) return "-";
@@ -13,12 +19,7 @@ function formatDateTime(val) {
 // Alle mogelijke statussen van planning_momenten:
 // voorgesteld · bevestigd · alternatief_gevraagd · gepland · gegeven · geweest · geannuleerd
 function getStatusClass(status) {
-  if (status === "bevestigd" || status === "gepland") return "s_ok";
-  if (status === "voorgesteld") return "s_amber";
-  if (status === "alternatief_gevraagd") return "s_amber";
-  if (status === "gegeven" || status === "geweest") return "s_info";
-  if (status === "geannuleerd") return "s_rood";
-  return "s_grijs";
+  return planningStatusClass(status);
 }
 
 function getStatusLabel(status, moment = {}) {
@@ -40,7 +41,7 @@ export default function DocentPlanningPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [bezig, setBezig] = useState(false);
-  const [succesModal, setSuccesModal] = useState("");
+  const [succesModal, setSuccesModal] = useState(null);
   const [foutModal, setFoutModal] = useState("");
 
   const [zoek, setZoek] = useState("");
@@ -59,6 +60,7 @@ export default function DocentPlanningPage() {
   const [altCounterDatum, setAltCounterDatum] = useState("");
   const [altCounterUur, setAltCounterUur] = useState("10:00");
   const [altCounterPlaats, setAltCounterPlaats] = useState("");
+  const isPresentatieNieuw = nieuwType === "Eindpresentatie";
 
   async function loadPlanning(force = false) {
     try {
@@ -97,6 +99,9 @@ export default function DocentPlanningPage() {
   const planbareStudenten = studenten.filter((s) =>
     ["geregistreerd", "stage_loopt", "actief"].includes(s.dossier_status)
   );
+  const studentenVoorNieuwType = planbareStudenten.filter((s) => {
+    return (isPresentatieNieuw ? canPlanPresentation(s) : canPlanVisit(s)).ok;
+  });
 
   function openModal(type = "Bedrijfsbezoek") {
     setNieuwModal(true);
@@ -106,7 +111,10 @@ export default function DocentPlanningPage() {
     setNieuwLocatie("");
     setNieuwDeelnemers("");
     setNieuwType(type);
-    setNieuwDossierId(planbareStudenten[0]?.dossier_id ? String(planbareStudenten[0].dossier_id) : "");
+    const lijst = type === "Eindpresentatie"
+      ? planbareStudenten.filter((s) => canPlanPresentation(s).ok)
+      : planbareStudenten.filter((s) => canPlanVisit(s).ok);
+    setNieuwDossierId(lijst[0]?.dossier_id ? String(lijst[0].dossier_id) : "");
   }
 
   // 521: per type een aparte lijst (twee secties zoals het docentprototype), met de zoekfilter erop.
@@ -127,6 +135,12 @@ export default function DocentPlanningPage() {
       setBezig(true);
       setFout("");
       const isPresentatie = nieuwType === "Eindpresentatie";
+      const student = planbareStudenten.find((s) => String(s.dossier_id) === String(nieuwDossierId));
+      const gate = isPresentatie ? canPlanPresentation(student) : canPlanVisit(student);
+      if (!gate.ok) {
+        setFout(gate.reason);
+        return;
+      }
       const endpoint = isPresentatie ? "/docent/planning/presentation" : "/docent/planning/visit";
       // Datum + uur samenvoegen tot één tijdstip (prototype gebruikt aparte velden).
       const geplandOp = `${nieuwDatum}T${nieuwUur || "00:00"}`;
@@ -140,7 +154,12 @@ export default function DocentPlanningPage() {
       cacheDelete("docent_planning");
       cacheDelete("docent_students");
       await loadPlanning(true);
-      setSuccesModal("Moment succesvol ingepland.");
+      setSuccesModal({
+        titel: isPresentatie ? "Eindpresentatie voorgesteld" : "Bedrijfsbezoek voorgesteld",
+        tekst: isPresentatie
+          ? "De mentor kreeg een melding om het presentatiemoment te bevestigen of een alternatief voor te stellen."
+          : "De mentor kreeg een melding om het bedrijfsbezoek te bevestigen of een alternatief voor te stellen.",
+      });
     } catch (err) {
       setFout(err.response?.data?.message || "Plannen mislukt.");
     } finally {
@@ -149,6 +168,12 @@ export default function DocentPlanningPage() {
   }
 
   async function markeerGegeven(id, type) {
+    const moment = planning.find((p) => p.id === id);
+    const gate = canMarkMomentDone(moment);
+    if (!gate.ok) {
+      setFoutModal(gate.reason);
+      return;
+    }
     const nieuweStatus = type === "bedrijfsbezoek" ? "geweest" : "gegeven";
     try {
       setGegevenId(id);
@@ -159,8 +184,14 @@ export default function DocentPlanningPage() {
       // 534: na een gegeven eindpresentatie de prototype-tekst tonen die naar de finale beoordeling leidt.
       setSuccesModal(
         nieuweStatus === "geweest"
-          ? "Het bedrijfsbezoek is gemarkeerd als geweest. Je kan nu de tussentijdse evaluatie registreren."
-          : "Eindpresentatie geregistreerd. Je kan nu de finale beoordeling invullen."
+          ? {
+              titel: "Bedrijfsbezoek geregistreerd",
+              tekst: "Je kan nu de tussentijdse bespreking verwerken zodra student en mentor hun input hebben ingediend.",
+            }
+          : {
+              titel: "Eindpresentatie geregistreerd",
+              tekst: "Je kan nu de finale beoordeling invullen.",
+            }
       );
     } catch (err) {
       setFoutModal(err.response?.data?.message || "Markeren mislukt");
@@ -179,7 +210,7 @@ export default function DocentPlanningPage() {
       cacheDelete("docent_planning");
       cacheDelete("docent_students");
       await loadPlanning(true);
-      setSuccesModal("Het voorgestelde moment is bevestigd. De mentor en student zijn verwittigd.");
+      setSuccesModal({ titel: "Moment bevestigd", tekst: "Het voorgestelde moment is bevestigd. De mentor en student zijn verwittigd." });
     } catch (err) {
       setFoutModal(err.response?.data?.message || "Bevestigen mislukt");
     } finally {
@@ -202,7 +233,7 @@ export default function DocentPlanningPage() {
       cacheDelete("docent_planning");
       cacheDelete("docent_students");
       await loadPlanning(true);
-      setSuccesModal("Tegenvoorstel verstuurd. De mentor kan het bevestigen of opnieuw een ander moment voorstellen.");
+      setSuccesModal({ titel: "Tegenvoorstel verstuurd", tekst: "De mentor kan het bevestigen of opnieuw een ander moment voorstellen." });
     } catch (err) {
       setFoutModal(err.response?.data?.message || "Tegenvoorstel versturen mislukt");
     } finally {
@@ -259,12 +290,13 @@ export default function DocentPlanningPage() {
     );
   }
 
-  // De eindpresentatie-flow is pas "aan de beurt" zodra er een bezoek geweest is (de tussentijdse fase loopt).
-  // 531: de eindpresentatie is pas inplanbaar nadat het bezoek geweest is én de tussentijdse evaluatie
-  // geregistreerd is — exact dezelfde regel als de backend-gate (499), zodat de knop niet 409 geeft.
-  const bezoekGeweest = bezoeken.some((p) => ["geweest", "gegeven"].includes(p.status));
-  const tussentijdsKlaar = studenten.some((s) => Number(s.tussentijds_geregistreerd) > 0);
-  const eindpresentatieKlaar = bezoekGeweest && tussentijdsKlaar;
+  // De eindpresentatie-flow is pas aan de beurt na bezoek én geregistreerde tussentijdse evaluatie.
+  const eindpresentatiePlanbaar = planbareStudenten.some(
+    (s) => canPlanPresentation(s).ok
+  );
+  const presentatieReden = eindpresentatiePlanbaar
+    ? ""
+    : (planbareStudenten.map((s) => canPlanPresentation(s).reason).find(Boolean) || "Registreer eerst het bedrijfsbezoek en de tussentijdse evaluatie.");
 
   return (
     <div className="page-inner">
@@ -313,13 +345,19 @@ export default function DocentPlanningPage() {
           <div className="card doc_students_card">
             <div className="card_title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <span><i className="ti ti-presentation" style={{ color: "var(--red)", marginRight: 6 }} />Eindpresentatie</span>
-              <button className="btn primary sm" disabled={!eindpresentatieKlaar} title={eindpresentatieKlaar ? "" : "Eerst het bedrijfsbezoek + tussentijdse evaluatie"} onClick={() => openModal("Eindpresentatie")}>
+              <button
+                className="btn primary sm"
+                disabled={!eindpresentatiePlanbaar}
+                title={presentatieReden}
+                onClick={() => openModal("Eindpresentatie")}
+              >
                 <IconPlus size={14} stroke={2} /> Inplannen
               </button>
             </div>
-            {!eindpresentatieKlaar && (
+            {!eindpresentatiePlanbaar && (
               <p className="muted" style={{ fontSize: 12.5, marginTop: 0 }}>
-                <i className="ti ti-info-circle" /> Nog niet aan de beurt — {!bezoekGeweest ? "markeer eerst het bedrijfsbezoek als geweest" : "registreer eerst de tussentijdse evaluatie"}.
+                <i className="ti ti-info-circle" /> Nog niet aan toe — registreer eerst het bedrijfsbezoek én de tussentijdse evaluatie.
+                {presentatieReden && <span> ({presentatieReden})</span>}
               </p>
             )}
             {planningTabel(presentaties, "Nog geen eindpresentatie ingepland.")}
@@ -333,24 +371,31 @@ export default function DocentPlanningPage() {
           <div className="modal_box" style={{ maxWidth: 480 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal_header">
               <span className="modal_title">
-                {nieuwType === "Eindpresentatie" ? "Eindpresentatie inplannen" : "Bedrijfsbezoek + tussentijdse inplannen"}
+                {isPresentatieNieuw ? "Eindpresentatie inplannen" : "Bedrijfsbezoek + tussentijdse evaluatie inplannen"}
               </span>
               <button className="icon_btn" onClick={() => setNieuwModal(false)}><IconX size={16} stroke={1.8} /></button>
             </div>
             <div className="modal_body">
+              {isPresentatieNieuw && (
+                <p className="muted" style={{ fontSize: 12, marginTop: 0 }}>
+                  <i className="ti ti-info-circle" /> Een eindpresentatie kan pas ingepland worden nadat het bedrijfsbezoek heeft plaatsgevonden én de tussentijdse evaluatie geregistreerd is.
+                </p>
+              )}
               <div className="form_group">
                 <label className="form_label">Student <span style={{ color: "var(--red)" }}>*</span></label>
                 <select className="form_input" value={nieuwDossierId} onChange={(e) => setNieuwDossierId(e.target.value)}>
                   <option value="">-- Kies een student --</option>
-                  {planbareStudenten.map((s) => (
+                  {studentenVoorNieuwType.map((s) => (
                     <option key={s.dossier_id} value={s.dossier_id}>
                       {s.voornaam} {s.achternaam}
                     </option>
                   ))}
                 </select>
-                {planbareStudenten.length === 0 && (
+                {studentenVoorNieuwType.length === 0 && (
                   <p className="muted" style={{ fontSize: 12, marginTop: 6 }}>
-                    Geen planbare studenten — planning kan pas zodra een stage geregistreerd is of loopt.
+                    {isPresentatieNieuw
+                      ? "Geen student is klaar voor een eindpresentatie — registreer eerst bedrijfsbezoek en tussentijdse evaluatie."
+                      : "Geen planbare studenten — registreer eerst de stage en koppel een mentor."}
                   </p>
                 )}
               </div>
@@ -437,16 +482,16 @@ export default function DocentPlanningPage() {
 
       {/* Success modal */}
       {succesModal && (
-        <div className="modal_overlay" onClick={() => setSuccesModal("")}>
+        <div className="modal_overlay" onClick={() => setSuccesModal(null)}>
           <div className="modal_box" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal_header">
-              <span className="modal_title">Bevestiging geregistreerd</span>
-              <button className="icon_btn" onClick={() => setSuccesModal("")}><IconX size={16} stroke={1.8} /></button>
+              <span className="modal_title">{succesModal.titel || "Bevestiging geregistreerd"}</span>
+              <button className="icon_btn" onClick={() => setSuccesModal(null)}><IconX size={16} stroke={1.8} /></button>
             </div>
             <div className="modal_body">
-              <p style={{ margin: 0, fontSize: 13, color: "var(--sub)" }}>{succesModal}</p>
+              <p style={{ margin: 0, fontSize: 13, color: "var(--sub)" }}>{succesModal.tekst || succesModal}</p>
               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 8 }}>
-                <button className="btn primary" onClick={() => setSuccesModal("")}>OK</button>
+                <button className="btn primary" onClick={() => setSuccesModal(null)}>OK</button>
               </div>
             </div>
           </div>

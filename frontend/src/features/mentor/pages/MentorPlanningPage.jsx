@@ -5,6 +5,7 @@ import { useAuth } from "../../../context/AuthContext";
 import "./MentorPlanningPage.css";
 import { cacheGet, cacheSet, cacheDelete } from "../mentorCache";
 import { kiesMentorStagiair, onthoudMentorDossier } from "../mentorSelection";
+import { planningStatusClass, planningStatusLabel } from "../../../utils/stageFlow";
 
 function formatDateTime(value) {
   if (!value) return "-";
@@ -15,21 +16,13 @@ function formatDateTime(value) {
 }
 
 function getBezoekStatusClass(status) {
-  if (status === "bevestigd") return "s_ok";
-  if (status === "alternatief_gevraagd") return "s_amber";
-  if (status === "gegeven") return "s_ok";
-  if (status === "geannuleerd") return "s_rood";
-  return "s_info";
+  return planningStatusClass(status);
 }
 
 function getBezoekStatusLabel(status) {
-  if (status === "voorgesteld") return "Te bevestigen";
-  if (status === "gepland") return "Gepland";
   if (status === "bevestigd") return "Bevestigd door jou";
-  if (status === "alternatief_gevraagd") return "Nieuw moment gevraagd";
   if (status === "gegeven") return "Heeft plaatsgevonden";
-  if (status === "geannuleerd") return "Geannuleerd";
-  return status || "-";
+  return planningStatusLabel({ status });
 }
 
 function getTypeLabel(type) {
@@ -58,7 +51,18 @@ export default function MentorPlanningPage() {
   const [altPlaats, setAltPlaats] = useState("");
   const [melding, setMelding] = useState({ id: null, tekst: "", type: "" });
   const [voorstelPopupId, setVoorstelPopupId] = useState(null); // 522: auto-popup voor een nieuw voorstel
-  const [gesloten, setGesloten] = useState(() => new Set()); // per planning-id: popup bewust gesloten
+  const [gesloten, setGesloten] = useState(() => {
+    try {
+      return new Set(
+        Object.keys(sessionStorage)
+          .filter((k) => k.startsWith("flow_popup_seen_") && k.includes("_mentor_planning_"))
+          .map((k) => Number(k.split("_mentor_planning_")[1]?.split("_")[0]))
+          .filter(Boolean)
+      );
+    } catch {
+      return new Set();
+    }
+  }); // per planning-id: popup bewust gesloten
 
   // 522: zodra de planning geladen is, automatisch de pop-up tonen voor het nieuwste nog te bevestigen
   // (voorgesteld/gepland) moment dat de mentor nog niet bewust sloot — net als het prototype.
@@ -140,6 +144,10 @@ export default function MentorPlanningPage() {
   }
 
   function sluitVoorstelPopup(id) {
+    try {
+      sessionStorage.setItem(`flow_popup_seen_${user.id}_mentor_planning_${id}_voorgesteld`, "1");
+      sessionStorage.setItem(`flow_popup_seen_${user.id}_mentor_planning_${id}_gepland`, "1");
+    } catch { /* ignore */ }
     setGesloten((prev) => new Set(prev).add(id));
     setVoorstelPopupId(null);
   }

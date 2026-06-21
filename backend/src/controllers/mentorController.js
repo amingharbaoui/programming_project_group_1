@@ -36,7 +36,13 @@ async function getMentorStudents(req, res) {
           WHERE e.stagedossier_id = sd.id
           ORDER BY FIELD(e.status, 'student_ingediend','open','mentor_ingediend','klaar_voor_docent','geregistreerd','klaar_voor_vrijgave','vrijgegeven','niet_open'), e.id DESC
           LIMIT 1
-        ) AS evaluatie_status
+        ) AS evaluatie_status,
+        (
+          SELECT COUNT(*) FROM planning_momenten pm
+          WHERE pm.stagedossier_id = sd.id
+            AND pm.type IN ('bedrijfsbezoek', 'eindpresentatie')
+            AND pm.status IN ('voorgesteld', 'gepland')
+        ) AS planning_te_bevestigen
       FROM stagedossiers sd
       JOIN studenten  st ON st.gebruiker_id = sd.student_id
       JOIN gebruikers  g ON g.id             = st.gebruiker_id

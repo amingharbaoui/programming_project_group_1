@@ -92,3 +92,22 @@
   border-top: 2.5px dotted #c9c9d2;
   margin-top: 17px;
 }
+
+.dd_actions {
+  display: grid;
+  gap: 10px;
+}
+
+.dd_action {
+  border: 1px solid #ececf1;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+
+.dd_action p {
+  margin: 8px 0 10px;
+  color: var(--sub);
+  font-size: 12.5px;
+  line-height: 1.55;
+}

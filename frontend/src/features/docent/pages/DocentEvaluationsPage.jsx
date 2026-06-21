@@ -5,6 +5,7 @@ import { useAuth } from "../../../context/AuthContext";
 import "./DocentEvaluationsPage.css";
 import { IconCircleCheck, IconEye, IconX } from "@tabler/icons-react";
 import { cacheGet, cacheSet, cacheDelete } from "../docentCache";
+import { evaluationGate, evaluationStatusLabel } from "../../../utils/stageFlow";
 
 // Alle mogelijke statussen van evaluaties:
 // niet_open · open · student_ingediend · mentor_ingediend · klaar_voor_docent
@@ -21,17 +22,10 @@ function getEvalStatusClass(status) {
 }
 
 function getEvalStatusLabel(status) {
-  const labels = {
-    niet_open:          "Nog niet beschikbaar",
-    open:               "Geopend",
-    student_ingediend:  "Student ingediend",
-    mentor_ingediend:   "Mentor ingediend",
-    klaar_voor_docent:  "Klaar om in te vullen",
-    geregistreerd:      "Geregistreerd",
-    klaar_voor_vrijgave:"Klaar om vrij te geven",
-    vrijgegeven:        "Vrijgegeven",
-  };
-  return labels[status] || status || "-";
+  if (status === "open") return "Geopend";
+  if (status === "klaar_voor_docent") return "Klaar om in te vullen";
+  if (status === "klaar_voor_vrijgave") return "Klaar om vrij te geven";
+  return evaluationStatusLabel(status);
 }
 
 // Korte fase-omschrijving van het dossier voor de evaluatielijst.
@@ -85,7 +79,7 @@ function ScoreDisplay({ waarde }) {
   );
 }
 
-function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, dossierStatus }) {
+function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, student }) {
   const evaluatie = evalData?.evaluaties?.find((e) => e.type === activeType) || null;
   const competenties = evalData?.competenties || [];
 
@@ -267,14 +261,16 @@ function EvalDetail({ evalData, activeType, userId, onRefresh, stagedossierId, d
   }
 
   if (!evaluatie || evaluatie.status === "niet_open") {
-    // De docent kan de evaluatie openen zodra de stage geregistreerd is of loopt (niet in contract-/eindfase).
-    const planbaar = ["geregistreerd", "stage_loopt", "actief"].includes(dossierStatus);
+    const gate = evaluationGate(activeType, evaluatie, student);
     return (
       <div className="card">
         <p className="muted" style={{ margin: 0 }}>
           {activeType === "tussentijds" ? "Tussentijdse" : "Finale"} evaluatie is nog niet beschikbaar.
         </p>
-        {planbaar && !evaluatie && (
+        {!gate.open && (
+          <p className="status s_grijs" style={{ marginTop: 10 }}>{gate.reason}</p>
+        )}
+        {gate.open && !evaluatie && (
           <div style={{ marginTop: 10 }}>
             <button className="btn primary sm" disabled={bezig} onClick={handleOpenEval}>
               <IconCircleCheck size={14} stroke={1.8} /> {activeType === "tussentijds" ? "Tussentijdse" : "Finale"} evaluatie openen
@@ -810,7 +806,7 @@ export default function DocentEvaluationsPage() {
               userId={geselecteerdId}
               onRefresh={() => { cacheDelete(`docent_eval_${geselecteerdId}`); cacheDelete("docent_students"); loadEval(geselecteerdId, true); }}
               stagedossierId={evalData.stagedossierId ?? geselecteerdeStudent?.dossier_id}
-              dossierStatus={geselecteerdeStudent?.dossier_status}
+              student={geselecteerdeStudent}
             />
           )}
         </>

@@ -52,16 +52,16 @@ function evalBadge(s) {
   return { cls: "s_grijs", icon: "ti-lock", txt: "Nog niet open" };
 }
 
-// Alle openstaande mentortaken in prioriteitsvolgorde (zoals het prototype: eerste actie + "+ x andere").
-function mentorTaken(s) {
-  const taken = [];
+function actiesVoorMentor(s) {
+  const acties = [];
   const ds = s.dossier_status;
-  const es = s.evaluatie_status;
-  if (ds === "wacht_op_bedrijf") taken.push("Stageovereenkomst ondertekenen");
-  if (ds === "geregistreerd") taken.push("Praktische afspraken delen");
-  if (s.logboek_status === "ingediend") taken.push("Logboek afchecken");
-  if (es === "student_ingediend") taken.push("Mentorinput invullen");
-  return taken;
+  if (ds === "wacht_op_bedrijf") acties.push("Stageovereenkomst ondertekenen");
+  if (ds === "geregistreerd") acties.push("Praktische afspraken delen");
+  if (Number(s.planning_te_bevestigen || 0) > 0) acties.push("Planning bevestigen");
+  if (s.logboek_status === "ingediend") acties.push("Logboek af te checken");
+  if (s.evaluatie_status === "student_ingediend" || s.evaluatie_status === "open") acties.push("Mentorinput invullen");
+  if (s.evaluatie_status === "mentor_ingediend") acties.push("Wacht op docent");
+  return acties;
 }
 
 export default function MentorStudentsPage() {
@@ -118,8 +118,8 @@ export default function MentorStudentsPage() {
               {studenten.map((s) => {
                 const lb = logboekBadge(s.logboek_status);
                 const eb = evalBadge(s);
-                const taken = mentorTaken(s);
-                const actie = taken[0] || null;
+                const acties = actiesVoorMentor(s);
+                const actie = acties[0] || null;
                 const pct = voortgangPct(s);
                 return (
                   <tr key={s.dossier_id ?? s.id}>
@@ -174,12 +174,16 @@ export default function MentorStudentsPage() {
                     {/* Actie */}
                     <td>
                       {actie ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 3, alignItems: "flex-start" }}>
-                          <span className="status s_rood"><span className="warn-mini">!</span>{actie}</span>
-                          {taken.length > 1 && (
-                            <span style={{ fontSize: 11, color: "var(--sub)" }}>+ {taken.length - 1} andere {taken.length - 1 === 1 ? "taak" : "taken"}</span>
+                        <>
+                          <span className="status s_rood">
+                            <span className="warn-mini">!</span>{actie}
+                          </span>
+                          {acties.length > 1 && (
+                            <div style={{ fontSize: 11, color: "var(--faint)", marginTop: 4 }}>
+                              + {acties.length - 1} andere {acties.length - 1 > 1 ? "taken" : "taak"}
+                            </div>
                           )}
-                        </div>
+                        </>
                       ) : (
                         <span className="status s_ok"><i className="ti ti-check" />Niets te doen</span>
                       )}

@@ -35,7 +35,18 @@ export default function StudentPlanningPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [popupMoment, setPopupMoment] = useState(null); // 525: auto-pop-up bij een bevestigd moment
-  const [gezien, setGezien] = useState(() => new Set());
+  const [gezien, setGezien] = useState(() => {
+    try {
+      return new Set(
+        Object.keys(sessionStorage)
+          .filter((k) => k.startsWith(`flow_popup_seen_${user.id}_planning_`))
+          .map((k) => Number(k.split("_planning_")[1]?.split("_")[0]))
+          .filter(Boolean)
+      );
+    } catch {
+      return new Set();
+    }
+  });
 
   // 525: zodra de planning geladen is, een pop-up tonen voor het nieuwste bevestigde moment dat de student
   // nog niet bevestigd-gezien heeft — net als het studentprototype ("Bedrijfsbezoek/Eindpresentatie ingepland").
@@ -75,12 +86,16 @@ export default function StudentPlanningPage() {
 
       {popupMoment && (() => {
         const isPres = popupMoment.type === "eindpresentatie";
+        const sluitPopup = () => {
+          try { sessionStorage.setItem(`flow_popup_seen_${user.id}_planning_${popupMoment.id}_${popupMoment.status}`, "1"); } catch {}
+          setGezien((p) => new Set(p).add(popupMoment.id));
+        };
         return (
-          <div className="modal_overlay" onClick={() => setGezien((p) => new Set(p).add(popupMoment.id))}>
+          <div className="modal_overlay" onClick={sluitPopup}>
             <div className="modal_box" style={{ maxWidth: 460 }} onClick={(e) => e.stopPropagation()}>
               <div className="modal_header">
                 <span className="modal_title">{isPres ? "Eindpresentatie ingepland" : "Bedrijfsbezoek ingepland"}</span>
-                <button className="icon_btn" onClick={() => setGezien((p) => new Set(p).add(popupMoment.id))}><i className="ti ti-x" /></button>
+                <button className="icon_btn" onClick={sluitPopup}><i className="ti ti-x" /></button>
               </div>
               <div className="modal_body">
                 <div className="card" style={{ marginBottom: 10 }}>
@@ -94,7 +109,7 @@ export default function StudentPlanningPage() {
                 </p>
               </div>
               <div className="modal_footer">
-                <button className="btn primary" onClick={() => setGezien((p) => new Set(p).add(popupMoment.id))}>Begrepen</button>
+                <button className="btn primary" onClick={sluitPopup}>Begrepen</button>
               </div>
             </div>
           </div>
