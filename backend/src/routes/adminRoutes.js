@@ -17,6 +17,17 @@ const router = express.Router();
 
 router.use(authenticateDemoUser, requireRole("administratie"));
 
+router.get("/docenten", async (req, res) => {
+  const db = require("../config/db");
+  const { ok, fail } = require("../utils/response");
+  try {
+    const [rows] = await db.query(
+      "SELECT id, voornaam, achternaam, email FROM gebruikers WHERE hoofdrol = 'docent' AND status = 'actief' ORDER BY achternaam ASC, voornaam ASC"
+    );
+    return ok(res, rows, "Docenten opgehaald");
+  } catch (e) { return fail(res, 500, "Ophalen mislukt", e.message); }
+});
+
 router.get("/dossiers", getAdminDossiers);
 router.get("/dossiers/:id", getAdminDossierById);
 router.patch("/dossiers/:id/status", updateAdminDossierStatus);

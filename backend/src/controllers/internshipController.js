@@ -1096,12 +1096,15 @@ async function createDossierAfterApproval(connection, stagevoorstelId, pendingMa
         throw new Error(`Het e-mailadres ${data.mentor_email} hoort bij een gebruiker die geen mentor is en kan niet als mentor gekoppeld worden`);
       }
       mentorId = bestaand[0].id;
-      const mentorRecordToken = crypto.randomBytes(24).toString("hex");
-      await connection.query(
-        `INSERT INTO mentoren (gebruiker_id, bedrijf_id, functie, mag_stageovereenkomst_tekenen, uitnodiging_status, uitnodiging_token, uitnodiging_vervalt_op)
-         VALUES (?, ?, ?, 1, 'verstuurd', ?, DATE_ADD(NOW(), INTERVAL 14 DAY))`,
-        [mentorId, data.bedrijf_id, data.mentor_functie || "Mentor", mentorRecordToken]
-      );
+      const [bestaandMentor] = await connection.query("SELECT gebruiker_id FROM mentoren WHERE gebruiker_id = ? LIMIT 1", [mentorId]);
+      if (bestaandMentor.length === 0) {
+        const mentorRecordToken = crypto.randomBytes(24).toString("hex");
+        await connection.query(
+          `INSERT INTO mentoren (gebruiker_id, bedrijf_id, functie, mag_stageovereenkomst_tekenen, uitnodiging_status, uitnodiging_token, uitnodiging_vervalt_op)
+           VALUES (?, ?, ?, 1, 'verstuurd', ?, DATE_ADD(NOW(), INTERVAL 14 DAY))`,
+          [mentorId, data.bedrijf_id, data.mentor_functie || "Mentor", mentorRecordToken]
+        );
+      }
     } else {
       const naam = String(data.mentor_naam || "").trim();
       const spatie = naam.indexOf(" ");

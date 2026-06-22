@@ -165,6 +165,8 @@ export default function DossierDetailPage() {
 
   /* modals */
   const [modal, setModal] = useState(null); // null | 'registreren' | 'afkeuren' | 'eindoverzicht' | 'herinnering'
+  const [docenten, setDocenten] = useState([]);
+  const [gekozenDocentId, setGekozenDocentId] = useState("");
   const [afkeurReden, setAfkeurReden] = useState("");
   const [afkeurError, setAfkeurError] = useState("");
 
@@ -255,7 +257,7 @@ export default function DossierDetailPage() {
   async function doRegistreer() {
     setActionLoading(true);
     try {
-      await api.patch(`/admin/dossiers/${id}/overeenkomst/registreer`);
+      await api.patch(`/admin/dossiers/${id}/overeenkomst/registreer`, gekozenDocentId ? { stagebegeleiderId: Number(gekozenDocentId) } : {});
       showToast("Stageovereenkomst geregistreerd — dossier compleet en startklaar.");
       setModal(null);
       load();
@@ -687,7 +689,7 @@ export default function DossierDetailPage() {
             <IconX size={14} stroke={2.5} />
             Afkeuren
           </button>
-          <button className="btn primary" disabled={!docsKlaar} onClick={() => docsKlaar && setModal("registreren")}>
+          <button className="btn primary" disabled={!docsKlaar} onClick={async () => { if (!docsKlaar) return; if (docenten.length === 0) { try { const r = await api.get("/admin/docenten"); setDocenten(r.data.data || []); } catch {} } setGekozenDocentId(dossier.stagebegeleider_id ? String(dossier.stagebegeleider_id) : ""); setModal("registreren"); }}>
             <IconCheck size={14} stroke={2.5} />
             Goedkeuren &amp; registreren
           </button>
@@ -885,6 +887,19 @@ export default function DossierDetailPage() {
               {dossier.startdatum && dossier.einddatum && (
                 <div className="kv"><span className="k">Periode</span><span className="v">{fmtDate(dossier.startdatum)} – {fmtDate(dossier.einddatum)}</span></div>
               )}
+              <div className="kv" style={{ alignItems: "center", marginTop: "0.75rem" }}>
+                <span className="k">Stagebegeleider</span>
+                <select
+                  value={gekozenDocentId}
+                  onChange={(e) => setGekozenDocentId(e.target.value)}
+                  style={{ flex: 1, padding: "0.35rem 0.5rem", borderRadius: "6px", border: "1px solid var(--border)", background: "var(--surface)", color: "var(--text)", fontSize: "0.9rem" }}
+                >
+                  <option value="">— Kies een docent —</option>
+                  {docenten.map((d) => (
+                    <option key={d.id} value={d.id}>{d.voornaam} {d.achternaam}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="modal_footer">
               <button className="btn" onClick={() => setModal(null)}>Annuleren</button>

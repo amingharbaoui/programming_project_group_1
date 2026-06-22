@@ -168,6 +168,7 @@ async function signContract(req, res) {
 async function registerOvereenkomst(req, res) {
   const dossierId = Number(req.params.id);
   const adminId = getUserId(req);
+  const nieuweDocentId = req.body.stagebegeleiderId ? Number(req.body.stagebegeleiderId) : null;
 
   if (!dossierId) return fail(res, 400, "Ongeldig dossier-id");
 
@@ -224,6 +225,13 @@ async function registerOvereenkomst(req, res) {
     if (regResult.affectedRows === 0) {
       await conn.rollback();
       return fail(res, 409, "Deze overeenkomst is ondertussen al geregistreerd of gewijzigd; vernieuw de pagina");
+    }
+
+    // Docent bijwerken indien meegegeven via de modal.
+    if (nieuweDocentId) {
+      const [docCheck] = await conn.query("SELECT id FROM gebruikers WHERE id = ? AND hoofdrol = 'docent' AND status = 'actief' LIMIT 1", [nieuweDocentId]);
+      if (docCheck.length === 0) { await conn.rollback(); return fail(res, 400, "Gekozen docent bestaat niet of is niet actief"); }
+      await conn.query("UPDATE stagedossiers SET stagebegeleider_id = ?, aangepast_op = NOW() WHERE id = ?", [nieuweDocentId, dossierId]);
     }
 
     // Verzekering in orde + dossier startklaar registreren. Forward-only: nooit een dossier dat al verder
