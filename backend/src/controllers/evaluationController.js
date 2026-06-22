@@ -619,9 +619,9 @@ async function calculateResult(req, res) {
           : (evaluatie.eindpresentatie_score != null ? Number(evaluatie.eindpresentatie_score) : null);
       }
       if (presentatie != null) presentatieScoreOpslaan = presentatie;
-      eindcijfer = presentatie != null
-        ? Math.round((competentie20 * 0.8 + presentatie * 0.2) * 100) / 100
-        : competentie20;
+      // Eindcijfer = 80% competenties + 20% presentatie, op /20 en netjes op 1 decimaal afgerond.
+      const ruw = presentatie != null ? (competentie20 * 0.8 + presentatie * 0.2) : competentie20;
+      eindcijfer = Math.round(Math.max(0, Math.min(20, ruw)) * 10) / 10;
     }
     const nieuweStatus = isFinaal ? "klaar_voor_vrijgave" : "geregistreerd";
 
