@@ -38,6 +38,10 @@ function markSeen(userId, item) {
   }
 }
 
+function isEindfase(status) {
+  return ["resultaat_vrijgegeven", "afgerond", "voltooid"].includes(status);
+}
+
 export default function FlowPopups() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -83,7 +87,9 @@ export default function FlowPopups() {
       try {
         const evalData = (await apiRequest("GET", `/evaluations/${user.id}`, null, { skipAuthRedirect: true })).data;
         const tussentijds = evalData?.evaluaties?.find((e) => e.type === "tussentijds");
-        if (tussentijds?.status === "geregistreerd" && (tussentijds.verslag || tussentijds.mentor_algemene_feedback)) {
+        const finaal = evalData?.evaluaties?.find((e) => e.type === "finaal");
+        const finaleAfgehandeld = ["klaar_voor_vrijgave", "vrijgegeven"].includes(finaal?.status);
+        if (!finaleAfgehandeld && tussentijds?.status === "geregistreerd" && (tussentijds.verslag || tussentijds.mentor_algemene_feedback)) {
           found.push({
             key: `verslag_${tussentijds.id}_${tussentijds.status}`,
             icon: "ti-file-text",
@@ -100,7 +106,8 @@ export default function FlowPopups() {
 
       try {
         const internship = (await apiRequest("GET", "/internships/my", null, { skipAuthRedirect: true })).data;
-        if (["goedgekeurd", "geregistreerd", "stage_loopt", "resultaat_vrijgegeven"].includes(internship?.status)) {
+        const dossierStatus = internship?.dossier_status || internship?.stagedossier_status || internship?.status;
+        if (internship?.status === "goedgekeurd" && !isEindfase(dossierStatus)) {
           found.push({
             key: `proposal_${internship.id || internship.dossier_id || user.id}_${internship.status}`,
             icon: "ti-circle-check",

@@ -38,7 +38,13 @@ function getFaseIdx(status, contractGetekend, gestart, dossierStatus) {
   return FASE_IDX[status] ?? 0;
 }
 
-function getSubs(status, contractGetekend, gestart) {
+function getSubs(status, contractGetekend, gestart, dossierStatus) {
+  if (dossierStatus === "resultaat_vrijgegeven") {
+    return ["Ingediend", "Goedgekeurd", "Geregistreerd", "Afgerond", "Vrijgegeven"];
+  }
+  if (["afgerond", "voltooid"].includes(dossierStatus)) {
+    return ["Ingediend", "Goedgekeurd", "Geregistreerd", "Afgerond", "Afgesloten"];
+  }
   if (status === "goedgekeurd" && contractGetekend && gestart)
     return ["Ingediend", "Goedgekeurd", "Geregistreerd", "Stage loopt", "—"];
   if (status === "goedgekeurd" && contractGetekend)
@@ -59,7 +65,7 @@ function getSubs(status, contractGetekend, gestart) {
 function ProgressBar({ status, contractGetekend, startdatum, dossierStatus }) {
   const gestart = isStageGestart(startdatum);
   const idx  = getFaseIdx(status, contractGetekend, gestart, dossierStatus);
-  const subs = getSubs(status, contractGetekend, gestart);
+  const subs = getSubs(status, contractGetekend, gestart, dossierStatus);
   return (
     <div className="steps">
       {FASES.map((fase, i) => {

@@ -27,19 +27,21 @@ CREATE TABLE IF NOT EXISTS `rubriek_scores` (
 );
 
 -- 5 standaard rubriek-criteria (admin kan aanpassen, deactiveren of toevoegen).
--- Idempotent: opnieuw uitvoeren maakt geen dubbele criteria aan.
+-- Idempotent: alleen toevoegen wanneer er nog geen actieve rubriek bestaat.
+-- Zo maken we geen dubbele set naast prototype-/demo-criteria.
+SET @has_active_rubriek = (SELECT COUNT(*) FROM `rubriek_criteria` WHERE `actief` = 1);
 INSERT INTO `rubriek_criteria` (`titel`, `volgorde`)
 SELECT 'Inhoud en technische diepgang', 1
-WHERE NOT EXISTS (SELECT 1 FROM `rubriek_criteria` WHERE `titel` = 'Inhoud en technische diepgang');
+WHERE @has_active_rubriek = 0;
 INSERT INTO `rubriek_criteria` (`titel`, `volgorde`)
 SELECT 'Structuur en opbouw', 2
-WHERE NOT EXISTS (SELECT 1 FROM `rubriek_criteria` WHERE `titel` = 'Structuur en opbouw');
+WHERE @has_active_rubriek = 0;
 INSERT INTO `rubriek_criteria` (`titel`, `volgorde`)
 SELECT 'Communicatie en presentatie', 3
-WHERE NOT EXISTS (SELECT 1 FROM `rubriek_criteria` WHERE `titel` = 'Communicatie en presentatie');
+WHERE @has_active_rubriek = 0;
 INSERT INTO `rubriek_criteria` (`titel`, `volgorde`)
 SELECT 'Beantwoording van vragen', 4
-WHERE NOT EXISTS (SELECT 1 FROM `rubriek_criteria` WHERE `titel` = 'Beantwoording van vragen');
+WHERE @has_active_rubriek = 0;
 INSERT INTO `rubriek_criteria` (`titel`, `volgorde`)
 SELECT 'Professionaliteit', 5
-WHERE NOT EXISTS (SELECT 1 FROM `rubriek_criteria` WHERE `titel` = 'Professionaliteit');
+WHERE @has_active_rubriek = 0;

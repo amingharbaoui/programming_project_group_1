@@ -77,13 +77,16 @@ async function main() {
       [DEMO_USER_IDS]
     ).catch(() => {});
 
-    for (const [titel, volgorde] of DEMO_RUBRIEK) {
-      await connection.query(
-        `INSERT INTO rubriek_criteria (titel, volgorde, actief)
-         SELECT ?, ?, 1
-         WHERE NOT EXISTS (SELECT 1 FROM rubriek_criteria WHERE titel = ?)`,
-        [titel, volgorde, titel]
-      );
+    const [[rubriekCheck]] = await connection.query(
+      "SELECT COUNT(*) AS aantal FROM rubriek_criteria WHERE actief = 1"
+    );
+    if (Number(rubriekCheck.aantal || 0) === 0) {
+      for (const [titel, volgorde] of DEMO_RUBRIEK) {
+        await connection.query(
+          "INSERT INTO rubriek_criteria (titel, volgorde, actief) VALUES (?, ?, 1)",
+          [titel, volgorde]
+        );
+      }
     }
 
     console.log("Demo-data klaar.");

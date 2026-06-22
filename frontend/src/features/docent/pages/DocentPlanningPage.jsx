@@ -294,6 +294,8 @@ export default function DocentPlanningPage() {
   const eindpresentatiePlanbaar = planbareStudenten.some(
     (s) => canPlanPresentation(s).ok
   );
+  const heeftEindpresentaties = planning.some((p) => p.type === "eindpresentatie");
+  const toonEindpresentatieInfo = !eindpresentatiePlanbaar && !heeftEindpresentaties;
   const presentatieReden = eindpresentatiePlanbaar
     ? ""
     : (planbareStudenten.map((s) => canPlanPresentation(s).reason).find(Boolean) || "Registreer eerst het bedrijfsbezoek en de tussentijdse evaluatie.");
@@ -345,16 +347,16 @@ export default function DocentPlanningPage() {
           <div className="card doc_students_card">
             <div className="card_title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <span><i className="ti ti-presentation" style={{ color: "var(--red)", marginRight: 6 }} />Eindpresentatie</span>
-              <button
-                className="btn primary sm"
-                disabled={!eindpresentatiePlanbaar}
-                title={presentatieReden}
-                onClick={() => openModal("Eindpresentatie")}
-              >
-                <IconPlus size={14} stroke={2} /> Inplannen
-              </button>
+              {eindpresentatiePlanbaar && (
+                <button
+                  className="btn primary sm"
+                  onClick={() => openModal("Eindpresentatie")}
+                >
+                  <IconPlus size={14} stroke={2} /> Inplannen
+                </button>
+              )}
             </div>
-            {!eindpresentatiePlanbaar && (
+            {toonEindpresentatieInfo && (
               <p className="muted" style={{ fontSize: 12.5, marginTop: 0 }}>
                 <i className="ti ti-info-circle" /> Nog niet aan toe — registreer eerst het bedrijfsbezoek én de tussentijdse evaluatie.
                 {presentatieReden && <span> ({presentatieReden})</span>}
