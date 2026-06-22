@@ -291,6 +291,9 @@ export default function DocentPlanningPage() {
   }
 
   // De eindpresentatie-flow is pas aan de beurt na bezoek én geregistreerde tussentijdse evaluatie.
+  const bedrijfsbezoekPlanbaar = planbareStudenten.some(
+    (s) => canPlanVisit(s).ok
+  );
   const eindpresentatiePlanbaar = planbareStudenten.some(
     (s) => canPlanPresentation(s).ok
   );
@@ -336,9 +339,11 @@ export default function DocentPlanningPage() {
           <div className="card doc_students_card" style={{ marginBottom: 16 }}>
             <div className="card_title" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
               <span><i className="ti ti-building" style={{ color: "var(--red)", marginRight: 6 }} />Bedrijfsbezoek + tussentijdse evaluatie</span>
-              <button className="btn primary sm" onClick={() => openModal("Bedrijfsbezoek")}>
-                <IconPlus size={14} stroke={2} /> Inplannen
-              </button>
+              {bedrijfsbezoekPlanbaar && (
+                <button className="btn primary sm" onClick={() => openModal("Bedrijfsbezoek")}>
+                  <IconPlus size={14} stroke={2} /> Inplannen
+                </button>
+              )}
             </div>
             {planningTabel(bezoeken, "Nog geen bedrijfsbezoek ingepland.")}
           </div>

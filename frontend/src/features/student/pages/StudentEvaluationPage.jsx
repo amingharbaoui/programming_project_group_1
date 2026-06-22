@@ -232,7 +232,12 @@ export default function StudentEvaluationPage() {
 
   // 535: pop-up zodra een (tussentijdse/finale) evaluatie geregistreerd is en de student dat nog niet zag.
   useEffect(() => {
-    const ev = (data?.evaluaties || []).find((e) => e.status === "geregistreerd" && !verslagGezien.has(e.id));
+    const evaluaties = data?.evaluaties || [];
+    const finaal = evaluaties.find((e) => e.type === "finaal");
+    const finaleAfgehandeld = ["klaar_voor_vrijgave", "vrijgegeven"].includes(finaal?.status);
+    const ev = finaleAfgehandeld
+      ? null
+      : evaluaties.find((e) => e.status === "geregistreerd" && !verslagGezien.has(e.id));
     setVerslagPopup(ev ? { id: ev.id, type: ev.type } : null);
   }, [data, verslagGezien]);
 
