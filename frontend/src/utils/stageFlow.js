@@ -122,7 +122,7 @@ export function evaluationStatusLabel(status) {
     niet_open: "Nog niet beschikbaar",
     open: "Open",
     student_ingediend: "Wacht op mentorinput",
-    mentor_ingediend: "Wacht op studentinput",
+    mentor_ingediend: "Wacht op docent",
     klaar_voor_docent: "Klaar voor docent",
     geregistreerd: "Geregistreerd",
     klaar_voor_vrijgave: "Klaar om vrij te geven",

@@ -27,9 +27,19 @@ CREATE TABLE IF NOT EXISTS `rubriek_scores` (
 );
 
 -- 5 standaard rubriek-criteria (admin kan aanpassen, deactiveren of toevoegen).
-INSERT INTO `rubriek_criteria` (`titel`, `volgorde`) VALUES
-  ('Inhoud en technische diepgang', 1),
-  ('Structuur en opbouw', 2),
-  ('Communicatie en presentatie', 3),
-  ('Beantwoording van vragen', 4),
-  ('Professionaliteit', 5);
+-- Idempotent: opnieuw uitvoeren maakt geen dubbele criteria aan.
+INSERT INTO `rubriek_criteria` (`titel`, `volgorde`)
+SELECT 'Inhoud en technische diepgang', 1
+WHERE NOT EXISTS (SELECT 1 FROM `rubriek_criteria` WHERE `titel` = 'Inhoud en technische diepgang');
+INSERT INTO `rubriek_criteria` (`titel`, `volgorde`)
+SELECT 'Structuur en opbouw', 2
+WHERE NOT EXISTS (SELECT 1 FROM `rubriek_criteria` WHERE `titel` = 'Structuur en opbouw');
+INSERT INTO `rubriek_criteria` (`titel`, `volgorde`)
+SELECT 'Communicatie en presentatie', 3
+WHERE NOT EXISTS (SELECT 1 FROM `rubriek_criteria` WHERE `titel` = 'Communicatie en presentatie');
+INSERT INTO `rubriek_criteria` (`titel`, `volgorde`)
+SELECT 'Beantwoording van vragen', 4
+WHERE NOT EXISTS (SELECT 1 FROM `rubriek_criteria` WHERE `titel` = 'Beantwoording van vragen');
+INSERT INTO `rubriek_criteria` (`titel`, `volgorde`)
+SELECT 'Professionaliteit', 5
+WHERE NOT EXISTS (SELECT 1 FROM `rubriek_criteria` WHERE `titel` = 'Professionaliteit');
