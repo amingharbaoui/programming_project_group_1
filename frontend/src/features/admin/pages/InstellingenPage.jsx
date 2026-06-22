@@ -47,6 +47,11 @@ export default function InstellingenPage() {
   const [verwijderRubriek, setVerwijderRubriek] = useState(null);
 
   const [toast, setToast] = useState(null);
+  const rubriekCriteriaGesorteerd = [...rubriekCriteria].sort((a, b) => {
+    const actiefVerschil = Number(Boolean(b.actief)) - Number(Boolean(a.actief));
+    if (actiefVerschil !== 0) return actiefVerschil;
+    return Number(a.volgorde || 0) - Number(b.volgorde || 0);
+  });
 
   function showToast(msg, type = "ok") {
     setToast({ msg, type });
@@ -626,7 +631,7 @@ export default function InstellingenPage() {
             {rubriekCriteria.length === 0 && (
               <tr><td colSpan="4" style={{ color: "var(--faint)", fontSize: 13, padding: "16px 8px" }}>Nog geen rubriekcriteria — voeg er hieronder een toe.</td></tr>
             )}
-            {rubriekCriteria.map((item) => {
+            {rubriekCriteriaGesorteerd.map((item) => {
               const isBewerken = bewerkRubriek?.id === item.id;
               return (
                 <tr key={item.id}>

@@ -37,6 +37,9 @@ function logboekBadge(status) {
 
 function evalBadge(s) {
   // 455: gebruik de échte evaluatiestatus wanneer die er is, niet enkel de dossierstatus.
+  const dossierStatus = s.dossier_status;
+  if (dossierStatus === "resultaat_vrijgegeven") return { cls: "s_ok", icon: "ti-award", txt: "Vrijgegeven" };
+  if (["afgerond", "voltooid"].includes(dossierStatus)) return { cls: "s_ok", icon: "ti-check", txt: "Afgerond" };
   const es = s.evaluatie_status;
   if (es && es !== "niet_open") {
     if (es === "vrijgegeven") return { cls: "s_ok", icon: "ti-award", txt: "Vrijgegeven" };
@@ -46,9 +49,6 @@ function evalBadge(s) {
     if (es === "student_ingediend") return { cls: "s_amber", icon: "ti-pencil", txt: "Jouw input nodig" };
     if (es === "open") return { cls: "s_amber", icon: "ti-pencil", txt: "Open — in te vullen" };
   }
-  const dossierStatus = s.dossier_status;
-  if (dossierStatus === "resultaat_vrijgegeven") return { cls: "s_ok", icon: "ti-award", txt: "Afgerond" };
-  if (["afgerond", "voltooid"].includes(dossierStatus)) return { cls: "s_ok", icon: "ti-check", txt: "Ingediend" };
   return { cls: "s_grijs", icon: "ti-lock", txt: "Nog niet open" };
 }
 
