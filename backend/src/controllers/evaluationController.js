@@ -919,6 +919,23 @@ async function downloadMyEindoverzicht(req, res) {
 // ── Rubriek eindpresentatie: lezen + scoren door de docent ──
 
 // Actieve rubriek-criteria + de (eventuele) scores van deze evaluatie. Leesbaar voor alle betrokkenen.
+// Enkel de actieve rubriekcriteria (waarop de eindpresentatie beoordeeld wordt) — zonder scores. Zo kan de
+// student vóór de presentatie zien waarop hij beoordeeld wordt. Geen evaluatie/dossier nodig.
+async function getRubriekCriteria(_req, res) {
+  try {
+    const [rows] = await db.query(
+      `SELECT id, titel, beschrijving, max_score, volgorde
+       FROM rubriek_criteria
+       WHERE actief = 1
+       ORDER BY volgorde ASC, id ASC`
+    );
+    return ok(res, { criteria: rows }, "Rubriekcriteria opgehaald");
+  } catch (_) {
+    // rubriek-tabellen nog niet gemigreerd → lege lijst i.p.v. een fout.
+    return ok(res, { criteria: [] }, "Rubriekcriteria opgehaald");
+  }
+}
+
 async function getRubriek(req, res) {
   const evaluationId = Number(req.params.evaluationId);
   if (!evaluationId) return fail(res, 400, "Ongeldig evaluatie-id");
@@ -1001,4 +1018,4 @@ async function saveRubriekScores(req, res) {
   }
 }
 
-module.exports = { openEvaluation, getEvaluationsForStudent, saveScores, calculateResult, releaseResult, getMyStudents, getMyFinalResult, downloadMyEindoverzicht, getRubriek, saveRubriekScores };
+module.exports = { openEvaluation, getEvaluationsForStudent, saveScores, calculateResult, releaseResult, getMyStudents, getMyFinalResult, downloadMyEindoverzicht, getRubriek, saveRubriekScores, getRubriekCriteria };

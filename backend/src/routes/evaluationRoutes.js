@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { authenticateDemoUser, requireRole } = require("../middleware/authMiddleware");
-const { openEvaluation, getEvaluationsForStudent, saveScores, calculateResult, releaseResult, getMyStudents, getRubriek, saveRubriekScores } = require("../controllers/evaluationController");
+const { openEvaluation, getEvaluationsForStudent, saveScores, calculateResult, releaseResult, getMyStudents, getRubriek, saveRubriekScores, getRubriekCriteria } = require("../controllers/evaluationController");
 
 router.use(authenticateDemoUser);
 
@@ -21,6 +21,10 @@ router.post("/:evaluationId/rubriek", requireRole("docent"), saveRubriekScores);
 // Docent berekent/registreert het resultaat en geeft het vrij.
 router.post("/:evaluationId/calculate", requireRole("docent", "administratie"), calculateResult);
 router.post("/:evaluationId/release", requireRole("docent", "administratie"), releaseResult);
+
+// Actieve presentatie-rubriekcriteria (enkel waarop beoordeeld wordt, géén scores) — zodat de student
+// vóór de presentatie weet waarop hij beoordeeld wordt. Vóór de /:studentId-wildcard!
+router.get("/rubriek-criteria", requireRole("student", "mentor", "docent", "administratie"), getRubriekCriteria);
 
 // Lezen door de betrokken rollen.
 router.get("/:studentId", requireRole("student", "mentor", "docent", "administratie"), getEvaluationsForStudent);

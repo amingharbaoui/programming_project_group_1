@@ -229,6 +229,14 @@ export default function StudentEvaluationPage() {
   const [activeType, setActiveType] = useState(null); // null = automatische keuze (tussentijds/finaal)
   const [verslagPopup, setVerslagPopup] = useState(null); // 535: { type } auto-popup "Verslag beschikbaar"
   const [verslagGezien, setVerslagGezien] = useState(() => new Set());
+  const [rubriekCriteria, setRubriekCriteria] = useState([]); // waarop de eindpresentatie beoordeeld wordt
+
+  // De student moet weten waarop de eindpresentatie beoordeeld wordt — actieve rubriekcriteria ophalen (read-only).
+  useEffect(() => {
+    apiRequest("GET", "/evaluations/rubriek-criteria")
+      .then((res) => setRubriekCriteria(res.data?.criteria || []))
+      .catch(() => setRubriekCriteria([]));
+  }, []);
 
   // 535: pop-up zodra een (tussentijdse/finale) evaluatie geregistreerd is en de student dat nog niet zag.
   useEffect(() => {
@@ -617,6 +625,27 @@ export default function StudentEvaluationPage() {
           <span key={n}><strong>{n}</strong> {SCORE_LBL[n]}</span>
         ))}
       </div>
+
+      {/* Zo word je beoordeeld bij de eindpresentatie — de criteria die de docent gebruikt (read-only). */}
+      {rubriekCriteria.length > 0 && (
+        <div className="card" style={{ marginTop: 14 }}>
+          <div className="card_title" style={{ marginBottom: 4 }}>
+            <i className="ti ti-presentation" style={{ color: "var(--red)", marginRight: 6 }} />
+            Zo word je beoordeeld bij de eindpresentatie
+          </div>
+          <p style={{ fontSize: 12.5, color: "var(--sub)", marginTop: 0 }}>
+            Je eindcijfer = <strong>80% competenties</strong> + <strong>20% presentatie</strong>. De docent scoort je presentatie op deze criteria:
+          </p>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13 }}>
+            {rubriekCriteria.map((c) => (
+              <li key={c.id} style={{ marginBottom: 4 }}>
+                <strong>{c.titel}</strong> <span style={{ color: "var(--faint)" }}>(op {c.max_score ?? 5})</span>
+                {c.beschrijving && <div style={{ fontSize: 12, color: "var(--sub)" }}>{c.beschrijving}</div>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Matrix */}
       <Matrix
